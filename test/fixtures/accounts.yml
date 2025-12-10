@@ -1,0 +1,21 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  plaid_item: one
+  account_id: MyString
+  mask: MyString
+  name: MyString
+  type: 
+  subtype: MyString
+  current_balance: 9.99
+  iso_currency_code: MyString
+
+two:
+  plaid_item: two
+  account_id: MyString
+  mask: MyString
+  name: MyString
+  type: 
+  subtype: MyString
+  current_balance: 9.99
+  iso_currency_code: MyString

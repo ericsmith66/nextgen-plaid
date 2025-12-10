@@ -1,0 +1,19 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  account: one
+  security_id: MyString
+  symbol: MyString
+  name: MyString
+  quantity: 9.99
+  cost_basis: 9.99
+  market_value: 9.99
+
+two:
+  account: two
+  security_id: MyString
+  symbol: MyString
+  name: MyString
+  quantity: 9.99
+  cost_basis: 9.99
+  market_value: 9.99

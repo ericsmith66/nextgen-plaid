@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NextGen Plaid</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+</head>
+
+<body style="margin:0; background:#0f172a; color:white; font-family:system-ui;">
+<% flash.each do |type, msg| %>
+  <div style="padding:1rem; text-align:center; background:<%= type == 'notice' ? '#166534' : '#7f1d1d' %>; color:<%= type == 'notice' ? '#34d399' : '#fca5a5' %>;">
+    <%= msg %>
+  </div>
+<% end %>
+
+<%= yield %>
+</body>
+</html>

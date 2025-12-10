@@ -1,0 +1,72 @@
+<div style="padding:80px; background:#0f172a; color:white; min-height:100vh; font-family:system-ui; text-align:center;">
+  <h1 style="font-size:80px; background:linear-gradient(to right,#60a5fa,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+    NEXTGEN WEALTH ADVISOR
+  </h1>
+  <h2 style="font-size:48px; color:#94a3b8; margin:60px 0;">
+    Welcome, <%= current_user.email.split("@").first.capitalize %>!
+  </h2>
+
+  <!-- CONNECT BUTTON -->
+  <div style="margin:100px 0;">
+    <button id="plaid-link-button" style="padding:40px 120px; font-size:48px; background:#0055ff; color:white; border:none; border-radius:30px; cursor:pointer; box-shadow:0 30px 60px rgba(0,85,255,0.6);">
+      CONNECT BROKERAGE ACCOUNT
+    </button>
+  </div>
+
+  <!-- HOLDINGS DISPLAY -->
+  <% if current_user.plaid_items.any? %>
+    <div style="margin:60px 0; background:#1e293b; padding:40px; border-radius:20px; text-align:left; max-width:1000px; margin-left:auto; margin-right:auto;">
+      <h2 style="color:#60a5fa;">Connected Accounts & Holdings</h2>
+      <% current_user.plaid_items.each do |item| %>
+        <h3><%= item.institution_name || "Sandbox Brokerage" %></h3>
+        <p>Total Value: <%= number_to_currency(item.accounts.sum(:current_balance) || 0) %></p>
+        <ul>
+          <% item.positions.limit(10).each do |pos| %>
+            <li style="margin:10px 0; padding:10px; background:#334155; border-radius:8px;">
+              <strong><%= pos.symbol %> (<%= pos.name %>)</strong> — <%= number_with_delimiter(pos.quantity.to_f.round(2)) %> shares — <%= number_to_currency(pos.market_value) %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+  <% else %>
+    <p style="color:#94a3b8; font-size:32px;">No accounts connected yet — click the button above!</p>
+  <% end %>
+</div>
+
+<!-- FINAL WORKING PLAID SCRIPT -->
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+    document.getElementById('plaid-link-button').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/plaid/link_token', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }
+            });
+            const data = await response.json();
+
+            const handler = Plaid.create({
+                token: data.link_token,
+                onSuccess: (public_token, metadata) => {
+                    console.log('Plaid success!', public_token, metadata);
+                    fetch('/plaid/exchange', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify({ public_token })
+                    })
+                        .then(() => location.reload())
+                        .catch(err => console.error('Exchange failed', err));
+                },
+                onExit: (err, metadata) => {
+                    console.log('Plaid exited', err, metadata);
+                }
+            });
+            handler.open();
+        } catch (err) {
+            console.error('Link failed', err);
+        }
+    });
+</script>

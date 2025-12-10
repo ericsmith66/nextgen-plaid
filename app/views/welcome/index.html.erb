@@ -1,0 +1,43 @@
+<!-- app/views/welcome/index.html.erb -->
+<div style="padding:60px; background:#0f172a; color:white; min-height:100vh; font-family:system-ui;">
+  <h1 style="font-size:72px; text-align:center; background:linear-gradient(to right,#60a5fa,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+    NEXTGEN PLAID DEBUG
+  </h1>
+
+  <div style="max-width:900px; margin:0 auto; background:#1e293b; padding:40px; border-radius:20px;">
+    <h2>Authentication Status</h2>
+    <p>Signed in? <%= user_signed_in? ? "YES" : "NO" %></p>
+    <p>Current user: <%= current_user.inspect %></p>
+    <p>Warden user: <%= request.env['warden']&.user.inspect %></p>
+
+    <hr style="border:1px solid #444; margin:40px 0;">
+
+    <% if user_signed_in? %>
+      <div style="background:#166534; padding:30px; border-radius:12px; text-align:center;">
+        <h2 style="color:#34d399;">✓ YOU ARE LOGGED IN</h2>
+        <p style="font-size:24px;">Email: <%= current_user.email %></p>
+        <%= button_to "LOGOUT", destroy_user_session_path, method: :delete, style: "padding:20px 60px; font-size:28px; background:#dc2626; color:white; border:none; border-radius:16px; cursor:pointer; margin-top:20px;" %>
+      </div>
+    <% else %>
+      <div style="background:#7f1d1d; padding:30px; border-radius:12px; text-align:center;">
+        <h2 style="color:#fca5a5;">✗ NOT LOGGED IN</h2>
+        <form action="<%= new_user_session_path %>" method="post" style="margin-top:30px;">
+          <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+          <input type="email" name="user[email]" value="ericsmith66@me.com" style="padding:16px; font-size:20px; width:320px; border-radius:12px; border:none; margin:10px;">
+          <input type="password" name="user[password]" value="E12345!" style="padding:16px; font-size:20px; width:320px; border-radius:12px; border:none; margin:10px;">
+          <button type="submit" style="padding:20px 80px; font-size:28px; background:#3b82f6; color:white; border:none; border-radius:16px; cursor:pointer;">
+            LOGIN AS ERIC
+          </button>
+        </form>
+      </div>
+    <% end %>
+
+    <hr style="border:1px solid #444; margin:40px 0;">
+
+    <h2>Routes Check</h2>
+    <p>Authenticated root exists? <%= Rails.application.routes.named_routes[:authenticated_root] ? "YES → #{authenticated_root_path}" : "NO" %></p>
+
+    <h2>Session Debug</h2>
+    <pre style="background:#000; padding:20px; border-radius:12px; overflow:auto;"><%= session.to_hash.inspect %></pre>
+  </div>
+</div>
