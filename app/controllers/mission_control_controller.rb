@@ -8,12 +8,14 @@ class MissionControlController < ApplicationController
     @recurring_transactions = RecurringTransaction.includes(:plaid_item).order(created_at: :desc).limit(20)
     @accounts = Account.includes(:plaid_item, :positions, :transactions).order(created_at: :desc)
     @positions = Position.includes(account: :plaid_item).order(created_at: :desc)
+    @liabilities = Liability.includes(account: :plaid_item).order(created_at: :desc)
   end
 
   def nuke
     # Delete in dependency order
     Transaction.delete_all
     Position.delete_all
+    Liability.delete_all
     RecurringTransaction.delete_all
     Account.delete_all
     SyncLog.delete_all
@@ -40,6 +42,16 @@ class MissionControlController < ApplicationController
       count += 1
     end
     flash[:notice] = "Enqueued transactions sync for #{count} item(s)."
+    redirect_to mission_control_path
+  end
+
+  def sync_liabilities_now
+    count = 0
+    PlaidItem.find_each do |item|
+      SyncLiabilitiesJob.perform_later(item.id)
+      count += 1
+    end
+    flash[:notice] = "Enqueued liabilities sync for #{count} item(s)."
     redirect_to mission_control_path
   end
 

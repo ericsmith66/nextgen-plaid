@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_11_105700) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_11_174900) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,6 +27,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_105700) do
     t.datetime "updated_at", null: false
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
+  end
+
+  create_table "liabilities", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "liability_id", null: false
+    t.string "liability_type"
+    t.decimal "current_balance", precision: 14, scale: 4
+    t.decimal "min_payment_due", precision: 14, scale: 4
+    t.decimal "apr_percentage", precision: 6, scale: 4
+    t.date "payment_due_date"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "liability_id"], name: "index_liabilities_on_account_id_and_liability_id", unique: true
+    t.index ["account_id"], name: "index_liabilities_on_account_id"
   end
 
   create_table "plaid_items", force: :cascade do |t|
@@ -113,6 +127,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_105700) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "liabilities", "accounts"
   add_foreign_key "plaid_items", "users"
   add_foreign_key "positions", "accounts"
   add_foreign_key "recurring_transactions", "plaid_items"

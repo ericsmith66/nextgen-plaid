@@ -125,6 +125,37 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "owner POST sync_liabilities_now enqueues one job per item" do
+    login_as(@owner, scope: :user)
+    PlaidItem.create!(user: @owner, item_id: "it_l1", institution_name: "A", access_token: "tok", status: "good")
+    PlaidItem.create!(user: @owner, item_id: "it_l2", institution_name: "B", access_token: "tok", status: "good")
+
+    assert_enqueued_jobs 2, only: SyncLiabilitiesJob do
+      post mission_control_sync_liabilities_now_path
+      assert_redirected_to mission_control_path
+    end
+  end
+
+  test "non-owner POST sync_liabilities_now enqueues nothing" do
+    login_as(@user, scope: :user)
+    PlaidItem.create!(user: @owner, item_id: "it_l3", institution_name: "C", access_token: "tok", status: "good")
+
+    assert_enqueued_jobs 0 do
+      post mission_control_sync_liabilities_now_path
+      assert_redirected_to authenticated_root_path
+    end
+  end
+
+  test "owner sees flash notice after Sync Liabilities Now" do
+    login_as(@owner, scope: :user)
+    PlaidItem.create!(user: @owner, item_id: "it_lflash1", institution_name: "A", access_token: "tok", status: "good")
+    post mission_control_sync_liabilities_now_path
+    assert_redirected_to mission_control_path
+    follow_redirect!
+    assert_response :success
+    assert_includes @response.body, "Enqueued liabilities sync for 1 item(s)."
+  end
+
   # Tiny integration tests for flash messages on sync buttons (Step: flash assertions)
   test "owner sees flash notice after Sync Holdings Now" do
     login_as(@owner, scope: :user)
