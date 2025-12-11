@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_11_101500) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_11_105700) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -58,6 +58,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_101500) do
     t.index ["account_id"], name: "index_positions_on_account_id"
   end
 
+  create_table "recurring_transactions", force: :cascade do |t|
+    t.bigint "plaid_item_id", null: false
+    t.string "stream_id", null: false
+    t.string "description"
+    t.decimal "average_amount", precision: 14, scale: 4
+    t.string "frequency"
+    t.string "stream_type"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["plaid_item_id", "stream_id"], name: "index_recurring_transactions_on_plaid_item_id_and_stream_id", unique: true
+    t.index ["plaid_item_id"], name: "index_recurring_transactions_on_plaid_item_id"
+  end
+
   create_table "sync_logs", force: :cascade do |t|
     t.bigint "plaid_item_id", null: false
     t.string "job_type", null: false
@@ -69,6 +82,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_101500) do
     t.index ["plaid_item_id", "created_at", "job_id"], name: "index_sync_logs_on_item_created_at_job"
     t.index ["plaid_item_id", "created_at"], name: "index_sync_logs_on_plaid_item_id_and_created_at"
     t.index ["plaid_item_id"], name: "index_sync_logs_on_plaid_item_id"
+  end
+
+  create_table "transactions", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "transaction_id", null: false
+    t.string "name"
+    t.decimal "amount", precision: 14, scale: 4
+    t.date "date"
+    t.string "category"
+    t.string "merchant_name"
+    t.boolean "pending", default: false
+    t.string "payment_channel"
+    t.string "iso_currency_code"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "transaction_id"], name: "index_transactions_on_account_id_and_transaction_id", unique: true
+    t.index ["account_id"], name: "index_transactions_on_account_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -85,5 +115,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_101500) do
 
   add_foreign_key "plaid_items", "users"
   add_foreign_key "positions", "accounts"
+  add_foreign_key "recurring_transactions", "plaid_items"
   add_foreign_key "sync_logs", "plaid_items"
+  add_foreign_key "transactions", "accounts"
 end

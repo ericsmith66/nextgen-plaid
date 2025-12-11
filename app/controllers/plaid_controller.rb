@@ -5,7 +5,7 @@ class PlaidController < ApplicationController
     request = Plaid::LinkTokenCreateRequest.new(
       user: { client_user_id: current_user.id.to_s },
       client_name: "NextGen Wealth Advisor",
-      products: ["investments"],
+      products: ["investments", "transactions"],
       country_codes: ["US"],
       language: "en"
     )

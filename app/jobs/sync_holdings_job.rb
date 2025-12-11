@@ -3,7 +3,7 @@ class SyncHoldingsJob < ApplicationJob
   queue_as :default
 
   # Retry on Plaid errors (e.g., rate limits, temporary failures)
-  retry_on Plaid::ApiError, wait: :exponentially, attempts: 5
+  retry_on Plaid::ApiError, wait: :exponentially_longer, attempts: 5
 
   # If token is permanently bad, give up and alert
   discard_on Plaid::ApiError do |job, error|

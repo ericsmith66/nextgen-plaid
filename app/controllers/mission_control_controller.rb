@@ -4,12 +4,19 @@ class MissionControlController < ApplicationController
 
   def index
     @plaid_items = PlaidItem.includes(:accounts, :positions).order(created_at: :desc)
+    @transactions = Transaction.includes(account: :plaid_item).order(date: :desc).limit(20)
+    @recurring_transactions = RecurringTransaction.includes(:plaid_item).order(created_at: :desc).limit(20)
+    @accounts = Account.includes(:plaid_item, :positions, :transactions).order(created_at: :desc)
+    @positions = Position.includes(account: :plaid_item).order(created_at: :desc)
   end
 
   def nuke
     # Delete in dependency order
+    Transaction.delete_all
     Position.delete_all
+    RecurringTransaction.delete_all
     Account.delete_all
+    SyncLog.delete_all
     PlaidItem.delete_all
 
     flash[:notice] = "All Plaid data has been deleted."
@@ -45,7 +52,7 @@ class MissionControlController < ApplicationController
     request = Plaid::LinkTokenCreateRequest.new(
       user: { client_user_id: item.user_id.to_s },
       client_name: "NextGen Wealth Advisor",
-      products: ["investments"],
+      products: ["investments", "transactions"],
       country_codes: ["US"],
       language: "en",
       access_token: item.access_token

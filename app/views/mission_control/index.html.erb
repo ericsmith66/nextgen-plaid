@@ -50,6 +50,7 @@
           <th>Last Holdings Sync</th>
           <th># Accounts</th>
           <th># Positions</th>
+          <th># Transactions</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -73,6 +74,7 @@
             </td>
             <td><%= item.accounts.size %></td>
             <td><%= item.positions.size %></td>
+            <td><%= Transaction.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></td>
             <td>
               <button type="button" class="btn" data-item-id="<%= item.id %>" onclick="relinkItem(<%= item.id %>)">Re-link</button>
             </td>
@@ -92,6 +94,156 @@
   <div style="margin-top:24px;">
     <h2>Recent Syncs</h2>
     <div id="sync-log" style="font-style: italic; color: #111; background:#fff; border:1px solid #ddd; padding:12px; border-radius:6px;">Loading logs…</div>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h2>Recent Transactions (Last 20)</h2>
+    <% if @transactions.any? %>
+      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Name</th>
+            <th>Amount</th>
+            <th>Category</th>
+            <th>Merchant</th>
+            <th>Account</th>
+            <th>Pending</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @transactions.each do |txn| %>
+            <tr>
+              <td><%= txn.date %></td>
+              <td><%= txn.name %></td>
+              <td><%= number_to_currency(txn.amount) if txn.amount %></td>
+              <td><%= txn.category %></td>
+              <td><%= txn.merchant_name %></td>
+              <td><%= txn.account&.name || txn.account&.account_id %></td>
+              <td><%= txn.pending ? 'Yes' : 'No' %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div style="padding:12px; border:1px dashed #bbb; border-radius:6px; background:#fafafa; color:#333;">
+        No transactions yet. Click "Sync Transactions Now" to fetch data.
+      </div>
+    <% end %>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h2>Recurring Transactions</h2>
+    <% if @recurring_transactions.any? %>
+      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>Stream ID</th>
+            <th>Description</th>
+            <th>Avg Amount</th>
+            <th>Frequency</th>
+            <th>Type</th>
+            <th>Institution</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @recurring_transactions.each do |rt| %>
+            <tr>
+              <td><%= rt.stream_id %></td>
+              <td><%= rt.description %></td>
+              <td><%= number_to_currency(rt.average_amount) if rt.average_amount %></td>
+              <td><%= rt.frequency %></td>
+              <td><%= rt.stream_type %></td>
+              <td><%= rt.plaid_item&.institution_name %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div style="padding:12px; border:1px dashed #bbb; border-radius:6px; background:#fafafa; color:#333;">
+        No recurring transactions yet. Click "Sync Transactions Now" to fetch data.
+      </div>
+    <% end %>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h2>Accounts</h2>
+    <% if @accounts.any? %>
+      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>Account ID</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Subtype</th>
+            <th>Mask</th>
+            <th>Current Balance</th>
+            <th>Currency</th>
+            <th>Institution</th>
+            <th># Positions</th>
+            <th># Transactions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @accounts.each do |account| %>
+            <tr>
+              <td><%= account.account_id %></td>
+              <td><%= account.name %></td>
+              <td><%= account.type %></td>
+              <td><%= account.subtype %></td>
+              <td><%= account.mask %></td>
+              <td><%= number_to_currency(account.current_balance) if account.current_balance %></td>
+              <td><%= account.iso_currency_code %></td>
+              <td><%= account.plaid_item&.institution_name %></td>
+              <td><%= account.positions.count %></td>
+              <td><%= account.transactions.count %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div style="padding:12px; border:1px dashed #bbb; border-radius:6px; background:#fafafa; color:#333;">
+        No accounts yet. Link a Plaid item and sync holdings to see accounts.
+      </div>
+    <% end %>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h2>Positions</h2>
+    <% if @positions.any? %>
+      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>Security ID</th>
+            <th>Symbol</th>
+            <th>Name</th>
+            <th>Quantity</th>
+            <th>Cost Basis</th>
+            <th>Market Value</th>
+            <th>Account</th>
+            <th>Institution</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @positions.each do |position| %>
+            <tr>
+              <td><%= position.security_id %></td>
+              <td><%= position.symbol %></td>
+              <td><%= position.name %></td>
+              <td><%= position.quantity %></td>
+              <td><%= number_to_currency(position.cost_basis) if position.cost_basis %></td>
+              <td><%= number_to_currency(position.market_value) if position.market_value %></td>
+              <td><%= position.account&.name || position.account&.account_id %></td>
+              <td><%= position.account&.plaid_item&.institution_name %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div style="padding:12px; border:1px dashed #bbb; border-radius:6px; background:#fafafa; color:#333;">
+        No positions yet. Link a Plaid item and sync holdings to see positions.
+      </div>
+    <% end %>
   </div>
 </div>
 

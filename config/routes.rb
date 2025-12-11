@@ -9,6 +9,9 @@ Rails.application.routes.draw do
   # Public users get welcome SECOND
   root "welcome#index"
 
+  # Explicit dashboard route (requires authentication)
+  get "/dashboard", to: "dashboard#index"
+
   post "/plaid/link_token", to: "plaid#link_token"
   post "/plaid/exchange",   to: "plaid#exchange"
 
