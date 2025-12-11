@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_11_094000) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_11_101500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -58,6 +58,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_094000) do
     t.index ["account_id"], name: "index_positions_on_account_id"
   end
 
+  create_table "sync_logs", force: :cascade do |t|
+    t.bigint "plaid_item_id", null: false
+    t.string "job_type", null: false
+    t.string "status", null: false
+    t.text "error_message"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "job_id"
+    t.index ["plaid_item_id", "created_at", "job_id"], name: "index_sync_logs_on_item_created_at_job"
+    t.index ["plaid_item_id", "created_at"], name: "index_sync_logs_on_plaid_item_id_and_created_at"
+    t.index ["plaid_item_id"], name: "index_sync_logs_on_plaid_item_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -72,4 +85,5 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_094000) do
 
   add_foreign_key "plaid_items", "users"
   add_foreign_key "positions", "accounts"
+  add_foreign_key "sync_logs", "plaid_items"
 end

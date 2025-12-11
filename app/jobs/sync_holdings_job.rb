@@ -18,13 +18,17 @@ class SyncHoldingsJob < ApplicationJob
 
     unless token.present?
       Rails.logger.error "SyncHoldingsJob: access_token missing for PlaidItem #{plaid_item_id}"
+      SyncLog.create!(plaid_item: item, job_type: "holdings", status: "failure", error_message: "missing access_token", job_id: self.job_id)
       return
     end
 
+    SyncLog.create!(plaid_item: item, job_type: "holdings", status: "started", job_id: self.job_id)
+
     client = Rails.application.config.x.plaid_client
-    response = client.investments_holdings_get(
-      Plaid::InvestmentsHoldingsGetRequest.new(access_token: token)
-    )
+    begin
+      response = client.investments_holdings_get(
+        Plaid::InvestmentsHoldingsGetRequest.new(access_token: token)
+      )
 
     response.accounts.each do |plaid_account|
       account = item.accounts.find_or_create_by(account_id: plaid_account.account_id) do |a|
@@ -51,9 +55,17 @@ class SyncHoldingsJob < ApplicationJob
       end
     end
 
-    # Mark last successful holdings sync timestamp
-    item.update!(last_holdings_sync_at: Time.current)
+      # Mark last successful holdings sync timestamp
+      item.update!(last_holdings_sync_at: Time.current)
 
-    Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
+      SyncLog.create!(plaid_item: item, job_type: "holdings", status: "success", job_id: self.job_id)
+      Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
+    rescue Plaid::ApiError => e
+      SyncLog.create!(plaid_item: item, job_type: "holdings", status: "failure", error_message: e.message, job_id: self.job_id)
+      raise
+    rescue => e
+      SyncLog.create!(plaid_item: item, job_type: "holdings", status: "failure", error_message: e.message, job_id: self.job_id)
+      raise
+    end
   end
 end

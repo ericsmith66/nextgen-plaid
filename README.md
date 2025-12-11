@@ -15,6 +15,31 @@ Pulls brokerage accounts, positions, balances, and transactions from any institu
 - No SmartProxy, no public endpoints required
 - Works 100% on localhost
 
+## Mission Control (Admin)
+
+A private, owner-only control panel to manage Plaid items and background syncs.
+
+### Access
+- URL: `/mission_control`
+- Guarded by `before_action :require_owner`
+- Owner email: set `OWNER_EMAIL` env var (defaults to `ericsmith66@me.com`).
+
+### What you can do
+- See every `PlaidItem` (Institution, Item ID, status, last holdings sync, account/position counts).
+- Re-link an item (Plaid Link update mode) — click "Re-link" and complete Link; a holdings sync is auto-enqueued.
+- Sync Holdings Now — enqueues `SyncHoldingsJob` for all items.
+- Sync Transactions Now — enqueues `SyncTransactionsJob` (placeholder today).
+- Nuke Everything — deletes Positions, Accounts, PlaidItems (use with care; confirmation prompt shown).
+- View recent sync logs (last 20) — auto-refreshes every 5s with status colors and `job_id`. Toast appears when a new success is detected.
+
+### Empty state
+- If there are no Plaid items yet, the page shows guidance to link an account from the customer dashboard.
+
+### Notes
+- Logs are persisted in `sync_logs` with `job_type`, `status`, optional `error_message`, and `job_id`.
+- `SyncHoldingsJob` updates `plaid_items.last_holdings_sync_at` on success.
+- Secrets are filtered from logs (`filter_parameter_logging.rb`).
+
 ## Quick Start (Development)
 
 ```bash
@@ -45,6 +70,9 @@ PLAID_CLIENT_ID=your_sandbox_client_id
 PLAID_SECRET=your_sandbox_secret
 PLAID_ENV=sandbox        # change to "production" when ready
 ENCRYPTION_KEY=64_char_hex_string_here   # ← generate with `openssl rand -hex 32`
+
+# Admin (Mission Control)
+OWNER_EMAIL=your.owner@example.com       # optional; defaults to ericsmith66@me.com
 
 
 ### `TODO.md` (copy-paste)

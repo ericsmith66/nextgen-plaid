@@ -40,41 +40,196 @@
                   class: "btn" %>
   </div>
 
-  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-    <thead>
-      <tr>
-        <th>Institution</th>
-        <th>Item ID</th>
-        <th>Status</th>
-        <th>Last Holdings Sync</th>
-        <th># Accounts</th>
-        <th># Positions</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @plaid_items.each do |item| %>
+  <% if @plaid_items.any? %>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+      <thead>
         <tr>
-          <td><%= item.institution_name %></td>
-          <td><%= item.item_id %></td>
-          <td>
-            <% color = (item.status == 'good') ? 'green' : 'red' %>
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:<%= color %>;"></span>
-            <span style="margin-left:6px;"><%= item.status %></span>
-          </td>
-          <td><%= (item.respond_to?(:last_holdings_sync_at) && item.last_holdings_sync_at) ? item.last_holdings_sync_at.strftime('%Y-%m-%d %H:%M') : '-' %></td>
-          <td><%= item.accounts.size %></td>
-          <td><%= item.positions.size %></td>
-          <td>
-            <button disabled title="Coming next: re-link via update mode">Re-link</button>
-          </td>
+          <th>Institution</th>
+          <th>Item ID</th>
+          <th>Status</th>
+          <th>Last Holdings Sync</th>
+          <th># Accounts</th>
+          <th># Positions</th>
+          <th>Actions</th>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <% @plaid_items.each do |item| %>
+          <tr>
+            <td><%= item.institution_name %></td>
+            <td><%= item.item_id %></td>
+            <td>
+              <% color = (item.status == 'good') ? 'green' : 'red' %>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:<%= color %>;"></span>
+              <span style="margin-left:6px;"><%= item.status %></span>
+            </td>
+            <td>
+              <% if item.respond_to?(:last_holdings_sync_at) && item.last_holdings_sync_at.present? %>
+                <%= time_ago_in_words(item.last_holdings_sync_at) %> ago
+                (<%= item.last_holdings_sync_at.strftime('%Y-%m-%d %H:%M') %>)
+              <% else %>
+                -
+              <% end %>
+            </td>
+            <td><%= item.accounts.size %></td>
+            <td><%= item.positions.size %></td>
+            <td>
+              <button type="button" class="btn" data-item-id="<%= item.id %>" onclick="relinkItem(<%= item.id %>)">Re-link</button>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <div style="margin-top:12px; padding:16px; border:1px dashed #bbb; border-radius:6px; background:#fafafa; color:#333;">
+      <strong>No Plaid items yet.</strong>
+      <div style="margin-top:6px;">
+        Connect an account via the customer dashboard’s Plaid Link flow. After linking, return here to sync holdings and see real‑time logs.
+      </div>
+    </div>
+  <% end %>
 
   <div style="margin-top:24px;">
     <h2>Recent Syncs</h2>
-    <div id="sync-log" style="font-style: italic; color: #666;">Coming next: real-time logs</div>
+    <div id="sync-log" style="font-style: italic; color: #111; background:#fff; border:1px solid #ddd; padding:12px; border-radius:6px;">Loading logs…</div>
   </div>
 </div>
+
+<!-- Simple toast -->
+<div id="mc-toast" style="position:fixed; right:16px; bottom:16px; background:#333; color:#fff; padding:12px 14px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.25); z-index:9999; display:none; max-width:70vw;">
+  <span id="mc-toast-text">Done</span>
+  <button onclick="hideToast()" style="margin-left:12px; background:transparent; color:#fff; border:0; cursor:pointer;">✕</button>
+  <div style="font-size:11px; opacity:0.8; margin-top:4px;">This message will auto-dismiss</div>
+  </div>
+
+<!-- Plaid Link JS -->
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta && meta.getAttribute('content');
+  }
+
+  // Toast helpers
+  let toastTimer = null;
+  function showToast(message) {
+    const box = document.getElementById('mc-toast');
+    const txt = document.getElementById('mc-toast-text');
+    if (!box || !txt) return;
+    txt.textContent = message;
+    box.style.display = 'block';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 4500);
+  }
+  function hideToast() {
+    const box = document.getElementById('mc-toast');
+    if (box) box.style.display = 'none';
+  }
+
+  async function relinkItem(id) {
+    try {
+      const res = await fetch('<%= mission_control_relink_path(id: "__ID__") %>'.replace('__ID__', id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken()
+        },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to get link token: ' + (err.error || res.statusText));
+        return;
+      }
+      const data = await res.json();
+      const handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: async function(public_token, metadata) {
+          // After update-mode success, trigger a holdings sync server-side, then reload
+          try {
+            await fetch('<%= mission_control_relink_success_path(id: "__ID__") %>'.replace('__ID__', id), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken()
+              },
+              body: JSON.stringify({})
+            });
+            // Mark expectation for a holdings sync completion toast
+            try { localStorage.setItem('mc_expect_holdings_toast', '1'); } catch(e) {}
+          } catch (e) {
+            console.warn('Failed to notify relink success:', e);
+          }
+          window.location.reload();
+        },
+        onExit: function(err, metadata) {
+          if (err) {
+            console.warn('Plaid Link exit:', err);
+          }
+        }
+      });
+      handler.open();
+    } catch (e) {
+      alert('Error: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  // Logs auto-refresh placeholder (endpoint will be added next)
+  async function refreshLogs() {
+    try {
+      const res = await fetch('<%= url_for(controller: :mission_control, action: :logs, format: :json) rescue '#'%>');
+      if (!res || !res.ok) return;
+      const logs = await res.json();
+      const el = document.getElementById('sync-log');
+      if (!Array.isArray(logs) || logs.length === 0) {
+        el.textContent = 'No recent logs yet.';
+        return;
+      }
+      el.style.fontStyle = 'normal';
+      el.style.color = '#111';
+      el.innerHTML = logs.map(function(l){
+        var statusColor = l.status === 'success' ? 'green' : (l.status === 'started' ? 'gray' : 'red');
+        var msg = '[' + l.created_at + '] ' + l.job_type + ' — ' + l.status;
+        if (l.job_id) { msg += ' (#' + l.job_id + ')'; }
+        if (l.error_message) { msg += ' — ' + l.error_message; }
+        return '<div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+statusColor+';margin-right:6px;"></span>' + msg + '</div>';
+      }).join('');
+
+      // Show a one-time toast when a new success arrives since the last seen log
+      try {
+        var lastSeenId = localStorage.getItem('mc_last_seen_log_id');
+        if (!lastSeenId && logs.length > 0) {
+          // Initialize on first load to avoid toasting historical logs
+          localStorage.setItem('mc_last_seen_log_id', String(logs[0].id));
+          return;
+        }
+        if (logs.length > 0 && String(logs[0].id) !== String(lastSeenId)) {
+          // Find any new success logs among the new entries (up to the previous lastSeen)
+          const cutoffId = lastSeenId;
+          const newlySeen = [];
+          for (var i = 0; i < logs.length; i++) {
+            var entry = logs[i];
+            if (String(entry.id) === String(cutoffId)) break;
+            if (entry.status === 'success') newlySeen.push(entry);
+          }
+          if (newlySeen.length > 0) {
+            const expectToast = localStorage.getItem('mc_expect_holdings_toast') === '1';
+            // Prefer a holdings-specific message if we just re-linked, else general message
+            const first = newlySeen[0];
+            if (expectToast) {
+              showToast('Holdings sync finished for ' + (first.institution_name || ('item #' + first.plaid_item_id)) + '.');
+              localStorage.removeItem('mc_expect_holdings_toast');
+            } else {
+              showToast('Sync finished: ' + first.job_type + (first.institution_name ? (' — ' + first.institution_name) : ''));
+            }
+          }
+          localStorage.setItem('mc_last_seen_log_id', String(logs[0].id));
+        }
+      } catch(e) { /* ignore */ }
+    } catch (e) {
+      // noop
+    }
+  }
+  setInterval(refreshLogs, 5000);
+  document.addEventListener('DOMContentLoaded', refreshLogs);
+</script>

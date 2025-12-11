@@ -35,4 +35,52 @@ class MissionControlController < ApplicationController
     flash[:notice] = "Enqueued transactions sync for #{count} item(s)."
     redirect_to mission_control_path
   end
+
+  # Returns a Plaid Link token for update mode (re-linking an existing item)
+  def relink
+    item = PlaidItem.find_by(id: params[:id])
+    return render json: { error: "Not found" }, status: :not_found unless item
+
+    client = Rails.application.config.x.plaid_client
+    request = Plaid::LinkTokenCreateRequest.new(
+      user: { client_user_id: item.user_id.to_s },
+      client_name: "NextGen Wealth Advisor",
+      products: ["investments"],
+      country_codes: ["US"],
+      language: "en",
+      access_token: item.access_token
+    )
+
+    response = client.link_token_create(request)
+    render json: { link_token: response.link_token }
+  rescue Plaid::ApiError => e
+    Rails.logger.error("Re-link failed for PlaidItem #{item&.id}: #{e.message}")
+    render json: { error: "Plaid error: #{e.message}" }, status: :bad_gateway
+  end
+
+  # Called by the UI after Plaid Link update-mode succeeds, to auto-enqueue a holdings sync
+  def relink_success
+    item = PlaidItem.find_by(id: params[:id])
+    return render json: { error: "Not found" }, status: :not_found unless item
+
+    SyncHoldingsJob.perform_later(item.id)
+    render json: { status: "ok" }
+  end
+
+  # Returns last 20 sync logs as JSON (owner-only)
+  def logs
+    logs = SyncLog.includes(:plaid_item).order(created_at: :desc).limit(20)
+    render json: logs.map { |l|
+      {
+        id: l.id,
+        plaid_item_id: l.plaid_item_id,
+        institution_name: l.plaid_item&.institution_name,
+        job_type: l.job_type,
+        status: l.status,
+        error_message: l.error_message,
+        created_at: l.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        job_id: l.job_id
+      }
+    }
+  end
 end
