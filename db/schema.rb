@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_11_174900) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_11_200647) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -53,6 +53,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_174900) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "last_holdings_sync_at"
+    t.datetime "holdings_synced_at"
+    t.datetime "transactions_synced_at"
+    t.datetime "liabilities_synced_at"
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"

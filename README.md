@@ -10,8 +10,11 @@ Pulls brokerage accounts, positions, balances, and transactions from any institu
 ## Features
 - Plaid Link v2 with correct OAuth flow
 - Encrypted `access_token` using `attr_encrypted` + per-record random IV
-- Full holdings sync (accounts + positions) via background job
-- Clean dashboard showing real-time portfolio
+- Full data sync (holdings, transactions, liabilities) via background jobs
+- **Daily auto-sync** at 3am via Solid Queue recurring jobs
+- Clean dashboard showing real-time portfolio with data counts
+- Owner-only Mission Control with full sync visibility and manual triggers
+- Per-product sync timestamps (holdings, transactions, liabilities)
 - No SmartProxy, no public endpoints required
 - Works 100% on localhost
 
@@ -25,19 +28,30 @@ A private, owner-only control panel to manage Plaid items and background syncs.
 - Owner email: set `OWNER_EMAIL` env var (defaults to `ericsmith66@me.com`).
 
 ### What you can do
-- See every `PlaidItem` (Institution, Item ID, status, last holdings sync, account/position counts).
-- Re-link an item (Plaid Link update mode) — click "Re-link" and complete Link; a holdings sync is auto-enqueued.
-- Sync Holdings Now — enqueues `SyncHoldingsJob` for all items.
-- Sync Transactions Now — enqueues `SyncTransactionsJob` (placeholder today).
-- Nuke Everything — deletes Positions, Accounts, PlaidItems (use with care; confirmation prompt shown).
-- View recent sync logs (last 20) — auto-refreshes every 5s with status colors and `job_id`. Toast appears when a new success is detected.
+- **Global Status Dashboard** — see every `PlaidItem` with per-product sync timestamps:
+  - Institution, Item ID, Status (green/red indicator)
+  - Holdings Synced At, Transactions Synced At, Liabilities Synced At (relative time + absolute timestamp)
+  - Account/Position/Transaction counts
+- **Refresh Everything Now** (green button) — one-click full sync: enqueues holdings + transactions + liabilities jobs for all items.
+- **Sync Holdings Now** — enqueues `SyncHoldingsJob` for all items.
+- **Sync Transactions Now** — enqueues `SyncTransactionsJob` for all items (730 days of transactions + recurring streams).
+- **Sync Liabilities Now** — enqueues `SyncLiabilitiesJob` for all items (credit cards, loans, mortgages).
+- **Re-link** an item (Plaid Link update mode) — click "Re-link" and complete Link; a holdings sync is auto-enqueued.
+- **Nuke Everything** — deletes all Plaid data (use with care; confirmation prompt shown).
+- **Real-time sync logs** (last 20) — auto-refreshes every 5s with status colors and `job_id`. Toast notifications on success.
+
+### Daily Auto-Sync
+- **Solid Queue recurring job** runs at **3am every day** (configured in `config/recurring.yml`).
+- Automatically enqueues full sync (holdings + transactions + liabilities) for all items.
+- Ensures data stays fresh without manual intervention.
 
 ### Empty state
 - If there are no Plaid items yet, the page shows guidance to link an account from the customer dashboard.
 
 ### Notes
 - Logs are persisted in `sync_logs` with `job_type`, `status`, optional `error_message`, and `job_id`.
-- `SyncHoldingsJob` updates `plaid_items.last_holdings_sync_at` on success.
+- Per-product timestamps: `holdings_synced_at`, `transactions_synced_at`, `liabilities_synced_at` updated on success.
+- Each job runs independently; one failure doesn't block others (graceful error handling).
 - Secrets are filtered from logs (`filter_parameter_logging.rb`).
 
 ## Quick Start (Development)

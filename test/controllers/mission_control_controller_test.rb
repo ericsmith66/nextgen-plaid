@@ -156,6 +156,39 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     assert_includes @response.body, "Enqueued liabilities sync for 1 item(s)."
   end
 
+  # PRD 5.3: Refresh Everything Now button tests
+  test "owner POST refresh_everything_now enqueues all three jobs per item" do
+    login_as(@owner, scope: :user)
+    item1 = PlaidItem.create!(user: @owner, item_id: "it_ref1", institution_name: "A", access_token: "tok", status: "good")
+    item2 = PlaidItem.create!(user: @owner, item_id: "it_ref2", institution_name: "B", access_token: "tok", status: "good")
+
+    # Should enqueue 2 holdings + 2 transactions + 2 liabilities = 6 jobs total
+    assert_enqueued_jobs 6 do
+      post mission_control_refresh_everything_now_path
+      assert_redirected_to mission_control_path
+    end
+  end
+
+  test "non-owner POST refresh_everything_now enqueues nothing" do
+    login_as(@user, scope: :user)
+    PlaidItem.create!(user: @owner, item_id: "it_ref3", institution_name: "C", access_token: "tok", status: "good")
+
+    assert_enqueued_jobs 0 do
+      post mission_control_refresh_everything_now_path
+      assert_redirected_to authenticated_root_path
+    end
+  end
+
+  test "owner sees flash notice after Refresh Everything Now" do
+    login_as(@owner, scope: :user)
+    PlaidItem.create!(user: @owner, item_id: "it_refflash", institution_name: "A", access_token: "tok", status: "good")
+    post mission_control_refresh_everything_now_path
+    assert_redirected_to mission_control_path
+    follow_redirect!
+    assert_response :success
+    assert_includes @response.body, "Enqueued full sync"
+  end
+
   # Tiny integration tests for flash messages on sync buttons (Step: flash assertions)
   test "owner sees flash notice after Sync Holdings Now" do
     login_as(@owner, scope: :user)

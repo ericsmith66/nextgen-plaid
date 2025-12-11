@@ -22,7 +22,7 @@ class PlaidController < ApplicationController
     client = Rails.application.config.x.plaid_client
     exchange_response = client.item_public_token_exchange(exchange_request)
 
-    PlaidItem.create!(
+    item = PlaidItem.create!(
       user: current_user,
       item_id: exchange_response.item_id,
       institution_name: params[:institution_name] || "Sandbox Institution",
@@ -30,7 +30,10 @@ class PlaidController < ApplicationController
       status: "good"
     )
 
-    SyncHoldingsJob.perform_later(PlaidItem.last.id)
+    # PRD 5.1: Sync everything on connect (holdings, transactions, liabilities)
+    SyncHoldingsJob.perform_later(item.id)
+    SyncTransactionsJob.perform_later(item.id)
+    SyncLiabilitiesJob.perform_later(item.id)
 
     render json: { status: "connected" }
   end

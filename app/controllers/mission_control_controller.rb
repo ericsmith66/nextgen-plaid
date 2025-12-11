@@ -55,6 +55,19 @@ class MissionControlController < ApplicationController
     redirect_to mission_control_path
   end
 
+  # PRD 5.3: Refresh Everything Now - syncs all three products for all items
+  def refresh_everything_now
+    count = 0
+    PlaidItem.find_each do |item|
+      SyncHoldingsJob.perform_later(item.id)
+      SyncTransactionsJob.perform_later(item.id)
+      SyncLiabilitiesJob.perform_later(item.id)
+      count += 1
+    end
+    flash[:notice] = "Enqueued full sync (holdings + transactions + liabilities) for #{count} item(s)."
+    redirect_to mission_control_path
+  end
+
   # Returns a Plaid Link token for update mode (re-linking an existing item)
   def relink
     item = PlaidItem.find_by(id: params[:id])

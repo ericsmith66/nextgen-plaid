@@ -67,6 +67,9 @@ class SyncTransactionsJob < ApplicationJob
         end.save!
       end
 
+      # Mark last successful transactions sync timestamp (PRD 5.5)
+      item.update!(transactions_synced_at: Time.current)
+
       SyncLog.create!(plaid_item: item, job_type: "transactions", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced #{transactions_data.size} transactions & #{all_streams.size} recurring streams for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e

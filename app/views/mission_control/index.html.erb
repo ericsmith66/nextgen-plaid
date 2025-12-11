@@ -42,8 +42,15 @@
     <%= button_to "Sync Liabilities Now",
                   mission_control_sync_liabilities_now_path,
                   method: :post,
-                  form: { style: "display:inline-block;" },
+                  form: { style: "display:inline-block; margin-right:8px;" },
                   class: "btn" %>
+
+    <%= button_to "Refresh Everything Now",
+                  mission_control_refresh_everything_now_path,
+                  method: :post,
+                  form: { style: "display:inline-block;" },
+                  class: "btn",
+                  style: "background:#28a745; color:white; font-weight:bold;" %>
   </div>
 
   <% if @plaid_items.any? %>
@@ -53,7 +60,9 @@
           <th>Institution</th>
           <th>Item ID</th>
           <th>Status</th>
-          <th>Last Holdings Sync</th>
+          <th>Holdings Synced</th>
+          <th>Transactions Synced</th>
+          <th>Liabilities Synced</th>
           <th># Accounts</th>
           <th># Positions</th>
           <th># Transactions</th>
@@ -71,9 +80,25 @@
               <span style="margin-left:6px;"><%= item.status %></span>
             </td>
             <td>
-              <% if item.respond_to?(:last_holdings_sync_at) && item.last_holdings_sync_at.present? %>
-                <%= time_ago_in_words(item.last_holdings_sync_at) %> ago
-                (<%= item.last_holdings_sync_at.strftime('%Y-%m-%d %H:%M') %>)
+              <% if item.holdings_synced_at.present? %>
+                <%= time_ago_in_words(item.holdings_synced_at) %> ago
+                (<%= item.holdings_synced_at.strftime('%Y-%m-%d %H:%M') %>)
+              <% else %>
+                -
+              <% end %>
+            </td>
+            <td>
+              <% if item.transactions_synced_at.present? %>
+                <%= time_ago_in_words(item.transactions_synced_at) %> ago
+                (<%= item.transactions_synced_at.strftime('%Y-%m-%d %H:%M') %>)
+              <% else %>
+                -
+              <% end %>
+            </td>
+            <td>
+              <% if item.liabilities_synced_at.present? %>
+                <%= time_ago_in_words(item.liabilities_synced_at) %> ago
+                (<%= item.liabilities_synced_at.strftime('%Y-%m-%d %H:%M') %>)
               <% else %>
                 -
               <% end %>

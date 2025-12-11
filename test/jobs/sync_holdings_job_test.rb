@@ -24,9 +24,11 @@ class SyncHoldingsJobTest < ActiveJob::TestCase
     assert_equal 1, item.accounts.count
     assert_equal 1, item.positions.count
 
-    # last_holdings_sync_at should be set on successful sync
+    # PRD 5.5: both last_holdings_sync_at and holdings_synced_at should be set on successful sync
     refute_nil item.last_holdings_sync_at
     assert item.last_holdings_sync_at <= Time.now && item.last_holdings_sync_at > Time.now - 60
+    refute_nil item.holdings_synced_at
+    assert item.holdings_synced_at <= Time.now && item.holdings_synced_at > Time.now - 60
 
     account = item.accounts.find_by(account_id: "acc_1")
     refute_nil account
