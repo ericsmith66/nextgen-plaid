@@ -10,13 +10,13 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_10_165049) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_10_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "accounts", force: :cascade do |t|
     t.bigint "plaid_item_id", null: false
-    t.string "account_id"
+    t.string "account_id", null: false
     t.string "mask"
     t.string "name"
     t.string "type"
@@ -25,25 +25,27 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_10_165049) do
     t.string "iso_currency_code"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
   end
 
   create_table "plaid_items", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "item_id", null: false
-    t.string "institution_name"
+    t.string "institution_name", null: false
     t.text "access_token_encrypted"
     t.text "access_token_encrypted_iv"
-    t.string "status", default: "good"
+    t.string "status", default: "good", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"
   end
 
   create_table "positions", force: :cascade do |t|
     t.bigint "account_id", null: false
-    t.string "security_id"
+    t.string "security_id", null: false
     t.string "symbol"
     t.string "name"
     t.decimal "quantity"
@@ -51,6 +53,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_10_165049) do
     t.decimal "market_value"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
     t.index ["account_id"], name: "index_positions_on_account_id"
   end
 

@@ -21,7 +21,8 @@ class SyncHoldingsJob < ApplicationJob
       return
     end
 
-    response = PLAID_CLIENT.investments_holdings_get(
+    client = Rails.application.config.x.plaid_client
+    response = client.investments_holdings_get(
       Plaid::InvestmentsHoldingsGetRequest.new(access_token: token)
     )
 

@@ -6,6 +6,12 @@ config.api_key['PLAID-CLIENT-ID'] = ENV['PLAID_CLIENT_ID']
 config.api_key['PLAID-SECRET'] = ENV['PLAID_SECRET']
 
 api_client = Plaid::ApiClient.new(config)
-PLAID_CLIENT = Plaid::PlaidApi.new(api_client)
+client = Plaid::PlaidApi.new(api_client)
+
+# Preferred access point for app code (easier to stub in tests)
+Rails.application.config.x.plaid_client = client
+
+# Backwards-compatibility constant (will be removed later)
+PLAID_CLIENT = client
 
 Rails.logger.info "PLAID READY | Env: #{ENV['PLAID_ENV']} | Client-ID: #{ENV['PLAID_CLIENT_ID']&.first(8)}...#{ENV['PLAID_CLIENT_ID']&.last(4)}"

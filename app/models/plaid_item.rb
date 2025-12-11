@@ -11,4 +11,9 @@ class PlaidItem < ApplicationRecord
                  random_iv: true                          # use the _iv column we added
 
   attr_encrypted_encrypted_attributes
+
+  validates :item_id, presence: true
+  validates :institution_name, presence: true
+  validates :status, presence: true
+  validates :item_id, uniqueness: { scope: :user_id }
 end

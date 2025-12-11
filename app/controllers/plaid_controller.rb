@@ -10,7 +10,8 @@ class PlaidController < ApplicationController
       language: "en"
     )
 
-    response = PLAID_CLIENT.link_token_create(request)
+    client = Rails.application.config.x.plaid_client
+    response = client.link_token_create(request)
     render json: { link_token: response.link_token }
   end
 
@@ -18,9 +19,8 @@ class PlaidController < ApplicationController
     public_token = params[:public_token]
 
     exchange_request = Plaid::ItemPublicTokenExchangeRequest.new(public_token: public_token)
-    exchange_response = PLAID_CLIENT.item_public_token_exchange(exchange_request)
-
-    Rails.logger.info "RAW TOKEN: #{exchange_response.access_token}"
+    client = Rails.application.config.x.plaid_client
+    exchange_response = client.item_public_token_exchange(exchange_request)
 
     PlaidItem.create!(
       user: current_user,

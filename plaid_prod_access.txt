@@ -1,0 +1,37 @@
+To get production access with the Plaid API, you'll need to follow a few required steps that allow Plaid's team to review your use case and ensure you meet security, compliance, and product requirements.
+
+Steps to Production Access
+Sign Up and Integrate in Sandbox
+Begin by building and testing your integration in the Plaid Sandbox environment, which uses mock data and is free.
+Production Access Request
+When you're ready to move to live customer data, request Production access via your Plaid Dashboard.
+Provide Company & Use Case Information
+During the application, you’ll be asked for:
+
+Details about your company
+Details about how you plan to use Plaid and which products you’d like to use
+Information required for compliance (see below)
+Complete Compliance & Security Requirements
+
+Company and Application Display Info: Enter information about your business and your app. This is especially important for OAuth institutions, as end users see this info during OAuth flows.
+Plaid Master Services Agreement (MSA): Sign or review the Plaid MSA.
+Security Questionnaire: Complete a questionnaire about your company’s risk and security practices. This helps Plaid ensure safe data access for users.
+(Optional for now) Legal Entity Identifier (LEI): For those planning to use OAuth with US banks, you’ll be asked for an LEI, but it is not enforced until April 2026.
+Review & Approval
+After you submit your production access request and compliance materials, Plaid’s team reviews and may reach out for clarifications or additional details. Approval usually takes a couple of business days.
+Production Access Granted
+Once approved, you’ll receive production API credentials via the Dashboard, and your application can begin interacting with real user data.
+Adding or Modifying Products Later
+After gaining production access, you can request additional Plaid products anytime through the Dashboard. You’ll need to provide details about your new use case, and there will be a short review before approval.
+
+If you’re on a Pay-as-you-go or Growth plan, product access is immediate after approval.
+If you’re on a Custom plan, an Account Manager will work with you to update your contract before activation.
+Additional Notes
+OAuth Institutions: Full production access is required before you can connect with OAuth-enabled institutions in the US. You must also complete extra registration steps; see the OAuth institutions page for requirements.
+Limited Production: In some cases, you can test with real data before full access is granted—this is called Limited Production. It has caps and may not be available for all products.
+Where to Find More Information
+For the most up-to-date instructions and to start your application, visit the Production access page in your Plaid Dashboard.
+
+If you have detailed questions about your specific use case or plan, or if you’d like to learn more about some Plaid products, you can contact the Plaid sales team.
+
+Let me know if you need any details about specific products or parts of the process!
