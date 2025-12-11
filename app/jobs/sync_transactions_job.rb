@@ -1,7 +1,7 @@
 # app/jobs/sync_transactions_job.rb
 class SyncTransactionsJob < ApplicationJob
   queue_as :default
-  retry_on Plaid::ApiError, wait: :exponentially_longer, attempts: 3
+  retry_on Plaid::ApiError, wait: :exponentially, attempts: 3
 
   def perform(plaid_item_id)
     item = PlaidItem.find_by(id: plaid_item_id)

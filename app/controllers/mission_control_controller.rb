@@ -64,7 +64,7 @@ class MissionControlController < ApplicationController
     request = Plaid::LinkTokenCreateRequest.new(
       user: { client_user_id: item.user_id.to_s },
       client_name: "NextGen Wealth Advisor",
-      products: ["investments", "transactions"],
+      products: ["investments", "transactions", "liabilities"],
       country_codes: ["US"],
       language: "en",
       access_token: item.access_token

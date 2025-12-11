@@ -31,8 +31,8 @@ class SyncLiabilitiesJob < ApplicationJob
           credit_cards.each do |cc|
             account.liabilities.find_or_initialize_by(liability_id: cc.account_id).tap do |liability|
               liability.liability_type = "CREDIT_CARD"
-              liability.current_balance = cc.balances.current
-              liability.min_payment_due = cc.aprs.present? ? cc.last_payment_amount : nil
+              liability.current_balance = cc.last_statement_balance
+              liability.min_payment_due = cc.minimum_payment_amount
               liability.apr_percentage = cc.aprs&.first&.apr_percentage
               liability.payment_due_date = cc.next_payment_due_date
             end.save!
@@ -45,7 +45,7 @@ class SyncLiabilitiesJob < ApplicationJob
           student_loans.each do |sl|
             account.liabilities.find_or_initialize_by(liability_id: sl.account_id).tap do |liability|
               liability.liability_type = "STUDENT_LOAN"
-              liability.current_balance = sl.balance
+              liability.current_balance = sl.last_statement_balance
               liability.min_payment_due = sl.minimum_payment_amount
               liability.apr_percentage = sl.interest_rate_percentage
               liability.payment_due_date = sl.next_payment_due_date
@@ -59,7 +59,7 @@ class SyncLiabilitiesJob < ApplicationJob
           mortgages.each do |m|
             account.liabilities.find_or_initialize_by(liability_id: m.account_id).tap do |liability|
               liability.liability_type = "MORTGAGE"
-              liability.current_balance = m.balance
+              liability.current_balance = account.current_balance
               liability.min_payment_due = m.last_payment_amount
               liability.apr_percentage = m.interest_rate.percentage
               liability.payment_due_date = m.next_payment_due_date

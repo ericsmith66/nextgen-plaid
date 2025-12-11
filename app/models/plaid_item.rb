@@ -3,6 +3,8 @@ class PlaidItem < ApplicationRecord
   belongs_to :user
   has_many :accounts, dependent: :destroy
   has_many :positions, through: :accounts
+  has_many :transactions, through: :accounts
+  has_many :liabilities, through: :accounts
   has_many :recurring_transactions, dependent: :destroy
 
   # This is the correct, final version for 2025

@@ -20,6 +20,19 @@
       <% current_user.plaid_items.each do |item| %>
         <h3><%= item.institution_name || "Sandbox Brokerage" %></h3>
         <p>Total Value: <%= number_to_currency(item.accounts.sum(:current_balance) || 0) %></p>
+        
+        <!-- Data Counts -->
+        <div style="margin:20px 0; padding:15px; background:#334155; border-radius:8px;">
+          <strong style="color:#60a5fa;">Data Summary:</strong>
+          <ul style="list-style:none; padding:10px 0; margin:0;">
+            <li style="margin:5px 0;">📊 Accounts: <strong><%= item.accounts.count %></strong></li>
+            <li style="margin:5px 0;">📈 Positions: <strong><%= item.positions.count %></strong></li>
+            <li style="margin:5px 0;">💳 Transactions: <strong><%= Transaction.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></strong></li>
+            <li style="margin:5px 0;">💰 Liabilities: <strong><%= Liability.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></strong></li>
+            <li style="margin:5px 0;">🔁 Recurring Transactions: <strong><%= item.recurring_transactions.count %></strong></li>
+          </ul>
+        </div>
+        
         <ul>
           <% item.positions.limit(10).each do |pos| %>
             <li style="margin:10px 0; padding:10px; background:#334155; border-radius:8px;">

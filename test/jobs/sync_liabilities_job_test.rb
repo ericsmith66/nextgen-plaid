@@ -20,9 +20,9 @@ class SyncLiabilitiesJobTest < ActiveJob::TestCase
     mock_liabilities = Minitest::Mock.new
     mock_credit = OpenStruct.new(
       account_id: @account.account_id,
-      balances: OpenStruct.new(current: 1500.00),
+      last_statement_balance: 1500.00,
+      minimum_payment_amount: 50.00,
       aprs: [OpenStruct.new(apr_percentage: 18.99)],
-      last_payment_amount: 50.00,
       next_payment_due_date: Date.today + 30
     )
 
