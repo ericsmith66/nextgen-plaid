@@ -1,0 +1,80 @@
+<div class="container" style="padding: 24px;">
+  <h1>Mission Control</h1>
+
+  <div style="margin: 16px 0;">
+    <%= button_to "Nuke Everything", 
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  mission_control_nuke_path,
+                  method: :post,
+                  form: { style: "display:inline-block; margin-right:8px;" , data: { turbo_confirm: "Are you sure? This deletes all Plaid data (items, accounts, positions)." } },
+                  class: "btn" %>
+
+    <%= button_to "Sync Holdings Now",
+                  mission_control_sync_holdings_now_path,
+                  method: :post,
+                  form: { style: "display:inline-block; margin-right:8px;" },
+                  class: "btn" %>
+
+    <%= button_to "Sync Transactions Now",
+                  mission_control_sync_transactions_now_path,
+                  method: :post,
+                  form: { style: "display:inline-block;" },
+                  class: "btn" %>
+  </div>
+
+  <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+    <thead>
+      <tr>
+        <th>Institution</th>
+        <th>Item ID</th>
+        <th>Status</th>
+        <th>Last Holdings Sync</th>
+        <th># Accounts</th>
+        <th># Positions</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @plaid_items.each do |item| %>
+        <tr>
+          <td><%= item.institution_name %></td>
+          <td><%= item.item_id %></td>
+          <td>
+            <% color = (item.status == 'good') ? 'green' : 'red' %>
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:<%= color %>;"></span>
+            <span style="margin-left:6px;"><%= item.status %></span>
+          </td>
+          <td><%= (item.respond_to?(:last_holdings_sync_at) && item.last_holdings_sync_at) ? item.last_holdings_sync_at.strftime('%Y-%m-%d %H:%M') : '-' %></td>
+          <td><%= item.accounts.size %></td>
+          <td><%= item.positions.size %></td>
+          <td>
+            <button disabled title="Coming next: re-link via update mode">Re-link</button>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <div style="margin-top:24px;">
+    <h2>Recent Syncs</h2>
+    <div id="sync-log" style="font-style: italic; color: #666;">Coming next: real-time logs</div>
+  </div>
+</div>

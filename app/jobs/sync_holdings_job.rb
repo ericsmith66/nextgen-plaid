@@ -51,6 +51,9 @@ class SyncHoldingsJob < ApplicationJob
       end
     end
 
+    # Mark last successful holdings sync timestamp
+    item.update!(last_holdings_sync_at: Time.current)
+
     Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
   end
 end
