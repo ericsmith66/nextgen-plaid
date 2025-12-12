@@ -1,4 +1,4 @@
-class Position < ApplicationRecord
+class Holding < ApplicationRecord
   belongs_to :account
 
   validates :security_id, presence: true

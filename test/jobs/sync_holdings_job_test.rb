@@ -2,7 +2,7 @@ require "test_helper"
 require "ostruct"
 
 class SyncHoldingsJobTest < ActiveJob::TestCase
-  test "sync creates accounts and positions from Plaid response" do
+  test "sync creates accounts and holdings from Plaid response" do
     user = User.create!(email: "sync@example.com", password: "Password!123")
     item = PlaidItem.create!(user: user, item_id: "it_1", institution_name: "Test Inst", access_token: "tok_1", status: "good")
 
@@ -22,7 +22,7 @@ class SyncHoldingsJobTest < ActiveJob::TestCase
 
     item.reload
     assert_equal 1, item.accounts.count
-    assert_equal 1, item.positions.count
+    assert_equal 1, item.holdings.count
 
     # PRD 5.5: both last_holdings_sync_at and holdings_synced_at should be set on successful sync
     refute_nil item.last_holdings_sync_at
@@ -38,7 +38,7 @@ class SyncHoldingsJobTest < ActiveJob::TestCase
     assert_equal BigDecimal("1000.25"), account.current_balance
     assert_equal "USD", account.iso_currency_code
 
-    pos = account.positions.find_by(security_id: "sec_1")
+    pos = account.holdings.find_by(security_id: "sec_1")
     refute_nil pos
     assert_equal "AAPL", pos.symbol
     assert_equal "Apple Inc.", pos.name

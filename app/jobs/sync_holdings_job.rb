@@ -104,7 +104,7 @@ class SyncHoldingsJob < ApplicationJob
         security = response.securities.find { |s| s.security_id == holding.security_id }
         next unless security
 
-        account.positions.find_or_create_by(security_id: security.security_id) do |pos|
+        account.holdings.find_or_create_by(security_id: security.security_id) do |pos|
           pos.symbol        = security.ticker_symbol
           pos.name          = security.name
           pos.quantity      = holding.quantity
@@ -126,7 +126,7 @@ class SyncHoldingsJob < ApplicationJob
       )
 
       SyncLog.create!(plaid_item: item, job_type: "holdings", status: "success", job_id: self.job_id)
-      Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
+      Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.holdings.count} holdings for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e
       # PRD 6.1: Detect expired/broken tokens
       error_code = self.class.extract_plaid_error_code(e)

@@ -1,6 +1,6 @@
 class Account < ApplicationRecord
   belongs_to :plaid_item
-  has_many :positions, dependent: :destroy
+  has_many :holdings, dependent: :destroy
   has_many :transactions, dependent: :destroy
   has_many :liabilities, dependent: :destroy
 

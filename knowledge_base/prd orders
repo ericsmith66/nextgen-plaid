@@ -1,0 +1,21 @@
+prd orders 
+
+Order,PRD,Title,Status,Effort,Why This Order
+1–8,,Core Engine + Enrich + Cost Tracker,Done,—,Done
+9,18,Holdings Extended Fields,Ready,3 hrs,"cost_basis, vested, institution_price"
+10,19,Securities Extended Fields,Ready,3 hrs,"ISIN, CUSIP, sector, industry"
+11,20,Fixed Income & Options Detail,Ready,4 hrs,New tables for bonds & options
+12,21,Investment Transactions Extended,Ready,4 hrs,"price, fees, subtype"
+13,22,Item & Account Metadata,Ready,1 hr,"persistent_account_id, holder_category, consent_expiry"
+14,23,Liabilities Extended Fields,Ready,2 hrs,"APR, min_payment, due_date"
+15,24,Transactions Extended Fields,Ready,2 hrs,"payment_channel, etc."
+16,9,UI Refactor – Dashboard & Mission Control,Ready,2–3 days,NOW SAFE — all schema is final
+17,10,Tests + Docs + Repo Polish,Ready,1 day,Final polish
+18,11,Admin CRUD for Users & PlaidItems,Ready,1 day,
+19,12,Off-boarding & Revoke Plaid Access,Ready,4 hrs,
+20,13,Invitation Flow,Ready,6 hrs,
+21,14,Password Recovery,Ready,2 hrs,
+22,15,Mission Control – Breadcrumb Hierarchy,Ready,1 day,
+23,16,Net Worth Page,Ready,1 day,
+24,17,Manual Account Enrichment,Ready,1 day,
+
