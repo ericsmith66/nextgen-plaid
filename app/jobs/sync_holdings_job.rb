@@ -8,7 +8,18 @@ class SyncHoldingsJob < ApplicationJob
   # If token is permanently bad, give up and alert
   discard_on Plaid::ApiError do |job, error|
     if error.error_code == "INVALID_ACCESS_TOKEN"
-      Rails.logger.error "PlaidItem #{job.arguments.first} has invalid token — needs re-link"
+      plaid_item_id = job.arguments.first
+      Rails.logger.error "PlaidItem #{plaid_item_id} has invalid token — needs re-link"
+      item = PlaidItem.find_by(id: plaid_item_id)
+      if item
+        SyncLog.create!(
+          plaid_item: item,
+          job_type: "holdings",
+          status: "failure",
+          error_message: "INVALID_ACCESS_TOKEN - needs re-link",
+          job_id: job.job_id
+        )
+      end
     end
   end
 
