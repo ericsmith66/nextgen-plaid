@@ -1,8 +1,9 @@
 <div style="padding:20px; font-family:system-ui; max-width:1200px; margin:0 auto;">
   <h1>API Cost Tracker</h1>
   <p style="color:#666; margin-bottom:30px;">
-    Track your Plaid API usage costs across all products. Enrich costs $2.00 per 1,000 transactions.
+    Track your Plaid API usage costs across all products. Costs loaded from <code>config/plaid_costs.yml</code> — edit anytime, no deploy needed.
     <a href="/mission_control" style="margin-left:20px;">← Back to Mission Control</a>
+    <a href="/mission_control/costs/export.csv" style="margin-left:10px;">📥 Export CSV</a>
   </p>
 
   <!-- Current Month Summary -->
@@ -65,6 +66,43 @@
     <% end %>
   </div>
 
+  <!-- PRD 8.6: Monthly Summary Table -->
+  <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:30px; margin-bottom:30px;">
+    <h2 style="margin:0 0 20px 0;">Monthly Summary (Last 12 Months)</h2>
+    <% if @monthly_summary.any? %>
+      <table border="1" cellpadding="12" cellspacing="0" style="border-collapse:collapse; width:100%;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left; padding:12px;">Month</th>
+            <th style="text-align:right; padding:12px;">Total Cost</th>
+            <th style="text-align:right; padding:12px;">API Calls</th>
+            <th style="text-align:right; padding:12px;">Avg per Call</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @monthly_summary.each do |summary| %>
+            <tr>
+              <td style="padding:12px; font-weight:bold;">
+                <%= summary.month.strftime("%B %Y") %>
+              </td>
+              <td style="padding:12px; text-align:right; font-weight:bold; color:#1e40af;">
+                $<%= sprintf("%.2f", summary.total_cents / 100.0) %>
+              </td>
+              <td style="padding:12px; text-align:right; color:#64748b;">
+                <%= number_with_delimiter(summary.call_count) %>
+              </td>
+              <td style="padding:12px; text-align:right; color:#64748b;">
+                <%= sprintf("%.2f", summary.total_cents.to_f / summary.call_count / 100.0) %>¢
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p style="color:#94a3b8; font-style:italic;">No monthly data yet.</p>
+    <% end %>
+  </div>
+
   <!-- Recent Cost Logs -->
   <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:30px;">
     <h2 style="margin:0 0 20px 0;">Recent API Calls (Last 20)</h2>
@@ -74,7 +112,8 @@
           <tr style="background:#f1f5f9;">
             <th style="text-align:left; padding:10px;">Date</th>
             <th style="text-align:left; padding:10px;">Product</th>
-            <th style="text-align:right; padding:10px;">Transaction Count</th>
+            <th style="text-align:left; padding:10px;">Endpoint</th>
+            <th style="text-align:right; padding:10px;">Count</th>
             <th style="text-align:right; padding:10px;">Cost</th>
             <th style="text-align:left; padding:10px;">Request ID</th>
           </tr>
@@ -83,10 +122,13 @@
           <% @recent_logs.each do |log| %>
             <tr>
               <td style="padding:10px; color:#64748b;">
-                <%= log.created_at.strftime("%Y-%m-%d %H:%M") %>
+                <%= log.called_at.strftime("%Y-%m-%d %H:%M") %>
               </td>
               <td style="padding:10px; text-transform:capitalize;">
-                <%= log.api_product %>
+                <%= log.product.gsub('_', ' ') %>
+              </td>
+              <td style="padding:10px; font-family:monospace; font-size:11px; color:#475569;">
+                <%= log.endpoint %>
               </td>
               <td style="padding:10px; text-align:right;">
                 <%= number_with_delimiter(log.transaction_count) %>

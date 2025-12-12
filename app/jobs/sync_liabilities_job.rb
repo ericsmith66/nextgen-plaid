@@ -96,6 +96,19 @@ class SyncLiabilitiesJob < ApplicationJob
       # Mark last successful liabilities sync timestamp (PRD 5.5)
       item.update!(liabilities_synced_at: Time.current)
 
+      # PRD 8.2: Log API cost for liabilities
+      liability_count = [
+        response.liabilities.credit&.size || 0,
+        response.liabilities.student&.size || 0,
+        response.liabilities.mortgage&.size || 0
+      ].sum
+      PlaidApiCall.log_call(
+        product: 'liabilities',
+        endpoint: '/liabilities/get',
+        request_id: response.request_id,
+        count: liability_count
+      )
+
       SyncLog.create!(plaid_item: item, job_type: "liabilities", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced liabilities for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e

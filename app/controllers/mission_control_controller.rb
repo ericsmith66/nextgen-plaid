@@ -12,16 +12,18 @@ class MissionControlController < ApplicationController
   end
 
   def nuke
+    # PRD 8.4: Delete everything EXCEPT plaid_api_calls and sync_logs (cost history preserved forever)
     # Delete in dependency order
+    EnrichedTransaction.delete_all
     Transaction.delete_all
     Position.delete_all
     Liability.delete_all
     RecurringTransaction.delete_all
     Account.delete_all
-    SyncLog.delete_all
     PlaidItem.delete_all
+    # SyncLog and PlaidApiCall are kept for audit trail and billing history
 
-    flash[:notice] = "All Plaid data has been deleted."
+    flash[:notice] = "All Plaid data deleted — cost history & sync logs preserved."
     redirect_to mission_control_path
   end
 
@@ -152,7 +154,7 @@ class MissionControlController < ApplicationController
     }
   end
 
-  # PRD 7.7: Cost Tracker page
+  # PRD 8.3: Cost Tracker page
   def costs
     # Current month
     @current_month = Date.today.beginning_of_month
@@ -160,17 +162,21 @@ class MissionControlController < ApplicationController
     @current_month_number = @current_month.month
     
     # Calculate current month totals
-    @current_month_total = ApiCostLog.monthly_total(@current_year, @current_month_number)
-    @current_month_breakdown = ApiCostLog.monthly_breakdown(@current_year, @current_month_number)
+    @current_month_total = PlaidApiCall.monthly_total(@current_year, @current_month_number)
+    @current_month_breakdown = PlaidApiCall.monthly_breakdown(@current_year, @current_month_number)
+    @average_per_call = PlaidApiCall.average_per_call(@current_year, @current_month_number)
     
     # Previous month
     @previous_month = @current_month - 1.month
     @previous_year = @previous_month.year
     @previous_month_number = @previous_month.month
-    @previous_month_total = ApiCostLog.monthly_total(@previous_year, @previous_month_number)
+    @previous_month_total = PlaidApiCall.monthly_total(@previous_year, @previous_month_number)
+    
+    # PRD 8.6: Monthly summary
+    @monthly_summary = PlaidApiCall.monthly_summary.limit(12)
     
     # Recent cost logs
-    @recent_logs = ApiCostLog.order(created_at: :desc).limit(20)
+    @recent_logs = PlaidApiCall.order(called_at: :desc).limit(20)
     
     # Projection: based on current month's daily average
     days_in_month = @current_month.end_of_month.day
@@ -181,6 +187,28 @@ class MissionControlController < ApplicationController
     else
       @projected_total = 0
     end
+  end
+
+  # PRD 8.5: Export all API costs as CSV
+  def export_costs
+    require 'csv'
+    
+    csv_data = CSV.generate(headers: true) do |csv|
+      csv << ['Date', 'Product', 'Endpoint', 'Calls', 'Cost ($)', 'Request ID']
+      
+      PlaidApiCall.order(called_at: :desc).find_each do |call|
+        csv << [
+          call.called_at.strftime('%Y-%m-%d %H:%M:%S'),
+          call.product,
+          call.endpoint,
+          call.transaction_count,
+          sprintf('%.2f', call.cost_cents / 100.0),
+          call.request_id
+        ]
+      end
+    end
+    
+    send_data csv_data, filename: "plaid_api_costs_#{Date.today}.csv", type: 'text/csv'
   end
 
   private

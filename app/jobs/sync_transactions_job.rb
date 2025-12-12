@@ -101,8 +101,13 @@ class SyncTransactionsJob < ApplicationJob
       # Mark last successful transactions sync timestamp (PRD 5.5)
       item.update!(transactions_synced_at: Time.current)
 
-      # PRD 7.7: Log API cost for transaction enrichment
-      ApiCostLog.log_transaction_sync(response.request_id, transactions_data.size)
+      # PRD 8.2: Log API cost for transactions
+      PlaidApiCall.log_call(
+        product: 'transactions',
+        endpoint: '/transactions/get',
+        request_id: response.request_id,
+        count: transactions_data.size
+      )
 
       SyncLog.create!(plaid_item: item, job_type: "transactions", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced #{transactions_data.size} transactions & #{all_streams.size} recurring streams for PlaidItem #{item.id}"

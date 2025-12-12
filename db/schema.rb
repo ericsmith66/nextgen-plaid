@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_12_183130) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_12_191702) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -28,17 +28,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_183130) do
     t.string "persistent_account_id"
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
-  end
-
-  create_table "api_cost_logs", force: :cascade do |t|
-    t.string "api_product", null: false
-    t.string "request_id"
-    t.integer "transaction_count", default: 0
-    t.integer "cost_cents", default: 0
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["api_product"], name: "index_api_cost_logs_on_api_product"
-    t.index ["created_at"], name: "index_api_cost_logs_on_created_at"
   end
 
   create_table "enriched_transactions", force: :cascade do |t|
@@ -65,6 +54,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_183130) do
     t.datetime "updated_at", null: false
     t.index ["account_id", "liability_id"], name: "index_liabilities_on_account_id_and_liability_id", unique: true
     t.index ["account_id"], name: "index_liabilities_on_account_id"
+  end
+
+  create_table "plaid_api_calls", force: :cascade do |t|
+    t.string "product", null: false
+    t.string "request_id"
+    t.integer "transaction_count", default: 0
+    t.integer "cost_cents", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "endpoint", default: "unknown", null: false
+    t.datetime "called_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.index ["called_at"], name: "index_plaid_api_calls_on_called_at"
+    t.index ["created_at"], name: "index_plaid_api_calls_on_created_at"
+    t.index ["product", "called_at"], name: "index_plaid_api_calls_on_product_and_called_at"
   end
 
   create_table "plaid_items", force: :cascade do |t|

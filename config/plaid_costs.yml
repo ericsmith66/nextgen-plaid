@@ -1,0 +1,25 @@
+# config/plaid_costs.yml
+# Plaid API Cost Configuration
+# All costs in USD cents
+# Edit this file to update costs instantly (no deploy needed)
+
+# Monthly base costs per connected account/item
+monthly_per_item:
+  investments_holdings: 18        # $0.18/month per account with holdings
+  investments_transactions: 35    # $0.35/month per account with investment transactions
+  transactions: 30                # $0.30/month per account with transactions
+  recurring_transactions: 15      # $0.15/month per account with recurring analysis
+  liabilities: 20                 # $0.20/month per account with liabilities
+
+# Per-call costs (one-time charges)
+per_call:
+  refresh: 12                     # $0.12 per manual refresh
+
+# Volume-based costs (per transaction/record)
+volume:
+  enrich_per_transaction: 0.2     # $2.00 per 1,000 transactions = $0.002 per txn = 0.2 cents
+  
+# Notes:
+# - Sandbox environment is typically free; production costs apply
+# - Volume-based costs are calculated: (count / 1000.0 * cost_per_1000).ceil
+# - Update this file to reflect your actual Plaid pricing tier

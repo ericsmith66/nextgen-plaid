@@ -26,4 +26,5 @@ Rails.application.routes.draw do
   post "/mission_control/relink_success/:id", to: "mission_control#relink_success", as: :mission_control_relink_success
   get  "/mission_control/logs", to: "mission_control#logs", defaults: { format: :json }
   get  "/mission_control/costs", to: "mission_control#costs"
+  get  "/mission_control/costs/export.csv", to: "mission_control#export_costs", as: :export_mission_control_costs
 end

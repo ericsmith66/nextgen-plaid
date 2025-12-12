@@ -117,6 +117,14 @@ class SyncHoldingsJob < ApplicationJob
       # Mark last successful holdings sync timestamp (PRD 5.5)
       item.update!(holdings_synced_at: Time.current, last_holdings_sync_at: Time.current)
 
+      # PRD 8.2: Log API cost for holdings
+      PlaidApiCall.log_call(
+        product: 'investments_holdings',
+        endpoint: '/investments/holdings/get',
+        request_id: response.request_id,
+        count: response.holdings.size
+      )
+
       SyncLog.create!(plaid_item: item, job_type: "holdings", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e
