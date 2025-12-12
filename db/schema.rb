@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_12_171855) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_12_183130) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -28,6 +28,29 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_171855) do
     t.string "persistent_account_id"
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
+  end
+
+  create_table "api_cost_logs", force: :cascade do |t|
+    t.string "api_product", null: false
+    t.string "request_id"
+    t.integer "transaction_count", default: 0
+    t.integer "cost_cents", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["api_product"], name: "index_api_cost_logs_on_api_product"
+    t.index ["created_at"], name: "index_api_cost_logs_on_created_at"
+  end
+
+  create_table "enriched_transactions", force: :cascade do |t|
+    t.bigint "transaction_id", null: false
+    t.string "merchant_name"
+    t.string "logo_url"
+    t.string "website"
+    t.string "personal_finance_category"
+    t.string "confidence_level"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["transaction_id"], name: "index_enriched_transactions_on_transaction_id", unique: true
   end
 
   create_table "liabilities", force: :cascade do |t|
@@ -133,6 +156,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_171855) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "enriched_transactions", "transactions"
   add_foreign_key "liabilities", "accounts"
   add_foreign_key "plaid_items", "users"
   add_foreign_key "positions", "accounts"

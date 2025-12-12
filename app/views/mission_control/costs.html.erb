@@ -1,0 +1,117 @@
+<div style="padding:20px; font-family:system-ui; max-width:1200px; margin:0 auto;">
+  <h1>API Cost Tracker</h1>
+  <p style="color:#666; margin-bottom:30px;">
+    Track your Plaid API usage costs across all products. Enrich costs $2.00 per 1,000 transactions.
+    <a href="/mission_control" style="margin-left:20px;">← Back to Mission Control</a>
+  </p>
+
+  <!-- Current Month Summary -->
+  <div style="background:#f0f9ff; border:2px solid #3b82f6; border-radius:12px; padding:30px; margin-bottom:30px;">
+    <h2 style="color:#1e40af; margin:0 0 20px 0;">
+      <%= @current_month.strftime("%B %Y") %> — Current Month
+    </h2>
+    <div style="display:flex; gap:30px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <div style="font-size:14px; color:#64748b; margin-bottom:8px;">Total Cost</div>
+        <div style="font-size:48px; font-weight:bold; color:#1e40af;">
+          $<%= sprintf("%.2f", @current_month_total / 100.0) %>
+        </div>
+      </div>
+      <div style="flex:1; min-width:200px;">
+        <div style="font-size:14px; color:#64748b; margin-bottom:8px;">Projected (End of Month)</div>
+        <div style="font-size:48px; font-weight:bold; color:#0ea5e9;">
+          $<%= sprintf("%.2f", @projected_total / 100.0) %>
+        </div>
+      </div>
+      <div style="flex:1; min-width:200px;">
+        <div style="font-size:14px; color:#64748b; margin-bottom:8px;">Previous Month (<%= @previous_month.strftime("%B") %>)</div>
+        <div style="font-size:48px; font-weight:bold; color:#64748b;">
+          $<%= sprintf("%.2f", @previous_month_total / 100.0) %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breakdown by Product -->
+  <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:30px; margin-bottom:30px;">
+    <h2 style="margin:0 0 20px 0;">Cost Breakdown by Product</h2>
+    <% if @current_month_breakdown.any? %>
+      <table border="1" cellpadding="12" cellspacing="0" style="border-collapse:collapse; width:100%;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left; padding:12px;">API Product</th>
+            <th style="text-align:right; padding:12px;">Cost</th>
+            <th style="text-align:right; padding:12px;">Percentage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @current_month_breakdown.each do |product, cost_cents| %>
+            <tr>
+              <td style="padding:12px; text-transform:capitalize;">
+                <strong><%= product %></strong>
+              </td>
+              <td style="padding:12px; text-align:right; font-weight:bold; color:#0ea5e9;">
+                $<%= sprintf("%.2f", cost_cents / 100.0) %>
+              </td>
+              <td style="padding:12px; text-align:right; color:#64748b;">
+                <%= sprintf("%.1f", (cost_cents.to_f / @current_month_total * 100)) %>%
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p style="color:#94a3b8; font-style:italic;">No API costs recorded this month yet.</p>
+    <% end %>
+  </div>
+
+  <!-- Recent Cost Logs -->
+  <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:30px;">
+    <h2 style="margin:0 0 20px 0;">Recent API Calls (Last 20)</h2>
+    <% if @recent_logs.any? %>
+      <table border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse; width:100%; font-size:14px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="text-align:left; padding:10px;">Date</th>
+            <th style="text-align:left; padding:10px;">Product</th>
+            <th style="text-align:right; padding:10px;">Transaction Count</th>
+            <th style="text-align:right; padding:10px;">Cost</th>
+            <th style="text-align:left; padding:10px;">Request ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @recent_logs.each do |log| %>
+            <tr>
+              <td style="padding:10px; color:#64748b;">
+                <%= log.created_at.strftime("%Y-%m-%d %H:%M") %>
+              </td>
+              <td style="padding:10px; text-transform:capitalize;">
+                <%= log.api_product %>
+              </td>
+              <td style="padding:10px; text-align:right;">
+                <%= number_with_delimiter(log.transaction_count) %>
+              </td>
+              <td style="padding:10px; text-align:right; font-weight:bold; color:#0ea5e9;">
+                <%= log.cost_dollars %>
+              </td>
+              <td style="padding:10px; font-family:monospace; font-size:12px; color:#64748b;">
+                <%= log.request_id %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p style="color:#94a3b8; font-style:italic;">No API calls logged yet.</p>
+    <% end %>
+  </div>
+
+  <!-- Info Box -->
+  <div style="margin-top:30px; padding:20px; background:#fef3c7; border:1px solid #fbbf24; border-radius:8px;">
+    <strong style="color:#92400e;">💡 Cost Calculation:</strong>
+    <p style="color:#78350f; margin:10px 0 0 0;">
+      Plaid Enrich charges <strong>$2.00 per 1,000 transactions</strong>. Costs are logged automatically after each transaction sync.
+      The projection is based on your current daily average usage extrapolated to the end of the month.
+    </p>
+  </div>
+</div>

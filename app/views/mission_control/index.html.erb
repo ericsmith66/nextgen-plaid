@@ -183,23 +183,61 @@
       <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
         <thead>
           <tr>
+            <th>Logo</th>
             <th>Date</th>
-            <th>Name</th>
-            <th>Amount</th>
-            <th>Category</th>
             <th>Merchant</th>
+            <th>Amount</th>
+            <th>Category (Enriched)</th>
+            <th>Confidence</th>
             <th>Account</th>
             <th>Pending</th>
           </tr>
         </thead>
         <tbody>
           <% @transactions.each do |txn| %>
+            <% enriched = txn.enriched_transaction %>
             <tr>
+              <td style="text-align:center;">
+                <% if enriched&.use_enriched_data? && enriched.logo_url.present? %>
+                  <img src="<%= enriched.logo_url %>" alt="logo" style="width:32px; height:32px; border-radius:4px; object-fit:contain; background:white; padding:3px;">
+                <% else %>
+                  💳
+                <% end %>
+              </td>
               <td><%= txn.date %></td>
-              <td><%= txn.name %></td>
-              <td><%= number_to_currency(txn.amount) if txn.amount %></td>
-              <td><%= txn.category %></td>
-              <td><%= txn.merchant_name %></td>
+              <td>
+                <% if enriched&.use_enriched_data? %>
+                  <strong><%= enriched.merchant_name %></strong>
+                <% else %>
+                  <%= txn.name %> <span style="color:#999; font-size:12px;">(unverified)</span>
+                <% end %>
+              </td>
+              <td style="color:<%= txn.amount < 0 ? 'green' : 'red' %>;">
+                <%= number_to_currency(txn.amount) if txn.amount %>
+              </td>
+              <td>
+                <% if enriched&.personal_finance_category.present? %>
+                  <span style="background:#3b82f6; color:white; padding:3px 8px; border-radius:8px; font-size:11px;">
+                    <%= enriched.personal_finance_category %>
+                  </span>
+                <% else %>
+                  <%= txn.category %>
+                <% end %>
+              </td>
+              <td>
+                <% if enriched&.confidence_level.present? && !enriched.low_confidence? %>
+                  <% confidence_color = case enriched.confidence_level
+                       when "VERY_HIGH", "HIGH" then "green"
+                       when "MEDIUM" then "orange"
+                       else "red"
+                       end %>
+                  <span style="color:<%= confidence_color %>; font-weight:bold; font-size:11px;">
+                    <%= enriched.confidence_level.humanize %>
+                  </span>
+                <% else %>
+                  <span style="color:#999; font-size:11px;">Low</span>
+                <% end %>
+              </td>
               <td><%= txn.account&.name || txn.account&.account_id %></td>
               <td><%= txn.pending ? 'Yes' : 'No' %></td>
             </tr>

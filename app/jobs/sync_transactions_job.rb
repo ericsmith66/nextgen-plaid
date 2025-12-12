@@ -60,7 +60,7 @@ class SyncTransactionsJob < ApplicationJob
       item.accounts.each do |account|
         account_transactions = transactions_data.select { |t| t.account_id == account.account_id }
         account_transactions.each do |txn|
-          account.transactions.find_or_initialize_by(transaction_id: txn.transaction_id).tap do |t|
+          transaction = account.transactions.find_or_initialize_by(transaction_id: txn.transaction_id).tap do |t|
             t.name = txn.name
             t.amount = txn.amount
             t.date = txn.date
@@ -69,7 +69,13 @@ class SyncTransactionsJob < ApplicationJob
             t.pending = txn.pending
             t.payment_channel = txn.payment_channel
             t.iso_currency_code = txn.iso_currency_code
-          end.save!
+          end
+          transaction.save!
+          
+          # PRD 7.1-7.2: Extract and save enrichment data (only once per transaction)
+          unless transaction.enriched_transaction.present?
+            create_enriched_transaction(transaction, txn)
+          end
         end
       end
 
@@ -94,6 +100,9 @@ class SyncTransactionsJob < ApplicationJob
 
       # Mark last successful transactions sync timestamp (PRD 5.5)
       item.update!(transactions_synced_at: Time.current)
+
+      # PRD 7.7: Log API cost for transaction enrichment
+      ApiCostLog.log_transaction_sync(response.request_id, transactions_data.size)
 
       SyncLog.create!(plaid_item: item, job_type: "transactions", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced #{transactions_data.size} transactions & #{all_streams.size} recurring streams for PlaidItem #{item.id}"
@@ -124,5 +133,51 @@ class SyncTransactionsJob < ApplicationJob
     return nil unless error.respond_to?(:response_body)
     parsed = JSON.parse(error.response_body) rescue {}
     parsed["error_code"]
+  end
+
+  private
+
+  # PRD 7.1-7.2: Extract enrichment data from Plaid transaction and create EnrichedTransaction
+  def create_enriched_transaction(transaction, plaid_txn)
+    # Extract personal finance category
+    pfc = plaid_txn.personal_finance_category
+    category_string = if pfc
+      primary = pfc.primary || ""
+      detailed = pfc.detailed || ""
+      detailed.present? ? "#{primary} → #{detailed}" : primary
+    else
+      nil
+    end
+
+    # Extract confidence level from personal_finance_category or counterparties
+    confidence = if pfc&.respond_to?(:confidence_level)
+      pfc.confidence_level
+    elsif plaid_txn.respond_to?(:counterparties) && plaid_txn.counterparties&.any?
+      plaid_txn.counterparties.first&.confidence_level
+    else
+      "UNKNOWN"
+    end
+
+    # Extract merchant logo and website from counterparties
+    logo_url = nil
+    website = nil
+    if plaid_txn.respond_to?(:counterparties) && plaid_txn.counterparties&.any?
+      counterparty = plaid_txn.counterparties.first
+      logo_url = counterparty&.logo_url
+      website = counterparty&.website
+    end
+
+    # Create enriched transaction record
+    EnrichedTransaction.create!(
+      source_transaction: transaction,
+      merchant_name: plaid_txn.merchant_name || plaid_txn.name,
+      logo_url: logo_url,
+      website: website,
+      personal_finance_category: category_string,
+      confidence_level: confidence
+    )
+  rescue => e
+    # PRD 7.10: Graceful degradation - log error but continue
+    Rails.logger.error "Failed to create enriched transaction for #{transaction.transaction_id}: #{e.message}"
   end
 end

@@ -4,7 +4,7 @@ class MissionControlController < ApplicationController
 
   def index
     @plaid_items = PlaidItem.includes(:accounts, :positions).order(created_at: :desc)
-    @transactions = Transaction.includes(account: :plaid_item).order(date: :desc).limit(20)
+    @transactions = Transaction.includes(:enriched_transaction, account: :plaid_item).order(date: :desc).limit(20)
     @recurring_transactions = RecurringTransaction.includes(:plaid_item).order(created_at: :desc).limit(20)
     @accounts = Account.includes(:plaid_item, :positions, :transactions).order(created_at: :desc)
     @positions = Position.includes(account: :plaid_item).order(created_at: :desc)
@@ -150,6 +150,37 @@ class MissionControlController < ApplicationController
         job_id: l.job_id
       }
     }
+  end
+
+  # PRD 7.7: Cost Tracker page
+  def costs
+    # Current month
+    @current_month = Date.today.beginning_of_month
+    @current_year = @current_month.year
+    @current_month_number = @current_month.month
+    
+    # Calculate current month totals
+    @current_month_total = ApiCostLog.monthly_total(@current_year, @current_month_number)
+    @current_month_breakdown = ApiCostLog.monthly_breakdown(@current_year, @current_month_number)
+    
+    # Previous month
+    @previous_month = @current_month - 1.month
+    @previous_year = @previous_month.year
+    @previous_month_number = @previous_month.month
+    @previous_month_total = ApiCostLog.monthly_total(@previous_year, @previous_month_number)
+    
+    # Recent cost logs
+    @recent_logs = ApiCostLog.order(created_at: :desc).limit(20)
+    
+    # Projection: based on current month's daily average
+    days_in_month = @current_month.end_of_month.day
+    days_elapsed = Date.today.day
+    if days_elapsed > 0 && @current_month_total > 0
+      daily_average = @current_month_total.to_f / days_elapsed
+      @projected_total = (daily_average * days_in_month).ceil
+    else
+      @projected_total = 0
+    end
   end
 
   private
