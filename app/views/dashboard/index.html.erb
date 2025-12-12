@@ -6,6 +6,30 @@
     Welcome, <%= current_user.email.split("@").first.capitalize %>!
   </h2>
 
+  <% # PRD 6.2: Warning banner for broken items %>
+  <% broken_items = current_user.plaid_items.where(status: ['needs_reauth', 'failed']) %>
+  <% if broken_items.any? %>
+    <div style="margin: 40px auto; max-width: 1000px; padding: 30px; background: #dc3545; border-radius: 15px; text-align: left;">
+      <h3 style="margin: 0 0 15px 0; color: white; font-size: 32px;">⚠️ Connection Issues Detected</h3>
+      <% broken_items.each do |item| %>
+        <div style="margin: 15px 0; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+          <p style="margin: 0 0 10px 0; font-size: 24px; color: white;">
+            <strong><%= item.institution_name %></strong> — <%= item.status.humanize %>
+          </p>
+          <% if item.status == 'needs_reauth' %>
+            <button type="button" onclick="relinkItem(<%= item.id %>)" style="padding: 15px 30px; font-size: 20px; background: #ffc107; color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+              Fix Connection
+            </button>
+          <% else %>
+            <p style="margin: 10px 0 0 0; color: #ffcccc; font-size: 18px;">
+              Maximum re-link attempts reached. Please contact support.
+            </p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
   <!-- CONNECT BUTTON -->
   <div style="margin:100px 0;">
     <button id="plaid-link-button" style="padding:40px 120px; font-size:48px; background:#0055ff; color:white; border:none; border-radius:30px; cursor:pointer; box-shadow:0 30px 60px rgba(0,85,255,0.6);">
@@ -50,6 +74,56 @@
 <!-- FINAL WORKING PLAID SCRIPT -->
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script>
+    // PRD 6.2: Re-link function for broken items
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]').content;
+    }
+
+    async function relinkItem(itemId) {
+        try {
+            const res = await fetch('/mission_control/relink/' + itemId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
+                body: JSON.stringify({})
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert('Failed to get link token: ' + (err.error || res.statusText));
+                return;
+            }
+            const data = await res.json();
+            const handler = Plaid.create({
+                token: data.link_token,
+                onSuccess: async function(public_token, metadata) {
+                    try {
+                        await fetch('/mission_control/relink_success/' + itemId, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': getCsrfToken()
+                            },
+                            body: JSON.stringify({ public_token: public_token })
+                        });
+                    } catch (e) {
+                        console.warn('Failed to notify relink success:', e);
+                    }
+                    window.location.reload();
+                },
+                onExit: function(err, metadata) {
+                    if (err) {
+                        console.warn('Plaid Link exit:', err);
+                    }
+                }
+            });
+            handler.open();
+        } catch (e) {
+            alert('Error: ' + (e && e.message ? e.message : e));
+        }
+    }
+
     document.getElementById('plaid-link-button').addEventListener('click', async () => {
         try {
             const response = await fetch('/plaid/link_token', {

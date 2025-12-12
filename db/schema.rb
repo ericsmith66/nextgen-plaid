@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_11_200647) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_12_171855) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -25,6 +25,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_200647) do
     t.string "iso_currency_code"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "persistent_account_id"
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
   end
@@ -56,6 +57,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_11_200647) do
     t.datetime "holdings_synced_at"
     t.datetime "transactions_synced_at"
     t.datetime "liabilities_synced_at"
+    t.text "last_error"
+    t.integer "reauth_attempts", default: 0
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"

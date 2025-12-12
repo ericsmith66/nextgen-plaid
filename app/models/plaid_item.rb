@@ -7,6 +7,9 @@ class PlaidItem < ApplicationRecord
   has_many :liabilities, through: :accounts
   has_many :recurring_transactions, dependent: :destroy
 
+  # PRD 6.1: Status enum for error handling
+  enum :status, { good: "good", needs_reauth: "needs_reauth", failed: "failed" }
+
   # This is the correct, final version for 2025
   attr_encrypted :access_token,
                  key: ACCESS_TOKEN_ENCRYPTION_KEY,        # 32-byte binary key from initializer

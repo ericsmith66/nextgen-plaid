@@ -7,7 +7,8 @@ class SyncHoldingsJob < ApplicationJob
 
   # If token is permanently bad, give up and alert
   discard_on Plaid::ApiError do |job, error|
-    if error.error_code == "INVALID_ACCESS_TOKEN"
+    error_code = SyncHoldingsJob.extract_plaid_error_code(error)
+    if error_code == "INVALID_ACCESS_TOKEN"
       plaid_item_id = job.arguments.first
       Rails.logger.error "PlaidItem #{plaid_item_id} has invalid token — needs re-link"
       item = PlaidItem.find_by(id: plaid_item_id)
@@ -25,6 +26,13 @@ class SyncHoldingsJob < ApplicationJob
 
   def perform(plaid_item_id)
     item = PlaidItem.find(plaid_item_id)
+    
+    # PRD 6.6: Skip syncing items with failed status
+    if item.status == 'failed'
+      Rails.logger.warn "SyncHoldingsJob: Skipping PlaidItem #{plaid_item_id} with failed status"
+      return
+    end
+
     token = item.access_token
 
     unless token.present?
@@ -42,13 +50,53 @@ class SyncHoldingsJob < ApplicationJob
       )
 
     response.accounts.each do |plaid_account|
-      account = item.accounts.find_or_create_by(account_id: plaid_account.account_id) do |a|
-        a.name               = plaid_account.name
-        a.mask               = plaid_account.mask
-        a.type               = plaid_account.type
-        a.subtype            = plaid_account.subtype
-        a.current_balance    = plaid_account.balances.current
-        a.iso_currency_code  = plaid_account.balances.iso_currency_code
+      # Extract persistent_account_id (stable across re-auth) if available
+      persistent_id = plaid_account.persistent_account_id rescue nil
+      
+      # Try to find existing account by persistent_account_id first (most reliable)
+      account = nil
+      if persistent_id.present?
+        account = item.accounts.find_by(persistent_account_id: persistent_id)
+      end
+      
+      # If not found by persistent_id, try account_id
+      if account.nil?
+        account = item.accounts.find_by(account_id: plaid_account.account_id)
+      end
+      
+      # If not found, try to match by name, mask, and type (handles legacy accounts without persistent_id)
+      if account.nil?
+        account = item.accounts.find_by(
+          name: plaid_account.name,
+          mask: plaid_account.mask,
+          type: plaid_account.type
+        )
+      end
+      
+      # If we found an existing account, update it with current data
+      if account
+        account.update!(
+          account_id: plaid_account.account_id,
+          persistent_account_id: persistent_id,
+          name: plaid_account.name,
+          mask: plaid_account.mask,
+          type: plaid_account.type,
+          subtype: plaid_account.subtype,
+          current_balance: plaid_account.balances.current,
+          iso_currency_code: plaid_account.balances.iso_currency_code
+        )
+      else
+        # Create new account if no match found
+        account = item.accounts.create!(
+          account_id: plaid_account.account_id,
+          persistent_account_id: persistent_id,
+          name: plaid_account.name,
+          mask: plaid_account.mask,
+          type: plaid_account.type,
+          subtype: plaid_account.subtype,
+          current_balance: plaid_account.balances.current,
+          iso_currency_code: plaid_account.balances.iso_currency_code
+        )
       end
 
       # Holdings are top-level — match by account_id
@@ -72,11 +120,31 @@ class SyncHoldingsJob < ApplicationJob
       SyncLog.create!(plaid_item: item, job_type: "holdings", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e
+      # PRD 6.1: Detect expired/broken tokens
+      error_code = self.class.extract_plaid_error_code(e)
+      if error_code == "ITEM_LOGIN_REQUIRED" || error_code == "INVALID_ACCESS_TOKEN"
+        new_attempts = item.reauth_attempts + 1
+        # PRD 6.6: After 3 failed attempts, mark as failed
+        new_status = new_attempts >= 3 ? :failed : :needs_reauth
+        item.update!(
+          status: new_status,
+          last_error: e.message,
+          reauth_attempts: new_attempts
+        )
+        Rails.logger.error "PlaidItem #{item.id} needs reauth (attempt #{new_attempts}): #{e.message}"
+      end
       SyncLog.create!(plaid_item: item, job_type: "holdings", status: "failure", error_message: e.message, job_id: self.job_id)
       raise
     rescue => e
       SyncLog.create!(plaid_item: item, job_type: "holdings", status: "failure", error_message: e.message, job_id: self.job_id)
       raise
     end
+  end
+
+  # Helper method to extract error_code from Plaid::ApiError
+  def self.extract_plaid_error_code(error)
+    return nil unless error.respond_to?(:response_body)
+    parsed = JSON.parse(error.response_body) rescue {}
+    parsed["error_code"]
   end
 end
