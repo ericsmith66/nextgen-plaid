@@ -1,4 +1,4 @@
-<%= render(LayoutComponent.new(title: "Dashboard")) do %>
+<%= render(LayoutComponent.new(title: "Dashboard", current_user: current_user)) do %>
   <%= render(DashboardComponent.new(current_user: current_user)) %>
 <% end %>
 
