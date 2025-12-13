@@ -1,0 +1,71 @@
+<div class="bg-white p-6 rounded-lg shadow-md">
+  <div class="border-b pb-4 mb-4">
+    <h2 class="text-2xl font-bold text-gray-900"><%= @transaction.name %></h2>
+    <p class="text-gray-600 mt-1"><%= @transaction.date&.strftime("%B %d, %Y") %></p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Transaction ID</label>
+        <p class="text-gray-900"><%= @transaction.transaction_id %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Amount</label>
+        <p class="<%= @transaction.amount.to_f >= 0 ? 'text-green-600' : 'text-red-600' %> text-2xl font-bold">
+          $<%= number_to_currency(@transaction.amount || 0, precision: 2, unit: "") %>
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Merchant Name</label>
+        <p class="text-gray-900"><%= @transaction.merchant_name || "N/A" %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Subtype</label>
+        <p class="text-gray-900"><%= @transaction.subtype || "N/A" %></p>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Category</label>
+        <p class="text-gray-900"><%= @transaction.category || "N/A" %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Payment Channel</label>
+        <p class="text-gray-900"><%= @transaction.payment_channel || "N/A" %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Status</label>
+        <p class="text-gray-900">
+          <% if @transaction.respond_to?(:pending) && @transaction.pending %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              Pending
+            </span>
+          <% else %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              Completed
+            </span>
+          <% end %>
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Fees</label>
+        <p class="text-gray-900">
+          <%= @transaction.respond_to?(:fees) && @transaction.fees ? "$#{number_to_currency(@transaction.fees, precision: 2, unit: '')}" : "N/A" %>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 pt-4 border-t">
+    <label class="block text-sm font-medium text-gray-500">Account</label>
+    <p class="text-gray-900"><%= @transaction.account.name if @transaction.account %></p>
+  </div>
+</div>
