@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_13_172715) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -26,6 +26,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "persistent_account_id"
+    t.decimal "apr_percentage", precision: 15, scale: 8
+    t.decimal "min_payment_amount", precision: 15, scale: 8
+    t.date "next_payment_due_date"
+    t.boolean "is_overdue"
+    t.boolean "debt_risk_flag"
+    t.index ["is_overdue"], name: "index_accounts_on_is_overdue"
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
   end
@@ -78,20 +84,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
     t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
     t.index ["account_id"], name: "index_holdings_on_account_id"
     t.index ["sector"], name: "index_holdings_on_sector"
-  end
-
-  create_table "liabilities", force: :cascade do |t|
-    t.bigint "account_id", null: false
-    t.string "liability_id", null: false
-    t.string "liability_type"
-    t.decimal "current_balance", precision: 14, scale: 4
-    t.decimal "min_payment_due", precision: 14, scale: 4
-    t.decimal "apr_percentage", precision: 6, scale: 4
-    t.date "payment_due_date"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["account_id", "liability_id"], name: "index_liabilities_on_account_id_and_liability_id", unique: true
-    t.index ["account_id"], name: "index_liabilities_on_account_id"
   end
 
   create_table "option_contracts", force: :cascade do |t|
@@ -178,8 +170,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
     t.string "iso_currency_code"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "fees", precision: 15, scale: 8
+    t.string "subtype"
+    t.decimal "price", precision: 15, scale: 8
+    t.string "dividend_type"
+    t.boolean "wash_sale_risk_flag", default: false
     t.index ["account_id", "transaction_id"], name: "index_transactions_on_account_id_and_transaction_id", unique: true
     t.index ["account_id"], name: "index_transactions_on_account_id"
+    t.index ["subtype"], name: "index_transactions_on_subtype"
   end
 
   create_table "users", force: :cascade do |t|
@@ -197,7 +195,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
   add_foreign_key "enriched_transactions", "transactions"
   add_foreign_key "fixed_incomes", "holdings"
   add_foreign_key "holdings", "accounts"
-  add_foreign_key "liabilities", "accounts"
   add_foreign_key "option_contracts", "holdings"
   add_foreign_key "plaid_items", "users"
   add_foreign_key "recurring_transactions", "plaid_items"

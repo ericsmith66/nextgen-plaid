@@ -42,72 +42,12 @@ class SyncLiabilitiesJob < ApplicationJob
     SyncLog.create!(plaid_item: item, job_type: "liabilities", status: "started", job_id: self.job_id)
 
     begin
-      client = Rails.application.config.x.plaid_client
-
-      # Fetch liabilities from Plaid
-      request = Plaid::LiabilitiesGetRequest.new(access_token: token)
-      response = client.liabilities_get(request)
-
-      # Process each account's liabilities
-      item.accounts.each do |account|
-        # Credit cards
-        if response.liabilities.credit
-          credit_cards = response.liabilities.credit.select { |cc| cc.account_id == account.account_id }
-          credit_cards.each do |cc|
-            account.liabilities.find_or_initialize_by(liability_id: cc.account_id).tap do |liability|
-              liability.liability_type = "CREDIT_CARD"
-              liability.current_balance = cc.last_statement_balance
-              liability.min_payment_due = cc.minimum_payment_amount
-              liability.apr_percentage = cc.aprs&.first&.apr_percentage
-              liability.payment_due_date = cc.next_payment_due_date
-            end.save!
-          end
-        end
-
-        # Student loans
-        if response.liabilities.student
-          student_loans = response.liabilities.student.select { |sl| sl.account_id == account.account_id }
-          student_loans.each do |sl|
-            account.liabilities.find_or_initialize_by(liability_id: sl.account_id).tap do |liability|
-              liability.liability_type = "STUDENT_LOAN"
-              liability.current_balance = sl.last_statement_balance
-              liability.min_payment_due = sl.minimum_payment_amount
-              liability.apr_percentage = sl.interest_rate_percentage
-              liability.payment_due_date = sl.next_payment_due_date
-            end.save!
-          end
-        end
-
-        # Mortgages
-        if response.liabilities.mortgage
-          mortgages = response.liabilities.mortgage.select { |m| m.account_id == account.account_id }
-          mortgages.each do |m|
-            account.liabilities.find_or_initialize_by(liability_id: m.account_id).tap do |liability|
-              liability.liability_type = "MORTGAGE"
-              liability.current_balance = account.current_balance
-              liability.min_payment_due = m.last_payment_amount
-              liability.apr_percentage = m.interest_rate.percentage
-              liability.payment_due_date = m.next_payment_due_date
-            end.save!
-          end
-        end
-      end
+      # PRD 12: Use PlaidLiabilitiesService to fetch and sync liability data to Account model
+      service = PlaidLiabilitiesService.new(item)
+      service.fetch_and_sync_liabilities
 
       # Mark last successful liabilities sync timestamp (PRD 5.5)
       item.update!(liabilities_synced_at: Time.current)
-
-      # PRD 8.2: Log API cost for liabilities
-      liability_count = [
-        response.liabilities.credit&.size || 0,
-        response.liabilities.student&.size || 0,
-        response.liabilities.mortgage&.size || 0
-      ].sum
-      PlaidApiCall.log_call(
-        product: 'liabilities',
-        endpoint: '/liabilities/get',
-        request_id: response.request_id,
-        count: liability_count
-      )
 
       SyncLog.create!(plaid_item: item, job_type: "liabilities", status: "success", job_id: self.job_id)
       Rails.logger.info "Synced liabilities for PlaidItem #{item.id}"
