@@ -194,4 +194,217 @@ class SyncHoldingsJobTest < ActiveJob::TestCase
     assert_nil pos.institution_price_as_of
     refute pos.high_cost_flag  # Should be false when cost_basis is nil
   end
+
+  # PRD 10: Test FixedIncome parsing from Plaid response
+  test "sync creates FixedIncome record when fixed_income data present" do
+    user = User.create!(email: "bond@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_bond", institution_name: "JPM", access_token: "tok_bond", status: "good")
+
+    balances = OpenStruct.new(current: 10000.0, iso_currency_code: "USD")
+    plaid_account = OpenStruct.new(account_id: "acc_bond", name: "Bond Account", mask: "7890", type: "investment", subtype: "brokerage", balances: balances)
+
+    # Mock fixed_income data
+    fixed_income_data = OpenStruct.new(
+      yield_percentage: 3.5,
+      yield_type: "coupon",
+      maturity_date: Date.today + 5.years,
+      issue_date: Date.today - 1.year,
+      face_value: 10000.0
+    )
+
+    holding = OpenStruct.new(
+      account_id: "acc_bond",
+      security_id: "sec_bond",
+      quantity: 10.0,
+      cost_basis: 9500.0,
+      institution_value: 10000.0,
+      market_value: 10000.0
+    )
+    
+    security = OpenStruct.new(
+      security_id: "sec_bond",
+      ticker_symbol: "DBLTX",
+      name: "Treasury Bond",
+      type: "fixed income",
+      subtype: "bond",
+      fixed_income: fixed_income_data
+    )
+
+    fake_response = OpenStruct.new(accounts: [plaid_account], holdings: [holding], securities: [security], request_id: "req_bond")
+
+    with_stubbed_plaid_client(investments_holdings_get: fake_response) do
+      SyncHoldingsJob.perform_now(item.id)
+    end
+
+    pos = item.holdings.find_by(security_id: "sec_bond")
+    refute_nil pos
+    assert_equal "fixed income", pos.type
+    assert_equal "bond", pos.subtype
+    
+    # Check FixedIncome record created
+    refute_nil pos.fixed_income
+    assert_equal BigDecimal("3.5"), pos.fixed_income.yield_percentage
+    assert_equal "coupon", pos.fixed_income.yield_type
+    assert_equal Date.today + 5.years, pos.fixed_income.maturity_date
+    assert_equal Date.today - 1.year, pos.fixed_income.issue_date
+    assert_equal BigDecimal("10000.0"), pos.fixed_income.face_value
+    
+    # income_risk_flag should be false (yield 3.5% >= 2%)
+    refute pos.fixed_income.income_risk_flag
+  end
+
+  # PRD 10: Test income_risk_flag logic
+  test "sets income_risk_flag true when yield below 2 percent" do
+    user = User.create!(email: "lowbond@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_lowbond", institution_name: "Schwab", access_token: "tok_lowbond", status: "good")
+
+    balances = OpenStruct.new(current: 5000.0, iso_currency_code: "USD")
+    plaid_account = OpenStruct.new(account_id: "acc_lowbond", name: "Low Yield", mask: "1111", type: "investment", subtype: "brokerage", balances: balances)
+
+    fixed_income_data = OpenStruct.new(
+      yield_percentage: 1.5,
+      yield_type: "discount",
+      maturity_date: Date.today + 2.years,
+      issue_date: Date.today - 6.months,
+      face_value: 5000.0
+    )
+
+    holding = OpenStruct.new(
+      account_id: "acc_lowbond",
+      security_id: "sec_lowbond",
+      quantity: 5.0,
+      cost_basis: 4800.0,
+      institution_value: 5000.0,
+      market_value: 5000.0
+    )
+    
+    security = OpenStruct.new(
+      security_id: "sec_lowbond",
+      ticker_symbol: "TBILL",
+      name: "Treasury Bill",
+      type: "fixed income",
+      subtype: "bill",
+      fixed_income: fixed_income_data
+    )
+
+    fake_response = OpenStruct.new(accounts: [plaid_account], holdings: [holding], securities: [security], request_id: "req_lowbond")
+
+    with_stubbed_plaid_client(investments_holdings_get: fake_response) do
+      SyncHoldingsJob.perform_now(item.id)
+    end
+
+    pos = item.holdings.find_by(security_id: "sec_lowbond")
+    refute_nil pos.fixed_income
+    
+    # income_risk_flag should be true (yield 1.5% < 2%)
+    assert pos.fixed_income.income_risk_flag
+  end
+
+  # PRD 10: Test OptionContract parsing from Plaid response
+  test "sync creates OptionContract record when option_contract data present" do
+    user = User.create!(email: "option@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_option", institution_name: "Schwab", access_token: "tok_option", status: "good")
+
+    balances = OpenStruct.new(current: 5000.0, iso_currency_code: "USD")
+    plaid_account = OpenStruct.new(account_id: "acc_option", name: "Options", mask: "4567", type: "investment", subtype: "brokerage", balances: balances)
+
+    # Mock option_contract data
+    option_data = OpenStruct.new(
+      contract_type: "call",
+      expiration_date: Date.today + 90.days,
+      strike_price: 450.00,
+      underlying_ticker: "NFLX"
+    )
+
+    holding = OpenStruct.new(
+      account_id: "acc_option",
+      security_id: "sec_option",
+      quantity: 1.0,
+      cost_basis: 500.0,
+      institution_value: 600.0,
+      market_value: 600.0
+    )
+    
+    security = OpenStruct.new(
+      security_id: "sec_option",
+      ticker_symbol: "NFLX250315C00450000",
+      name: "Netflix Call Option",
+      type: "derivative",
+      subtype: "option",
+      option_contract: option_data
+    )
+
+    fake_response = OpenStruct.new(accounts: [plaid_account], holdings: [holding], securities: [security], request_id: "req_option")
+
+    with_stubbed_plaid_client(investments_holdings_get: fake_response) do
+      SyncHoldingsJob.perform_now(item.id)
+    end
+
+    pos = item.holdings.find_by(security_id: "sec_option")
+    refute_nil pos
+    assert_equal "derivative", pos.type
+    assert_equal "option", pos.subtype
+    
+    # Check OptionContract record created
+    refute_nil pos.option_contract
+    assert_equal "call", pos.option_contract.contract_type
+    assert_equal Date.today + 90.days, pos.option_contract.expiration_date
+    assert_equal BigDecimal("450.00"), pos.option_contract.strike_price
+    assert_equal "NFLX", pos.option_contract.underlying_ticker
+  end
+
+  # PRD 10: Test nil fixed_income fields handling
+  test "handles partial fixed_income data gracefully" do
+    user = User.create!(email: "partial@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_partial", institution_name: "Test", access_token: "tok_partial", status: "good")
+
+    balances = OpenStruct.new(current: 5000.0, iso_currency_code: "USD")
+    plaid_account = OpenStruct.new(account_id: "acc_partial", name: "Partial", mask: "9999", type: "investment", subtype: "brokerage", balances: balances)
+
+    # Partial fixed_income data (some nils)
+    fixed_income_data = OpenStruct.new(
+      yield_percentage: nil,
+      yield_type: nil,
+      maturity_date: Date.today + 3.years,
+      issue_date: nil,
+      face_value: nil
+    )
+
+    holding = OpenStruct.new(
+      account_id: "acc_partial",
+      security_id: "sec_partial",
+      quantity: 1.0,
+      cost_basis: 1000.0,
+      institution_value: 1000.0,
+      market_value: 1000.0
+    )
+    
+    security = OpenStruct.new(
+      security_id: "sec_partial",
+      ticker_symbol: "PARTIAL",
+      name: "Partial Bond Data",
+      type: "fixed income",
+      subtype: "bond",
+      fixed_income: fixed_income_data
+    )
+
+    fake_response = OpenStruct.new(accounts: [plaid_account], holdings: [holding], securities: [security], request_id: "req_partial")
+
+    with_stubbed_plaid_client(investments_holdings_get: fake_response) do
+      SyncHoldingsJob.perform_now(item.id)
+    end
+
+    pos = item.holdings.find_by(security_id: "sec_partial")
+    refute_nil pos.fixed_income
+    
+    # Check nil fields handled
+    assert_nil pos.fixed_income.yield_percentage
+    assert_equal "unknown", pos.fixed_income.yield_type  # Should default to "unknown"
+    assert_equal Date.today + 3.years, pos.fixed_income.maturity_date
+    assert_nil pos.fixed_income.issue_date
+    assert_nil pos.fixed_income.face_value
+    
+    # income_risk_flag should be false when yield_percentage is nil
+    refute pos.fixed_income.income_risk_flag
+  end
 end

@@ -124,4 +124,46 @@ class HoldingTest < ActiveSupport::TestCase
     assert_match(/quantity: nil/, inspect_output)
     assert_match(/cost_basis: nil/, inspect_output)
   end
+
+  # PRD 9: Test securities metadata fields
+  test "should accept securities metadata fields" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_meta",
+      symbol: "AAPL",
+      name: "Apple Inc.",
+      isin: "US0378331005",
+      cusip: "037833100",
+      sector: "Technology",
+      industry: "Consumer Electronics"
+    )
+    
+    assert_equal "US0378331005", holding.isin
+    assert_equal "037833100", holding.cusip
+    assert_equal "Technology", holding.sector
+    assert_equal "Consumer Electronics", holding.industry
+  end
+
+  test "securities metadata fields should be nullable" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_nullable",
+      symbol: "CUSTOM"
+    )
+    
+    assert_nil holding.isin
+    assert_nil holding.cusip
+    assert_nil holding.sector
+    assert_nil holding.industry
+  end
+
+  test "should handle Unknown sector" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_unknown",
+      sector: "Unknown"
+    )
+    
+    assert_equal "Unknown", holding.sector
+  end
 end
