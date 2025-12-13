@@ -37,4 +37,8 @@ class PlaidController < ApplicationController
 
     render json: { status: "connected" }
   end
+
+  def sync_logs
+    @sync_logs = SyncLog.includes(:plaid_item).order(created_at: :desc).limit(100)
+  end
 end
