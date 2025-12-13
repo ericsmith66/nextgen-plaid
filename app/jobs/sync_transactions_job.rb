@@ -114,6 +114,15 @@ class SyncTransactionsJob < ApplicationJob
     rescue Plaid::ApiError => e
       # PRD 6.1: Detect expired/broken tokens
       error_code = self.class.extract_plaid_error_code(e)
+      
+      # Handle PRODUCT_NOT_READY - transient error when product isn't ready yet
+      if error_code == "PRODUCT_NOT_READY"
+        Rails.logger.warn "PlaidItem #{item.id} transactions product not ready yet - will retry: #{e.message}"
+        SyncLog.create!(plaid_item: item, job_type: "transactions", status: "failure", error_message: "PRODUCT_NOT_READY - will retry later", job_id: self.job_id)
+        # Re-raise to allow retry_on to handle the retry logic
+        raise
+      end
+      
       if error_code == "ITEM_LOGIN_REQUIRED" || error_code == "INVALID_ACCESS_TOKEN"
         new_attempts = item.reauth_attempts + 1
         # PRD 6.6: After 3 failed attempts, mark as failed
