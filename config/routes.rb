@@ -14,6 +14,7 @@ Rails.application.routes.draw do
 
   post "/plaid/link_token", to: "plaid#link_token"
   post "/plaid/exchange",   to: "plaid#exchange"
+  get  "/plaid/sync_logs",  to: "plaid#sync_logs"
 
   # Mission Control (owner-only)
   get "/mission_control", to: "mission_control#index"

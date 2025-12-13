@@ -1,0 +1,118 @@
+<div class="space-y-8">
+  <!-- Actions -->
+  <div class="flex flex-wrap gap-4">
+    <%= button_to "🔄 Sync Holdings", mission_control_sync_holdings_now_path, method: :post, class: "bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold transition" %>
+    <%= button_to "💳 Sync Transactions", mission_control_sync_transactions_now_path, method: :post, class: "bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold transition" %>
+    <%= button_to "💰 Sync Liabilities", mission_control_sync_liabilities_now_path, method: :post, class: "bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold transition" %>
+    <%= button_to "🚀 Refresh Everything", mission_control_refresh_everything_now_path, method: :post, class: "bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition" %>
+    <%= button_to "💣 Nuke All Data", mission_control_nuke_path, method: :post, data: { confirm: "Delete ALL Plaid data? (cost history preserved)" }, class: "bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition" %>
+  </div>
+
+  <!-- Plaid Items -->
+  <div>
+    <h3 class="text-2xl font-bold text-primary-400 mb-4">Plaid Items (<%= @plaid_items.count %>)</h3>
+    <% if @plaid_items.any? %>
+      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+        <table class="w-full">
+          <thead class="bg-slate-700">
+            <tr>
+              <th class="px-4 py-3 text-left">Institution</th>
+              <th class="px-4 py-3 text-left">Status</th>
+              <th class="px-4 py-3 text-left">Accounts</th>
+              <th class="px-4 py-3 text-left">Holdings</th>
+              <th class="px-4 py-3 text-left">Last Synced</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700">
+            <% @plaid_items.each do |item| %>
+              <tr class="hover:bg-slate-700/50">
+                <td class="px-4 py-3"><%= item.institution_name %></td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded text-sm <%= item.status == 'good' ? 'bg-green-600' : 'bg-red-600' %>">
+                    <%= item.status.humanize %>
+                  </span>
+                </td>
+                <td class="px-4 py-3"><%= item.accounts.count %></td>
+                <td class="px-4 py-3"><%= item.holdings.count %></td>
+                <td class="px-4 py-3 text-sm text-slate-400">
+                  <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-slate-400">No Plaid items yet.</p>
+    <% end %>
+  </div>
+
+  <!-- Holdings -->
+  <div>
+    <h3 class="text-2xl font-bold text-primary-400 mb-4">Holdings (<%= @holdings.count %>)</h3>
+    <% if @holdings.any? %>
+      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-700">
+            <tr>
+              <th class="px-4 py-3 text-left">Symbol</th>
+              <th class="px-4 py-3 text-left">Name</th>
+              <th class="px-4 py-3 text-right">Quantity</th>
+              <th class="px-4 py-3 text-right">Market Value</th>
+              <th class="px-4 py-3 text-left">Account</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700">
+            <% @holdings.each do |holding| %>
+              <tr class="hover:bg-slate-700/50">
+                <td class="px-4 py-3 font-semibold"><%= holding.symbol %></td>
+                <td class="px-4 py-3"><%= holding.name %></td>
+                <td class="px-4 py-3 text-right"><%= number_with_delimiter(holding.quantity) %></td>
+                <td class="px-4 py-3 text-right"><%= number_to_currency(holding.market_value) if holding.market_value %></td>
+                <td class="px-4 py-3"><%= holding.account&.name || holding.account&.account_id %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-slate-400">No holdings yet. Link a Plaid item and sync holdings.</p>
+    <% end %>
+  </div>
+
+  <!-- Liabilities -->
+  <div>
+    <h3 class="text-2xl font-bold text-primary-400 mb-4">Liabilities</h3>
+    <% liability_accounts = @accounts.select { |a| a.respond_to?(:apr_percentage) && (a.apr_percentage.present? || a.min_payment_amount.present?) } %>
+    <% if liability_accounts.any? %>
+      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-700">
+            <tr>
+              <th class="px-4 py-3 text-left">Account</th>
+              <th class="px-4 py-3 text-right">Min Payment</th>
+              <th class="px-4 py-3 text-right">APR %</th>
+              <th class="px-4 py-3 text-left">Due Date</th>
+              <th class="px-4 py-3 text-center">Overdue?</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700">
+            <% liability_accounts.each do |account| %>
+              <tr class="hover:bg-slate-700/50">
+                <td class="px-4 py-3"><%= account.name || account.account_id %></td>
+                <td class="px-4 py-3 text-right"><%= number_to_currency(account.min_payment_amount) if account.min_payment_amount %></td>
+                <td class="px-4 py-3 text-right"><%= account.apr_percentage ? "#{account.apr_percentage}%" : '-' %></td>
+                <td class="px-4 py-3"><%= account.next_payment_due_date || '-' %></td>
+                <td class="px-4 py-3 text-center">
+                  <%= account.is_overdue ? '<span class="text-red-400">⚠️ YES</span>'.html_safe : '<span class="text-green-400">No</span>'.html_safe %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-slate-400">No liabilities yet. Click "Sync Liabilities" to fetch data.</p>
+    <% end %>
+  </div>
+</div>
