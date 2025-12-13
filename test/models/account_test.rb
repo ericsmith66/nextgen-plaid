@@ -118,4 +118,82 @@ class AccountTest < ActiveSupport::TestCase
     assert_includes nonprofit_results, h3
     assert_not_includes nonprofit_results, h2
   end
+
+  # PRD 12: Test liability HNW hooks
+  test "overdue_payment? should return false when is_overdue is false" do
+    @account.update!(is_overdue: false)
+    assert_not @account.overdue_payment?
+  end
+
+  test "overdue_payment? should return true when is_overdue is true" do
+    @account.update!(is_overdue: true)
+    assert @account.overdue_payment?
+  end
+
+  test "overdue_payment? should return false when is_overdue is nil" do
+    @account.update!(is_overdue: nil)
+    assert_not @account.overdue_payment?
+  end
+
+  test "high_debt_risk? should return false when debt_risk_flag is false" do
+    @account.update!(debt_risk_flag: false)
+    assert_not @account.high_debt_risk?
+  end
+
+  test "high_debt_risk? should return true when debt_risk_flag is true" do
+    @account.update!(debt_risk_flag: true)
+    assert @account.high_debt_risk?
+  end
+
+  test "high_debt_risk? should return false when debt_risk_flag is nil" do
+    @account.update!(debt_risk_flag: nil)
+    assert_not @account.high_debt_risk?
+  end
+
+  test "liability_summary should return nil when no liability data" do
+    assert_nil @account.liability_summary
+  end
+
+  test "liability_summary should return hash when apr_percentage present" do
+    @account.update!(
+      apr_percentage: 19.99,
+      min_payment_amount: 50.00,
+      next_payment_due_date: Date.parse("2025-01-15"),
+      is_overdue: false,
+      debt_risk_flag: false
+    )
+    
+    summary = @account.liability_summary
+    
+    assert_not_nil summary
+    assert_equal 19.99, summary[:apr_percentage]
+    assert_equal 50.00, summary[:min_payment_amount]
+    assert_equal Date.parse("2025-01-15"), summary[:next_payment_due_date]
+    assert_equal false, summary[:is_overdue]
+    assert_equal false, summary[:debt_risk_flag]
+  end
+
+  test "liability_summary should return hash when min_payment_amount present" do
+    @account.update!(min_payment_amount: 100.00)
+    
+    summary = @account.liability_summary
+    
+    assert_not_nil summary
+    assert_equal 100.00, summary[:min_payment_amount]
+  end
+
+  test "liability_summary should handle high risk debt" do
+    @account.update!(
+      apr_percentage: 24.99,
+      is_overdue: true,
+      debt_risk_flag: true
+    )
+    
+    summary = @account.liability_summary
+    
+    assert_not_nil summary
+    assert_equal 24.99, summary[:apr_percentage]
+    assert_equal true, summary[:is_overdue]
+    assert_equal true, summary[:debt_risk_flag]
+  end
 end
