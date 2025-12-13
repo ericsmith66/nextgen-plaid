@@ -8,7 +8,7 @@ class MissionControlController < ApplicationController
     @recurring_transactions = RecurringTransaction.includes(:plaid_item).order(created_at: :desc).limit(20)
     @accounts = Account.includes(:plaid_item, :holdings, :transactions).order(created_at: :desc)
     @holdings = Holding.includes(account: :plaid_item).order(created_at: :desc)
-    @liabilities = Liability.includes(account: :plaid_item).order(created_at: :desc)
+    # PRD 12: Liability data now stored directly on Account model
   end
 
   def nuke
@@ -17,7 +17,7 @@ class MissionControlController < ApplicationController
     EnrichedTransaction.delete_all
     Transaction.delete_all
     Holding.delete_all
-    Liability.delete_all
+    # PRD 12: Liability model removed - data now on Account model
     RecurringTransaction.delete_all
     Account.delete_all
     SyncLog.delete_all  # Delete sync_logs to avoid foreign key constraint violation
