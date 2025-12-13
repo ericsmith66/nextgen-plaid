@@ -23,7 +23,7 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 # NextGen Core – what actually matters for $20–$50M families
 # =============================================================================
 gem "devise"                    # Authentication
-gem "plaid", "~> 36.0"          # Official Plaid gem (Investments + OAuth)
+gem "plaid", "~> 44.1"          # Official Plaid gem (Investments + OAuth)
 gem "attr_encrypted",">4.0.0"            # Encrypt Plaid access_token in DB
 gem "dotenv-rails", groups: [:development, :test]
 
