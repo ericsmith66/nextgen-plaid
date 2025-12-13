@@ -1,0 +1,37 @@
+<div class="overflow-x-auto">
+  <table class="table-auto border-collapse w-full bg-white shadow-md rounded-lg">
+    <thead>
+      <tr class="bg-gray-100 border-b">
+        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subtype</th>
+        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Fees</th>
+        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @transactions.each do |transaction| %>
+        <tr class="border-b hover:bg-gray-50">
+          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.date&.strftime("%Y-%m-%d") %></td>
+          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.name %></td>
+          <td class="px-4 py-3 text-sm text-right <%= transaction.amount.to_f >= 0 ? 'text-green-600' : 'text-red-600' %> font-medium">
+            $<%= number_to_currency(transaction.amount || 0, precision: 2, unit: "") %>
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.subtype %></td>
+          <td class="px-4 py-3 text-sm text-right text-gray-900">
+            <%= transaction.respond_to?(:fees) ? "$#{number_to_currency(transaction.fees || 0, precision: 2, unit: '')}" : "N/A" %>
+          </td>
+          <td class="px-4 py-3 text-sm text-center">
+            <%= link_to "View", transaction_path(transaction), class: "text-blue-600 hover:text-blue-800 font-medium" %>
+          </td>
+        </tr>
+      <% end %>
+      <% if @transactions.empty? %>
+        <tr>
+          <td colspan="6" class="px-4 py-8 text-center text-gray-500">No transactions found</td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
