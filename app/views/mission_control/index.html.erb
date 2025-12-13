@@ -1,4 +1,4 @@
-<%= render(LayoutComponent.new(title: "Mission Control")) do %>
+<%= render(LayoutComponent.new(title: "Mission Control", current_user: current_user)) do %>
   <%= render(MissionControlComponent.new(
     plaid_items: @plaid_items,
     transactions: @transactions,

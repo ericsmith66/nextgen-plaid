@@ -1,26 +1,14 @@
-<div class="flex h-screen bg-slate-900 text-white">
-  <!-- Sidebar -->
-  <aside class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
-    <div class="p-6 border-b border-slate-700">
-      <h1 class="text-2xl font-bold text-primary-400"><%= @title %></h1>
-    </div>
-    <nav class="flex-1 p-4 space-y-2">
-      <%= link_to "Dashboard", root_path, class: "block px-4 py-2 rounded hover:bg-slate-700 transition" %>
-      <%= link_to "Mission Control", mission_control_path, class: "block px-4 py-2 rounded hover:bg-slate-700 transition" %>
-      <%= link_to "Sync Logs", plaid_sync_logs_path, class: "block px-4 py-2 rounded hover:bg-slate-700 transition" %>
-    </nav>
-  </aside>
-
+<div class="min-h-screen bg-gray-50">
+  <%= render NavigationComponent.new(current_user: @current_user) %>
+  
   <!-- Main Content -->
-  <main class="flex-1 overflow-auto">
-    <!-- Header -->
-    <header class="bg-slate-800 border-b border-slate-700 px-6 py-4">
-      <h2 class="text-xl font-semibold"><%= @title %></h2>
-    </header>
+  <main class="container mx-auto px-4 py-8">
+    <% if @title.present? %>
+      <header class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900"><%= @title %></h1>
+      </header>
+    <% end %>
     
-    <!-- Content Area -->
-    <div class="p-6">
-      <%= content %>
-    </div>
+    <%= content %>
   </main>
 </div>
