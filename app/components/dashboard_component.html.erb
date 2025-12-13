@@ -1,0 +1,53 @@
+<div class="grid grid-cols-1 gap-6">
+  <!-- Hero Section -->
+  <div class="text-center py-12">
+    <h1 class="text-5xl font-bold mb-4">Welcome to NextGen Wealth</h1>
+    <p class="text-xl text-slate-400">Connect your brokerage accounts and track your portfolio</p>
+  </div>
+
+  <!-- Connect Button -->
+  <div class="flex justify-center">
+    <button id="plaid-link-button" class="bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 px-12 rounded-lg text-2xl shadow-lg transition">
+      CONNECT BROKERAGE ACCOUNT
+    </button>
+  </div>
+
+  <!-- Connected Accounts -->
+  <% if @current_user.plaid_items.any? %>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+      <% @current_user.plaid_items.each do |item| %>
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+          <h3 class="text-2xl font-bold text-primary-400 mb-2"><%= item.institution_name || "Sandbox Brokerage" %></h3>
+          <p class="text-lg mb-4">Total Value: <%= number_to_currency(item.accounts.sum(:current_balance) || 0) %></p>
+          
+          <!-- Data Summary -->
+          <div class="bg-slate-700 rounded-lg p-4 mb-4">
+            <h4 class="font-semibold text-primary-300 mb-2">Data Summary</h4>
+            <ul class="space-y-1 text-sm">
+              <li>📊 Accounts: <strong><%= item.accounts.count %></strong></li>
+              <li>📈 Holdings: <strong><%= item.holdings.count %></strong></li>
+              <li>💳 Transactions: <strong><%= Transaction.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></strong></li>
+              <li>💰 Liabilities: <strong><%= item.accounts.where("apr_percentage IS NOT NULL OR min_payment_amount IS NOT NULL").count %></strong></li>
+              <li>🔁 Recurring: <strong><%= item.recurring_transactions.count %></strong></li>
+            </ul>
+          </div>
+          
+          <!-- Top Holdings -->
+          <% if item.holdings.any? %>
+            <h4 class="font-semibold text-primary-300 mb-2">Top Holdings</h4>
+            <ul class="space-y-2">
+              <% item.holdings.limit(5).each do |holding| %>
+                <li class="bg-slate-700 rounded p-3 text-sm">
+                  <strong><%= holding.symbol %></strong> — <%= number_with_delimiter(holding.quantity.to_f.round(2)) %> shares
+                  <span class="float-right text-primary-300"><%= number_to_currency(holding.market_value) %></span>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-center text-slate-400 text-xl mt-8">No accounts connected yet — click the button above!</p>
+  <% end %>
+</div>

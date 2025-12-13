@@ -27,6 +27,10 @@ gem "plaid", "~> 36.0"          # Official Plaid gem (Investments + OAuth)
 gem "attr_encrypted",">4.0.0"            # Encrypt Plaid access_token in DB
 gem "dotenv-rails", groups: [:development, :test]
 
+# UI/UX Framework (PRD UI-1)
+gem "tailwindcss-rails"         # Tailwind CSS for utility styling
+gem "view_component"            # ViewComponent for modular Ruby views
+
 # =============================================================================
 # Development & Test
 # =============================================================================
