@@ -79,6 +79,59 @@ class SyncTransactionsJob < ApplicationJob
         end
       end
 
+      # PRD 11: Fetch investment transactions for investment accounts
+      investment_accounts = item.accounts.where(type: 'investment')
+      if investment_accounts.any?
+        inv_request = Plaid::InvestmentsTransactionsGetRequest.new(
+          access_token: token,
+          start_date: start_date,
+          end_date: end_date
+        )
+        inv_response = client.investments_transactions_get(inv_request)
+        investment_transactions_data = inv_response.investment_transactions
+        securities_data = inv_response.securities
+
+        investment_accounts.each do |account|
+          account_inv_transactions = investment_transactions_data.select { |t| t.account_id == account.account_id }
+          account_inv_transactions.each do |inv_txn|
+            security = securities_data.find { |s| s.security_id == inv_txn.security_id }
+            
+            transaction = account.transactions.find_or_initialize_by(transaction_id: inv_txn.investment_transaction_id).tap do |t|
+              # Basic fields
+              t.name = inv_txn.name
+              t.amount = inv_txn.amount
+              t.date = inv_txn.date
+              t.iso_currency_code = inv_txn.iso_currency_code
+              
+              # PRD 11: Investment-specific fields
+              t.fees = inv_txn.fees
+              t.subtype = inv_txn.subtype
+              t.price = inv_txn.price
+              
+              # PRD 11: Dividend type for HNW tax hooks
+              if inv_txn.subtype&.downcase&.include?("dividend")
+                t.dividend_type = inv_txn.subtype
+                Rails.logger.info "SyncTransactionsJob: Dividend detected for HNW tax hook: #{inv_txn.investment_transaction_id} (#{inv_txn.subtype})"
+              end
+            end
+            transaction.save!
+            
+            # PRD 11: Compute wash sale risk flag if sell transaction
+            if inv_txn.subtype&.downcase == "sell" && inv_txn.security_id.present?
+              compute_wash_sale_flag(transaction, inv_txn.security_id, inv_txn.date, item)
+            end
+          end
+        end
+
+        # PRD 11: Log API cost for investment transactions
+        PlaidApiCall.log_call(
+          product: 'investments_transactions',
+          endpoint: '/investments/transactions/get',
+          request_id: inv_response.request_id,
+          count: investment_transactions_data.size
+        )
+      end
+
       # 2. Fetch recurring transactions
       recurring_request = Plaid::TransactionsRecurringGetRequest.new(access_token: token)
       recurring_response = client.transactions_recurring_get(recurring_request)
@@ -150,6 +203,33 @@ class SyncTransactionsJob < ApplicationJob
   end
 
   private
+
+  # PRD 11: Compute wash sale risk flag
+  # Detects if a sell transaction may trigger wash sale rule (buy of same security within 30 days)
+  def compute_wash_sale_flag(sell_transaction, security_id, sell_date, item)
+    return unless security_id.present? && sell_date.present?
+    
+    # Look for buy transactions of the same security within 30 days (before or after sell date)
+    date_range = (sell_date - 30.days)..(sell_date + 30.days)
+    
+    # Search across all user's accounts for potential wash sale
+    user = item.user
+    buy_exists = Transaction.joins(account: { plaid_item: :user })
+                           .where(users: { id: user.id })
+                           .where(subtype: ['buy', 'Buy', 'BUY'])
+                           .where(date: date_range)
+                           .joins('INNER JOIN holdings ON holdings.account_id = transactions.account_id')
+                           .where(holdings: { security_id: security_id })
+                           .exists?
+    
+    if buy_exists
+      sell_transaction.update_column(:wash_sale_risk_flag, true)
+      Rails.logger.info "SyncTransactionsJob: Wash sale risk detected for transaction #{sell_transaction.transaction_id} (security: #{security_id})"
+    end
+  rescue => e
+    # PRD 11: Graceful degradation - log error but continue
+    Rails.logger.error "Failed to compute wash sale flag for transaction #{sell_transaction.transaction_id}: #{e.message}"
+  end
 
   # PRD 7.1-7.2: Extract enrichment data from Plaid transaction and create EnrichedTransaction
   def create_enriched_transaction(transaction, plaid_txn)
