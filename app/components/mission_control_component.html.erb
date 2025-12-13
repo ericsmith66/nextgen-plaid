@@ -115,4 +115,116 @@
       <p class="text-slate-400">No liabilities yet. Click "Sync Liabilities" to fetch data.</p>
     <% end %>
   </div>
+
+  <!-- Sync Logs (PRD UI-3) -->
+  <div>
+    <h3 class="text-2xl font-bold text-primary-400 mb-4">Sync Logs (<%= @sync_logs.total_count %>)</h3>
+
+    <!-- Filters -->
+    <div class="mb-6 bg-slate-800 p-4 rounded-lg border border-slate-700">
+      <%= form_with url: mission_control_path, method: :get, local: true, class: "grid grid-cols-1 md:grid-cols-4 gap-4" do |f| %>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Job Type</label>
+          <%= f.select :job_type,
+              options_for_select([
+                ["All Types", ""],
+                ["Holdings", "holdings"],
+                ["Transactions", "transactions"],
+                ["Liabilities", "liabilities"]
+              ], params[:job_type]),
+              {},
+              class: "w-full bg-slate-700 border border-slate-600 text-white rounded-md p-2 focus:ring-primary-500 focus:border-primary-500" %>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+          <%= f.select :status,
+              options_for_select([
+                ["All Statuses", ""],
+                ["Success", "success"],
+                ["Failure", "failure"],
+                ["Started", "started"]
+              ], params[:status]),
+              {},
+              class: "w-full bg-slate-700 border border-slate-600 text-white rounded-md p-2 focus:ring-primary-500 focus:border-primary-500" %>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Start Date</label>
+          <%= f.date_field :start_date, value: params[:start_date], class: "w-full bg-slate-700 border border-slate-600 text-white rounded-md p-2 focus:ring-primary-500 focus:border-primary-500" %>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">End Date</label>
+          <%= f.date_field :end_date, value: params[:end_date], class: "w-full bg-slate-700 border border-slate-600 text-white rounded-md p-2 focus:ring-primary-500 focus:border-primary-500" %>
+        </div>
+
+        <div class="md:col-span-4 flex gap-3">
+          <%= f.submit "Apply Filters", class: "bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-6 rounded cursor-pointer transition" %>
+          <% if params[:job_type].present? || params[:status].present? || params[:start_date].present? || params[:end_date].present? %>
+            <%= link_to "Clear Filters", mission_control_path, class: "bg-slate-600 hover:bg-slate-500 text-white font-medium py-2 px-6 rounded transition" %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Logs Table -->
+    <% if @sync_logs.any? %>
+      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-700">
+            <tr>
+              <th class="px-4 py-3 text-left">Time</th>
+              <th class="px-4 py-3 text-left">Institution</th>
+              <th class="px-4 py-3 text-left">Job Type</th>
+              <th class="px-4 py-3 text-left">Status</th>
+              <th class="px-4 py-3 text-left">Error</th>
+              <th class="px-4 py-3 text-left">Job ID</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700">
+            <% @sync_logs.each do |log| %>
+              <tr class="hover:bg-slate-700/50">
+                <td class="px-4 py-3 text-slate-300">
+                  <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
+                </td>
+                <td class="px-4 py-3">
+                  <%= log.plaid_item&.institution_name || "N/A" %>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded text-xs bg-slate-600">
+                    <%= log.job_type %>
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <% if log.status == "success" %>
+                    <span class="px-2 py-1 rounded text-xs bg-green-600">✓ Success</span>
+                  <% elsif log.status == "failure" %>
+                    <span class="px-2 py-1 rounded text-xs bg-red-600">✗ Failure</span>
+                  <% elsif log.status == "started" %>
+                    <span class="px-2 py-1 rounded text-xs bg-blue-600">⟳ Started</span>
+                  <% else %>
+                    <span class="px-2 py-1 rounded text-xs bg-slate-600"><%= log.status %></span>
+                  <% end %>
+                </td>
+                <td class="px-4 py-3 text-slate-400 max-w-xs truncate">
+                  <%= log.error_message || "-" %>
+                </td>
+                <td class="px-4 py-3 text-slate-500 font-mono text-xs">
+                  <%= log.job_id&.first(8) || "-" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="mt-6 flex justify-center">
+        <%= paginate @sync_logs %>
+      </div>
+    <% else %>
+      <p class="text-slate-400">No sync logs found. Run a sync operation to see logs here.</p>
+    <% end %>
+  </div>
 </div>

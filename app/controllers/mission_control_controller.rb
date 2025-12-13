@@ -9,6 +9,41 @@ class MissionControlController < ApplicationController
     @accounts = Account.includes(:plaid_item, :holdings, :transactions).order(created_at: :desc)
     @holdings = Holding.includes(account: :plaid_item).order(created_at: :desc)
     # PRD 12: Liability data now stored directly on Account model
+    
+    # PRD UI-3: Load sync logs with filters
+    @sync_logs = SyncLog.includes(:plaid_item).order(created_at: :desc)
+    
+    # Filter by job type if provided
+    if params[:job_type].present? && SyncLog::JOB_TYPES.include?(params[:job_type])
+      @sync_logs = @sync_logs.where(job_type: params[:job_type])
+    end
+    
+    # Filter by status if provided
+    if params[:status].present? && SyncLog::STATUSES.include?(params[:status])
+      @sync_logs = @sync_logs.where(status: params[:status])
+    end
+    
+    # Filter by date range if provided
+    if params[:start_date].present?
+      begin
+        start_date = Date.parse(params[:start_date])
+        @sync_logs = @sync_logs.where('created_at >= ?', start_date.beginning_of_day)
+      rescue ArgumentError
+        # Invalid date format, ignore filter
+      end
+    end
+    
+    if params[:end_date].present?
+      begin
+        end_date = Date.parse(params[:end_date])
+        @sync_logs = @sync_logs.where('created_at <= ?', end_date.end_of_day)
+      rescue ArgumentError
+        # Invalid date format, ignore filter
+      end
+    end
+    
+    # Paginate logs
+    @sync_logs = @sync_logs.page(params[:page]).per(25)
   end
 
   def nuke
