@@ -16,7 +16,7 @@
           <%= link_to "Transactions", transactions_path, class: "text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition" %>
           <%= link_to "Accounts", accounts_path, class: "text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition" %>
           
-          <% if admin? %>
+          <% if admin? || owner? %>
             <%= link_to "Mission Control", mission_control_path, class: "text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition" %>
             <%= link_to "Admin", admin_users_path, class: "text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition" %>
           <% end %>
@@ -53,7 +53,7 @@
         <%= link_to "Transactions", transactions_path, class: "block text-gray-700 hover:bg-gray-100 hover:text-primary-600 px-3 py-2 rounded-md text-base font-medium transition" %>
         <%= link_to "Accounts", accounts_path, class: "block text-gray-700 hover:bg-gray-100 hover:text-primary-600 px-3 py-2 rounded-md text-base font-medium transition" %>
         
-        <% if admin? %>
+        <% if admin? || owner? %>
           <%= link_to "Mission Control", mission_control_path, class: "block text-gray-700 hover:bg-gray-100 hover:text-primary-600 px-3 py-2 rounded-md text-base font-medium transition" %>
           <%= link_to "Admin", admin_users_path, class: "block text-gray-700 hover:bg-gray-100 hover:text-primary-600 px-3 py-2 rounded-md text-base font-medium transition" %>
         <% end %>
