@@ -33,4 +33,10 @@ Rails.application.routes.draw do
   resources :holdings
   resources :transactions
   resources :accounts
+
+  # PRD UI-4: Admin namespace for user/account CRUD
+  namespace :admin do
+    resources :users
+    resources :accounts
+  end
 end

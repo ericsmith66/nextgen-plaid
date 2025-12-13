@@ -1,0 +1,64 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6">
+    <%= link_to "← Back to Accounts", admin_accounts_path, class: "text-blue-600 hover:text-blue-800 font-medium" %>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-md">
+    <div class="border-b pb-4 mb-4">
+      <h2 class="text-2xl font-bold text-gray-900">Account Details</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Name</label>
+        <p class="text-gray-900"><%= @account.name %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Type</label>
+        <p class="text-gray-900"><%= @account.type %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Subtype</label>
+        <p class="text-gray-900"><%= @account.subtype %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Mask</label>
+        <p class="text-gray-900"><%= @account.mask || "N/A" %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Current Balance</label>
+        <p class="text-gray-900 text-lg font-semibold">
+          <%= @account.current_balance ? "$#{number_to_currency(@account.current_balance, precision: 2, unit: '')}" : "N/A" %>
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Account ID</label>
+        <p class="text-gray-900 text-sm font-mono"><%= @account.account_id %></p>
+      </div>
+    </div>
+
+    <div class="mt-6 pt-4 border-t">
+      <label class="block text-sm font-medium text-gray-500 mb-2">Statistics</label>
+      <div class="flex gap-4">
+        <div>
+          <p class="text-xs text-gray-500">Holdings</p>
+          <p class="text-lg font-semibold text-gray-900"><%= @account.holdings.count %></p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-500">Transactions</p>
+          <p class="text-lg font-semibold text-gray-900"><%= @account.transactions.count %></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 flex gap-3">
+    <%= link_to "Edit", edit_admin_account_path(@account), class: "bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded" %>
+    <%= button_to "Delete", admin_account_path(@account), method: :delete, data: { confirm: "Are you sure?" }, class: "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded" %>
+  </div>
+</div>
