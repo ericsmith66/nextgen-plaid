@@ -52,7 +52,7 @@
             <li style="margin:5px 0;">📊 Accounts: <strong><%= item.accounts.count %></strong></li>
             <li style="margin:5px 0;">📈 Holdings: <strong><%= item.holdings.count %></strong></li>
             <li style="margin:5px 0;">💳 Transactions: <strong><%= Transaction.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></strong></li>
-            <li style="margin:5px 0;">💰 Liabilities: <strong><%= Liability.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></strong></li>
+            <li style="margin:5px 0;">💰 Liabilities: <strong><%= item.accounts.where("apr_percentage IS NOT NULL OR min_payment_amount IS NOT NULL").count %></strong></li>
             <li style="margin:5px 0;">🔁 Recurring Transactions: <strong><%= item.recurring_transactions.count %></strong></li>
           </ul>
         </div>
