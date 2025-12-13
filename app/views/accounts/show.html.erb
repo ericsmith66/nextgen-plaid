@@ -1,0 +1,12 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6">
+    <%= link_to "← Back to Accounts", accounts_path, class: "text-blue-600 hover:text-blue-800 font-medium" %>
+  </div>
+
+  <%= render AccountShowComponent.new(account: @account) %>
+
+  <div class="mt-6 flex gap-3">
+    <%= link_to "Edit", edit_account_path(@account), class: "bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded" %>
+    <%= button_to "Delete", account_path(@account), method: :delete, data: { confirm: "Are you sure?" }, class: "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded" %>
+  </div>
+</div>
