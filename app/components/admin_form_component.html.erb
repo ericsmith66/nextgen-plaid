@@ -1,80 +1,101 @@
-<div class="bg-white p-6 rounded-lg shadow-md">
-  <%= form_with(model: [:admin, @model], url: @url, method: @method, local: true, class: "space-y-4") do |f| %>
-    <% if @model.errors.any? %>
-      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-        <h3 class="text-red-800 font-semibold mb-2">
-          <%= pluralize(@model.errors.count, "error") %> prohibited this <%= @model.class.name.downcase %> from being saved:
-        </h3>
-        <ul class="list-disc list-inside text-red-700 text-sm">
-          <% @model.errors.full_messages.each do |message| %>
-            <li><%= message %></li>
-          <% end %>
-        </ul>
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body">
+    <%= form_with(model: [:admin, @model], url: @url, method: @method, local: true) do |f| %>
+      <% if @model.errors.any? %>
+        <div class="alert alert-error">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div>
+            <h3 class="font-bold">
+              <%= pluralize(@model.errors.count, "error") %> prohibited this <%= @model.class.name.downcase %> from being saved:
+            </h3>
+            <ul class="list-disc list-inside text-sm">
+              <% @model.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @model.is_a?(User) %>
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Email</span>
+          </label>
+          <%= f.email_field :email, class: "input input-bordered w-full", placeholder: "user@example.com" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Password</span>
+          </label>
+          <%= f.password_field :password, class: "input input-bordered w-full", placeholder: @model.new_record? ? "Enter password" : "Leave blank to keep current" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Password Confirmation</span>
+          </label>
+          <%= f.password_field :password_confirmation, class: "input input-bordered w-full", placeholder: "Confirm password" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Role</span>
+          </label>
+          <%= f.select :roles, 
+              [["Admin", "admin"], ["Parent", "parent"], ["Kid", "kid"]],
+              {},
+              class: "select select-bordered w-full" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Family ID</span>
+          </label>
+          <%= f.text_field :family_id, class: "input input-bordered w-full", placeholder: "family_001" %>
+        </div>
+      <% elsif @model.is_a?(Account) %>
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Name</span>
+          </label>
+          <%= f.text_field :name, class: "input input-bordered w-full", placeholder: "Account name" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Type</span>
+          </label>
+          <%= f.text_field :type, class: "input input-bordered w-full", placeholder: "depository" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Subtype</span>
+          </label>
+          <%= f.text_field :subtype, class: "input input-bordered w-full", placeholder: "checking" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Mask</span>
+          </label>
+          <%= f.text_field :mask, class: "input input-bordered w-full", placeholder: "1234" %>
+        </div>
+
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">Current Balance</span>
+          </label>
+          <%= f.number_field :current_balance, step: 0.01, class: "input input-bordered w-full", placeholder: "0.00" %>
+        </div>
+      <% end %>
+
+      <div class="card-actions justify-end mt-6">
+        <%= link_to "Cancel", :back, class: "btn btn-ghost" %>
+        <%= f.submit "Save", class: "btn btn-primary" %>
       </div>
     <% end %>
-
-    <% if @model.is_a?(User) %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-        <%= f.email_field :email, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
-        <%= f.password_field :password, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500", placeholder: @model.new_record? ? "" : "Leave blank to keep current password" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Password Confirmation</label>
-        <%= f.password_field :password_confirmation, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Roles</label>
-        <%= f.select :roles, 
-            options_for_select([
-              ["Admin", "admin"],
-              ["Parent", "parent"],
-              ["Kid", "kid"]
-            ], @model.roles),
-            {},
-            class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Family ID</label>
-        <%= f.text_field :family_id, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-    <% elsif @model.is_a?(Account) %>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Name</label>
-        <%= f.text_field :name, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
-        <%= f.text_field :type, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Subtype</label>
-        <%= f.text_field :subtype, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Mask</label>
-        <%= f.text_field :mask, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Current Balance</label>
-        <%= f.number_field :current_balance, step: 0.01, class: "w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" %>
-      </div>
-    <% end %>
-
-    <div class="flex gap-3 pt-4">
-      <%= f.submit "Save", class: "bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded cursor-pointer" %>
-      <%= link_to "Cancel", :back, class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded" %>
-    </div>
-  <% end %>
+  </div>
 </div>
