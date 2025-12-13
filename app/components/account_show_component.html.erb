@@ -17,24 +17,15 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-500">Available Balance</label>
-        <p class="text-gray-900 text-lg font-semibold">
-          <%= @account.available ? "$#{number_to_currency(@account.available, precision: 2, unit: '')}" : "N/A" %>
-        </p>
-      </div>
-
-      <div>
         <label class="block text-sm font-medium text-gray-500">Current Balance</label>
         <p class="text-gray-900 text-lg font-semibold">
-          <%= @account.current ? "$#{number_to_currency(@account.current, precision: 2, unit: '')}" : "N/A" %>
+          <%= @account.current_balance ? "$#{number_to_currency(@account.current_balance, precision: 2, unit: '')}" : "N/A" %>
         </p>
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-500">Credit Limit</label>
-        <p class="text-gray-900">
-          <%= @account.limit ? "$#{number_to_currency(@account.limit, precision: 2, unit: '')}" : "N/A" %>
-        </p>
+        <label class="block text-sm font-medium text-gray-500">Currency</label>
+        <p class="text-gray-900"><%= @account.iso_currency_code || "N/A" %></p>
       </div>
     </div>
 

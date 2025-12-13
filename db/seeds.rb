@@ -33,8 +33,8 @@ investment_account = Account.find_or_create_by!(
   acc.type = "investment"
   acc.subtype = "brokerage"
   acc.mask = "1234"
-  acc.available = 50000.00
-  acc.current = 52500.00
+  acc.current_balance = 52500.00
+  acc.iso_currency_code = "USD"
 end
 
 checking_account = Account.find_or_create_by!(
@@ -45,8 +45,8 @@ checking_account = Account.find_or_create_by!(
   acc.type = "depository"
   acc.subtype = "checking"
   acc.mask = "5678"
-  acc.available = 5000.00
-  acc.current = 5000.00
+  acc.current_balance = 5000.00
+  acc.iso_currency_code = "USD"
 end
 
 credit_account = Account.find_or_create_by!(
@@ -57,9 +57,8 @@ credit_account = Account.find_or_create_by!(
   acc.type = "credit"
   acc.subtype = "credit card"
   acc.mask = "9012"
-  acc.available = 8000.00
-  acc.current = 2000.00
-  acc.limit = 10000.00
+  acc.current_balance = -2000.00
+  acc.iso_currency_code = "USD"
   acc.apr_percentage = 18.99
   acc.min_payment_amount = 50.00
   acc.next_payment_due_date = Date.today + 15.days
@@ -73,7 +72,7 @@ Holding.find_or_create_by!(
   security_id: "EWZ_001"
 ) do |h|
   h.name = "iShares MSCI Brazil ETF"
-  h.ticker_symbol = "EWZ"
+  h.symbol = "EWZ"
   h.quantity = 100
   h.cost_basis = 3200.00
   h.market_value = 3500.00
@@ -88,7 +87,7 @@ Holding.find_or_create_by!(
   security_id: "AAPL_001"
 ) do |h|
   h.name = "Apple Inc."
-  h.ticker_symbol = "AAPL"
+  h.symbol = "AAPL"
   h.quantity = 50
   h.cost_basis = 8000.00
   h.market_value = 9000.00
@@ -103,7 +102,7 @@ Holding.find_or_create_by!(
   security_id: "MSFT_001"
 ) do |h|
   h.name = "Microsoft Corporation"
-  h.ticker_symbol = "MSFT"
+  h.symbol = "MSFT"
   h.quantity = 75
   h.cost_basis = 25000.00
   h.market_value = 28000.00
@@ -118,7 +117,7 @@ Holding.find_or_create_by!(
   security_id: "VTI_001"
 ) do |h|
   h.name = "Vanguard Total Stock Market ETF"
-  h.ticker_symbol = "VTI"
+  h.symbol = "VTI"
   h.quantity = 60
   h.cost_basis = 12000.00
   h.market_value = 12000.00

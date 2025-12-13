@@ -51,7 +51,7 @@ class HoldingsController < ApplicationController
     end
 
     def holding_params
-      params.require(:holding).permit(:account_id, :security_id, :name, :ticker_symbol,
+      params.require(:holding).permit(:account_id, :security_id, :name, :symbol,
                                       :quantity, :cost_basis, :market_value, :vested_value,
                                       :institution_price, :sector, :type)
     end

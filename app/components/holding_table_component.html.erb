@@ -14,7 +14,7 @@
       <% @holdings.each do |holding| %>
         <tr class="border-b hover:bg-gray-50">
           <td class="px-4 py-3 text-sm text-gray-900"><%= holding.name %></td>
-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.ticker_symbol %></td>
+          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.symbol %></td>
           <td class="px-4 py-3 text-sm text-right text-gray-900"><%= holding.quantity_s %></td>
           <td class="px-4 py-3 text-sm text-right text-gray-900">$<%= number_to_currency(holding.market_value || 0, precision: 2, unit: "") %></td>
           <td class="px-4 py-3 text-sm text-gray-900"><%= holding.sector %></td>

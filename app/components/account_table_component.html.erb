@@ -5,8 +5,7 @@
         <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
         <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Type</th>
         <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subtype</th>
-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Available</th>
-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Current</th>
+        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Current Balance</th>
         <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
       </tr>
     </thead>
@@ -17,10 +16,7 @@
           <td class="px-4 py-3 text-sm text-gray-900"><%= account.type %></td>
           <td class="px-4 py-3 text-sm text-gray-900"><%= account.subtype %></td>
           <td class="px-4 py-3 text-sm text-right text-gray-900">
-            <%= account.available ? "$#{number_to_currency(account.available, precision: 2, unit: '')}" : "N/A" %>
-          </td>
-          <td class="px-4 py-3 text-sm text-right text-gray-900">
-            <%= account.current ? "$#{number_to_currency(account.current, precision: 2, unit: '')}" : "N/A" %>
+            <%= account.current_balance ? "$#{number_to_currency(account.current_balance, precision: 2, unit: '')}" : "N/A" %>
           </td>
           <td class="px-4 py-3 text-sm text-center">
             <%= link_to "View", account_path(account), class: "text-blue-600 hover:text-blue-800 font-medium" %>
@@ -29,7 +25,7 @@
       <% end %>
       <% if @accounts.empty? %>
         <tr>
-          <td colspan="6" class="px-4 py-8 text-center text-gray-500">No accounts found</td>
+          <td colspan="5" class="px-4 py-8 text-center text-gray-500">No accounts found</td>
         </tr>
       <% end %>
     </tbody>
