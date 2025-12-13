@@ -1,5 +1,10 @@
 class Holding < ApplicationRecord
   belongs_to :account
+  has_one :fixed_income, dependent: :destroy
+  has_one :option_contract, dependent: :destroy
+
+  # PRD 10: Disable STI — type column is for security type data, not inheritance
+  self.inheritance_column = :_type_disabled
 
   validates :security_id, presence: true
   validates :security_id, uniqueness: { scope: :account_id }

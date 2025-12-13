@@ -143,7 +143,50 @@ class SyncHoldingsJob < ApplicationJob
           Rails.logger.info "SyncHoldingsJob: Securities metadata incomplete for #{security.security_id} (#{security.ticker_symbol}): sector=#{security.sector.inspect}, isin=#{security.isin.inspect}"
         end
         
+        # PRD 10: Map type/subtype from security
+        pos.type = security.type
+        pos.subtype = security.subtype
+        
         pos.save!
+        
+        # PRD 10: Handle FixedIncome details if present
+        if security.respond_to?(:fixed_income) && security.fixed_income.present?
+          fi = security.fixed_income
+          
+          fixed_income_record = pos.fixed_income || pos.build_fixed_income
+          fixed_income_record.yield_percentage = fi.yield_percentage
+          fixed_income_record.yield_type = fi.yield_type || "unknown"
+          fixed_income_record.maturity_date = fi.maturity_date
+          fixed_income_record.issue_date = fi.issue_date
+          fixed_income_record.face_value = fi.face_value
+          
+          # PRD 10: Set income_risk_flag if yield < 2%
+          if fi.yield_percentage.present? && fi.yield_percentage.to_f < 2.0
+            fixed_income_record.income_risk_flag = true
+          else
+            fixed_income_record.income_risk_flag = false
+          end
+          
+          fixed_income_record.save!
+          
+          # PRD 10: HNW Hook - Log tax-exempt bonds for DAF strategies
+          if fi.yield_type&.downcase&.include?("tax-exempt")
+            Rails.logger.info "SyncHoldingsJob: Tax-exempt bond detected for HNW philanthropy hook: #{security.security_id} (#{security.ticker_symbol})"
+          end
+        end
+        
+        # PRD 10: Handle OptionContract details if present
+        if security.respond_to?(:option_contract) && security.option_contract.present?
+          oc = security.option_contract
+          
+          option_record = pos.option_contract || pos.build_option_contract
+          option_record.contract_type = oc.contract_type
+          option_record.expiration_date = oc.expiration_date
+          option_record.strike_price = oc.strike_price
+          option_record.underlying_ticker = oc.underlying_ticker
+          
+          option_record.save!
+        end
       end
     end
 
