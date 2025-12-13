@@ -4,6 +4,9 @@ class Holding < ApplicationRecord
   validates :security_id, presence: true
   validates :security_id, uniqueness: { scope: :account_id }
 
+  # Decimal fields that require fixed notation formatting
+  DECIMAL_FIELDS = %w[quantity cost_basis market_value vested_value institution_price].freeze
+
   # Formatting methods for decimal fields to avoid scientific notation
   def quantity_s
     quantity&.to_s('F')
@@ -28,7 +31,7 @@ class Holding < ApplicationRecord
   # Override inspect to show fixed decimal notation in console
   def inspect
     attrs = attributes.map do |k, v|
-      if %w[quantity cost_basis market_value vested_value institution_price].include?(k) && v.is_a?(BigDecimal)
+      if DECIMAL_FIELDS.include?(k) && v.is_a?(BigDecimal)
         "#{k}: #{v.to_s('F')}"
       else
         "#{k}: #{v.inspect}"

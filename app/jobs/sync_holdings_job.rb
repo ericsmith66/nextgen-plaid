@@ -119,6 +119,12 @@ class SyncHoldingsJob < ApplicationJob
         pos.institution_price        = holding.institution_price
         pos.institution_price_as_of  = holding.institution_price_as_of
         
+        # PRD 9: Map securities metadata from Plaid (nullable, may require license)
+        pos.isin     = security.isin
+        pos.cusip    = security.cusip
+        pos.sector   = security.sector || "Unknown"
+        pos.industry = security.industry
+        
         # PRD 8: Compute high_cost_flag (>50% gain threshold)
         if pos.cost_basis.present? && pos.cost_basis > 0 && pos.market_value.present?
           gain_ratio = (pos.market_value - pos.cost_basis) / pos.cost_basis
@@ -130,6 +136,11 @@ class SyncHoldingsJob < ApplicationJob
         # PRD 8: Log when vested_value is missing (expected for some institutions)
         if holding.vested_value.nil? && pos.quantity.to_f > 0
           Rails.logger.warn "SyncHoldingsJob: vested_value nil for holding #{security.security_id} (#{security.ticker_symbol}) in account #{plaid_account.account_id}"
+        end
+        
+        # PRD 9: Log when securities metadata is missing (may require Plaid license or manual enrichment)
+        if security.sector.nil? || security.isin.nil?
+          Rails.logger.info "SyncHoldingsJob: Securities metadata incomplete for #{security.security_id} (#{security.ticker_symbol}): sector=#{security.sector.inspect}, isin=#{security.isin.inspect}"
         end
         
         pos.save!

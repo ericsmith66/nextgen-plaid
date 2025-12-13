@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_13_134559) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -47,17 +47,22 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
     t.string "security_id", null: false
     t.string "symbol"
     t.string "name"
-    t.decimal "quantity"
-    t.decimal "cost_basis"
-    t.decimal "market_value"
+    t.decimal "quantity", precision: 15, scale: 8
+    t.decimal "cost_basis", precision: 15, scale: 8
+    t.decimal "market_value", precision: 15, scale: 8
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.decimal "vested_value", precision: 10, scale: 2
-    t.decimal "institution_price", precision: 10, scale: 2
+    t.decimal "vested_value", precision: 15, scale: 8
+    t.decimal "institution_price", precision: 15, scale: 8
     t.datetime "institution_price_as_of"
     t.boolean "high_cost_flag", default: false, null: false
+    t.string "isin"
+    t.string "cusip"
+    t.string "sector"
+    t.string "industry"
     t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
     t.index ["account_id"], name: "index_holdings_on_account_id"
+    t.index ["sector"], name: "index_holdings_on_sector"
   end
 
   create_table "liabilities", force: :cascade do |t|
