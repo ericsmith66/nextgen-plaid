@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_12_191702) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,6 +40,24 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_191702) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["transaction_id"], name: "index_enriched_transactions_on_transaction_id", unique: true
+  end
+
+  create_table "holdings", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "security_id", null: false
+    t.string "symbol"
+    t.string "name"
+    t.decimal "quantity"
+    t.decimal "cost_basis"
+    t.decimal "market_value"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "vested_value", precision: 10, scale: 2
+    t.decimal "institution_price", precision: 10, scale: 2
+    t.datetime "institution_price_as_of"
+    t.boolean "high_cost_flag", default: false, null: false
+    t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
+    t.index ["account_id"], name: "index_holdings_on_account_id"
   end
 
   create_table "liabilities", force: :cascade do |t|
@@ -88,20 +106,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_191702) do
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"
-  end
-
-  create_table "positions", force: :cascade do |t|
-    t.bigint "account_id", null: false
-    t.string "security_id", null: false
-    t.string "symbol"
-    t.string "name"
-    t.decimal "quantity"
-    t.decimal "cost_basis"
-    t.decimal "market_value"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
-    t.index ["account_id"], name: "index_positions_on_account_id"
   end
 
   create_table "recurring_transactions", force: :cascade do |t|
@@ -160,9 +164,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_191702) do
   end
 
   add_foreign_key "enriched_transactions", "transactions"
+  add_foreign_key "holdings", "accounts"
   add_foreign_key "liabilities", "accounts"
   add_foreign_key "plaid_items", "users"
-  add_foreign_key "positions", "accounts"
   add_foreign_key "recurring_transactions", "plaid_items"
   add_foreign_key "sync_logs", "plaid_items"
   add_foreign_key "transactions", "accounts"

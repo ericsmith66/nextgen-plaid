@@ -32,8 +32,8 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     item = PlaidItem.create!(user: @owner, item_id: "it_123", institution_name: "Test Bank", access_token: "tok", status: "good")
     a1 = item.accounts.create!(account_id: "acc_1")
     item.accounts.create!(account_id: "acc_2")
-    a1.positions.create!(security_id: "sec_1")
-    a1.positions.create!(security_id: "sec_2")
+    a1.holdings.create!(security_id: "sec_1")
+    a1.holdings.create!(security_id: "sec_2")
 
     get "/mission_control"
     assert_response :success
@@ -51,18 +51,18 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     # Seed some data
     item = PlaidItem.create!(user: @owner, item_id: "it_nuke", institution_name: "Bank", access_token: "tok", status: "good")
     acc  = item.accounts.create!(account_id: "acc_nuke")
-    acc.positions.create!(security_id: "sec_nuke")
+    acc.holdings.create!(security_id: "sec_nuke")
 
     assert_difference [
       'PlaidItem.count',
       'Account.count',
-      'Position.count'
+      'Holding.count'
     ], -1 do
       post mission_control_nuke_path
       assert_redirected_to mission_control_path
       follow_redirect!
       assert_response :success
-      assert_includes @response.body, "All Plaid data has been deleted."
+      assert_includes @response.body, "All Plaid data deleted — cost history &amp; sync logs preserved."
     end
   end
 
@@ -71,12 +71,12 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
 
     item = PlaidItem.create!(user: @owner, item_id: "it_safe", institution_name: "Bank", access_token: "tok", status: "good")
     acc  = item.accounts.create!(account_id: "acc_safe")
-    acc.positions.create!(security_id: "sec_safe")
+    acc.holdings.create!(security_id: "sec_safe")
 
     assert_no_difference [
       'PlaidItem.count',
       'Account.count',
-      'Position.count'
+      'Holding.count'
     ] do
       post mission_control_nuke_path
       assert_redirected_to authenticated_root_path

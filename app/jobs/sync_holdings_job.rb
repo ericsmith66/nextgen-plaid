@@ -104,13 +104,35 @@ class SyncHoldingsJob < ApplicationJob
         security = response.securities.find { |s| s.security_id == holding.security_id }
         next unless security
 
-        account.positions.find_or_create_by(security_id: security.security_id) do |pos|
-          pos.symbol        = security.ticker_symbol
-          pos.name          = security.name
-          pos.quantity      = holding.quantity
-          pos.cost_basis    = holding.cost_basis
-          pos.market_value  = holding.institution_value || holding.market_value
+        # PRD 8: Use find_or_initialize_by to support both create and update
+        pos = account.holdings.find_or_initialize_by(security_id: security.security_id)
+        
+        # Map basic fields
+        pos.symbol        = security.ticker_symbol
+        pos.name          = security.name
+        pos.quantity      = holding.quantity
+        pos.cost_basis    = holding.cost_basis
+        pos.market_value  = holding.institution_value || holding.market_value
+        
+        # PRD 8: Map extended fields from Plaid (handle nil gracefully)
+        pos.vested_value             = holding.vested_value
+        pos.institution_price        = holding.institution_price
+        pos.institution_price_as_of  = holding.institution_price_as_of
+        
+        # PRD 8: Compute high_cost_flag (>50% gain threshold)
+        if pos.cost_basis.present? && pos.cost_basis > 0 && pos.market_value.present?
+          gain_ratio = (pos.market_value - pos.cost_basis) / pos.cost_basis
+          pos.high_cost_flag = (gain_ratio > 0.5)
+        else
+          pos.high_cost_flag = false
         end
+        
+        # PRD 8: Log when vested_value is missing (expected for some institutions)
+        if holding.vested_value.nil? && pos.quantity.to_f > 0
+          Rails.logger.warn "SyncHoldingsJob: vested_value nil for holding #{security.security_id} (#{security.ticker_symbol}) in account #{plaid_account.account_id}"
+        end
+        
+        pos.save!
       end
     end
 
@@ -126,7 +148,7 @@ class SyncHoldingsJob < ApplicationJob
       )
 
       SyncLog.create!(plaid_item: item, job_type: "holdings", status: "success", job_id: self.job_id)
-      Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.positions.count} positions for PlaidItem #{item.id}"
+      Rails.logger.info "Synced #{item.accounts.count} accounts & #{item.holdings.count} holdings for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e
       # PRD 6.1: Detect expired/broken tokens
       error_code = self.class.extract_plaid_error_code(e)

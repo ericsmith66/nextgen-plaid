@@ -3,11 +3,11 @@ class MissionControlController < ApplicationController
   before_action :require_owner
 
   def index
-    @plaid_items = PlaidItem.includes(:accounts, :positions).order(created_at: :desc)
+    @plaid_items = PlaidItem.includes(:accounts, :holdings).order(created_at: :desc)
     @transactions = Transaction.includes(:enriched_transaction, account: :plaid_item).order(date: :desc).limit(20)
     @recurring_transactions = RecurringTransaction.includes(:plaid_item).order(created_at: :desc).limit(20)
-    @accounts = Account.includes(:plaid_item, :positions, :transactions).order(created_at: :desc)
-    @positions = Position.includes(account: :plaid_item).order(created_at: :desc)
+    @accounts = Account.includes(:plaid_item, :holdings, :transactions).order(created_at: :desc)
+    @holdings = Holding.includes(account: :plaid_item).order(created_at: :desc)
     @liabilities = Liability.includes(account: :plaid_item).order(created_at: :desc)
   end
 
@@ -16,14 +16,15 @@ class MissionControlController < ApplicationController
     # Delete in dependency order
     EnrichedTransaction.delete_all
     Transaction.delete_all
-    Position.delete_all
+    Holding.delete_all
     Liability.delete_all
     RecurringTransaction.delete_all
     Account.delete_all
+    SyncLog.delete_all  # Delete sync_logs to avoid foreign key constraint violation
     PlaidItem.delete_all
-    # SyncLog and PlaidApiCall are kept for audit trail and billing history
+    # PlaidApiCall is kept for audit trail and billing history
 
-    flash[:notice] = "All Plaid data deleted — cost history & sync logs preserved."
+    flash[:notice] = "All Plaid data deleted — cost history preserved."
     redirect_to mission_control_path
   end
 

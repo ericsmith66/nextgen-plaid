@@ -23,11 +23,11 @@ namespace :accounts do
         duplicates.each do |dup|
           puts "  Merging duplicate: ID #{dup.id}, created #{dup.created_at}"
           
-          # Move positions to primary account
-          dup.positions.each do |pos|
-            existing_pos = primary_account.positions.find_by(security_id: pos.security_id)
+          # Move holdings to primary account
+          dup.holdings.each do |pos|
+            existing_pos = primary_account.holdings.find_by(security_id: pos.security_id)
             if existing_pos
-              # Update existing position with latest data
+              # Update existing holding with latest data
               existing_pos.update!(
                 symbol: pos.symbol,
                 name: pos.name,
