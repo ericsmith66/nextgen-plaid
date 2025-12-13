@@ -83,7 +83,7 @@
   <!-- Liabilities -->
   <div>
     <h3 class="text-2xl font-bold text-primary-400 mb-4">Liabilities</h3>
-    <% liability_accounts = @accounts.select { |a| a.apr_percentage.present? || a.min_payment_amount.present? } %>
+    <% liability_accounts = @accounts.select { |a| a.respond_to?(:apr_percentage) && (a.apr_percentage.present? || a.min_payment_amount.present?) } %>
     <% if liability_accounts.any? %>
       <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
         <table class="w-full text-sm">
