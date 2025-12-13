@@ -198,9 +198,91 @@ Transaction.find_or_create_by!(
   t.payment_channel = "online"
 end
 
+# PRD UI-3: Create sample sync logs for mission control viewer
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "holdings",
+  status: "success",
+  job_id: "sync_job_001_holdings_success"
+) do |sl|
+  sl.created_at = Time.current - 2.hours
+  sl.error_message = nil
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "transactions",
+  status: "success",
+  job_id: "sync_job_002_transactions_success"
+) do |sl|
+  sl.created_at = Time.current - 1.hour
+  sl.error_message = nil
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "liabilities",
+  status: "failure",
+  job_id: "sync_job_003_liabilities_failure"
+) do |sl|
+  sl.created_at = Time.current - 30.minutes
+  sl.error_message = "PRODUCT_NOT_READY: Liabilities product not enabled for this item"
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "holdings",
+  status: "failure",
+  job_id: "sync_job_004_holdings_failure"
+) do |sl|
+  sl.created_at = Time.current - 15.minutes
+  sl.error_message = "ITEM_LOGIN_REQUIRED: Item requires user re-authentication"
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "transactions",
+  status: "started",
+  job_id: "sync_job_005_transactions_started"
+) do |sl|
+  sl.created_at = Time.current - 5.minutes
+  sl.error_message = nil
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "holdings",
+  status: "success",
+  job_id: "sync_job_006_holdings_success"
+) do |sl|
+  sl.created_at = Time.current - 1.day
+  sl.error_message = nil
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "liabilities",
+  status: "failure",
+  job_id: "sync_job_007_liabilities_failure"
+) do |sl|
+  sl.created_at = Time.current - 2.days
+  sl.error_message = "RATE_LIMIT_EXCEEDED: Too many requests, retry after cooldown"
+end
+
+SyncLog.find_or_create_by!(
+  plaid_item: plaid_item,
+  job_type: "transactions",
+  status: "success",
+  job_id: "sync_job_008_transactions_success"
+) do |sl|
+  sl.created_at = Time.current - 3.days
+  sl.error_message = nil
+end
+
 puts "Seed data created successfully!"
 puts "  - #{User.count} users"
 puts "  - #{PlaidItem.count} plaid items"
 puts "  - #{Account.count} accounts"
 puts "  - #{Holding.count} holdings"
 puts "  - #{Transaction.count} transactions"
+puts "  - #{SyncLog.count} sync logs"
