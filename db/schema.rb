@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -42,22 +42,42 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
     t.index ["transaction_id"], name: "index_enriched_transactions_on_transaction_id", unique: true
   end
 
+  create_table "fixed_incomes", force: :cascade do |t|
+    t.bigint "holding_id", null: false
+    t.decimal "yield_percentage", precision: 15, scale: 8
+    t.string "yield_type"
+    t.date "maturity_date"
+    t.date "issue_date"
+    t.decimal "face_value", precision: 15, scale: 8
+    t.boolean "income_risk_flag", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["holding_id"], name: "index_fixed_incomes_on_holding_id", unique: true
+  end
+
   create_table "holdings", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.string "security_id", null: false
     t.string "symbol"
     t.string "name"
-    t.decimal "quantity"
-    t.decimal "cost_basis"
-    t.decimal "market_value"
+    t.decimal "quantity", precision: 15, scale: 8
+    t.decimal "cost_basis", precision: 15, scale: 8
+    t.decimal "market_value", precision: 15, scale: 8
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.decimal "vested_value", precision: 10, scale: 2
-    t.decimal "institution_price", precision: 10, scale: 2
+    t.decimal "vested_value", precision: 15, scale: 8
+    t.decimal "institution_price", precision: 15, scale: 8
     t.datetime "institution_price_as_of"
     t.boolean "high_cost_flag", default: false, null: false
+    t.string "isin"
+    t.string "cusip"
+    t.string "sector"
+    t.string "industry"
+    t.string "type"
+    t.string "subtype"
     t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
     t.index ["account_id"], name: "index_holdings_on_account_id"
+    t.index ["sector"], name: "index_holdings_on_sector"
   end
 
   create_table "liabilities", force: :cascade do |t|
@@ -72,6 +92,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
     t.datetime "updated_at", null: false
     t.index ["account_id", "liability_id"], name: "index_liabilities_on_account_id_and_liability_id", unique: true
     t.index ["account_id"], name: "index_liabilities_on_account_id"
+  end
+
+  create_table "option_contracts", force: :cascade do |t|
+    t.bigint "holding_id", null: false
+    t.string "contract_type"
+    t.date "expiration_date"
+    t.decimal "strike_price", precision: 15, scale: 8
+    t.string "underlying_ticker"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["holding_id"], name: "index_option_contracts_on_holding_id", unique: true
   end
 
   create_table "plaid_api_calls", force: :cascade do |t|
@@ -164,8 +195,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
   end
 
   add_foreign_key "enriched_transactions", "transactions"
+  add_foreign_key "fixed_incomes", "holdings"
   add_foreign_key "holdings", "accounts"
   add_foreign_key "liabilities", "accounts"
+  add_foreign_key "option_contracts", "holdings"
   add_foreign_key "plaid_items", "users"
   add_foreign_key "recurring_transactions", "plaid_items"
   add_foreign_key "sync_logs", "plaid_items"
