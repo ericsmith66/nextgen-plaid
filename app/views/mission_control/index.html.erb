@@ -366,32 +366,31 @@
   </div>
 
   <div style="margin-top:24px;">
-    <h2>Liabilities</h2>
-    <% if @liabilities.any? %>
+    <h2>Liabilities (PRD 12: Data on Account Model)</h2>
+    <% liability_accounts = @accounts.select { |a| a.apr_percentage.present? || a.min_payment_amount.present? } %>
+    <% if liability_accounts.any? %>
       <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
         <thead>
           <tr>
-            <th>Liability ID</th>
-            <th>Type</th>
-            <th>Current Balance</th>
-            <th>Min Payment Due</th>
-            <th>APR %</th>
-            <th>Payment Due Date</th>
             <th>Account</th>
+            <th>Min Payment</th>
+            <th>APR %</th>
+            <th>Due Date</th>
+            <th>Overdue?</th>
+            <th>Debt Risk?</th>
             <th>Institution</th>
           </tr>
         </thead>
         <tbody>
-          <% @liabilities.each do |liability| %>
+          <% liability_accounts.each do |account| %>
             <tr>
-              <td><%= liability.liability_id %></td>
-              <td><%= liability.liability_type %></td>
-              <td><%= number_to_currency(liability.current_balance) if liability.current_balance %></td>
-              <td><%= number_to_currency(liability.min_payment_due) if liability.min_payment_due %></td>
-              <td><%= liability.apr_percentage ? "#{liability.apr_percentage}%" : '-' %></td>
-              <td><%= liability.payment_due_date || '-' %></td>
-              <td><%= liability.account&.name || liability.account&.account_id %></td>
-              <td><%= liability.account&.plaid_item&.institution_name %></td>
+              <td><%= account.name || account.account_id %></td>
+              <td><%= number_to_currency(account.min_payment_amount) if account.min_payment_amount %></td>
+              <td><%= account.apr_percentage ? "#{account.apr_percentage}%" : '-' %></td>
+              <td><%= account.next_payment_due_date || '-' %></td>
+              <td><%= account.is_overdue ? '⚠️ YES' : 'No' %></td>
+              <td><%= account.debt_risk_flag ? '🚨 HIGH' : 'Normal' %></td>
+              <td><%= account.plaid_item&.institution_name %></td>
             </tr>
           <% end %>
         </tbody>
