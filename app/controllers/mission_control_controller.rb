@@ -20,10 +20,11 @@ class MissionControlController < ApplicationController
     Liability.delete_all
     RecurringTransaction.delete_all
     Account.delete_all
+    SyncLog.delete_all  # Delete sync_logs to avoid foreign key constraint violation
     PlaidItem.delete_all
-    # SyncLog and PlaidApiCall are kept for audit trail and billing history
+    # PlaidApiCall is kept for audit trail and billing history
 
-    flash[:notice] = "All Plaid data deleted — cost history & sync logs preserved."
+    flash[:notice] = "All Plaid data deleted — cost history preserved."
     redirect_to mission_control_path
   end
 

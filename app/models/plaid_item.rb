@@ -6,6 +6,7 @@ class PlaidItem < ApplicationRecord
   has_many :transactions, through: :accounts
   has_many :liabilities, through: :accounts
   has_many :recurring_transactions, dependent: :destroy
+  has_many :sync_logs, dependent: :destroy
 
   # PRD 6.1: Status enum for error handling
   enum :status, { good: "good", needs_reauth: "needs_reauth", failed: "failed" }
