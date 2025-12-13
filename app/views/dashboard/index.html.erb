@@ -1,217 +1,115 @@
-<div style="padding:80px; background:#0f172a; color:white; min-height:100vh; font-family:system-ui; text-align:center;">
-  <h1 style="font-size:80px; background:linear-gradient(to right,#60a5fa,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-    NEXTGEN WEALTH ADVISOR
-  </h1>
-  <h2 style="font-size:48px; color:#94a3b8; margin:60px 0;">
-    Welcome, <%= current_user.email.split("@").first.capitalize %>!
-  </h2>
+<%= render(LayoutComponent.new(title: "Dashboard")) do %>
+  <%= render(DashboardComponent.new(current_user: current_user)) %>
+<% end %>
 
-  <% # PRD 6.2: Warning banner for broken items %>
-  <% broken_items = current_user.plaid_items.where(status: ['needs_reauth', 'failed']) %>
-  <% if broken_items.any? %>
-    <div style="margin: 40px auto; max-width: 1000px; padding: 30px; background: #dc3545; border-radius: 15px; text-align: left;">
-      <h3 style="margin: 0 0 15px 0; color: white; font-size: 32px;">⚠️ Connection Issues Detected</h3>
-      <% broken_items.each do |item| %>
-        <div style="margin: 15px 0; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 10px;">
-          <p style="margin: 0 0 10px 0; font-size: 24px; color: white;">
-            <strong><%= item.institution_name %></strong> — <%= item.status.humanize %>
-          </p>
-          <% if item.status == 'needs_reauth' %>
-            <button type="button" onclick="relinkItem(<%= item.id %>)" style="padding: 15px 30px; font-size: 20px; background: #ffc107; color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
-              Fix Connection
-            </button>
-          <% else %>
-            <p style="margin: 10px 0 0 0; color: #ffcccc; font-size: 18px;">
-              Maximum re-link attempts reached. Please contact support.
-            </p>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
-
-  <!-- CONNECT BUTTON -->
-  <div style="margin:100px 0;">
-    <button id="plaid-link-button" style="padding:40px 120px; font-size:48px; background:#0055ff; color:white; border:none; border-radius:30px; cursor:pointer; box-shadow:0 30px 60px rgba(0,85,255,0.6);">
-      CONNECT BROKERAGE ACCOUNT
-    </button>
-  </div>
-
-  <!-- HOLDINGS DISPLAY -->
-  <% if current_user.plaid_items.any? %>
-    <div style="margin:60px 0; background:#1e293b; padding:40px; border-radius:20px; text-align:left; max-width:1000px; margin-left:auto; margin-right:auto;">
-      <h2 style="color:#60a5fa;">Connected Accounts & Holdings</h2>
-      <% current_user.plaid_items.each do |item| %>
-        <h3><%= item.institution_name || "Sandbox Brokerage" %></h3>
-        <p>Total Value: <%= number_to_currency(item.accounts.sum(:current_balance) || 0) %></p>
-        
-        <!-- Data Counts -->
-        <div style="margin:20px 0; padding:15px; background:#334155; border-radius:8px;">
-          <strong style="color:#60a5fa;">Data Summary:</strong>
-          <ul style="list-style:none; padding:10px 0; margin:0;">
-            <li style="margin:5px 0;">📊 Accounts: <strong><%= item.accounts.count %></strong></li>
-            <li style="margin:5px 0;">📈 Holdings: <strong><%= item.holdings.count %></strong></li>
-            <li style="margin:5px 0;">💳 Transactions: <strong><%= Transaction.joins(account: :plaid_item).where(plaid_items: { id: item.id }).count %></strong></li>
-            <li style="margin:5px 0;">💰 Liabilities: <strong><%= item.accounts.where("apr_percentage IS NOT NULL OR min_payment_amount IS NOT NULL").count %></strong></li>
-            <li style="margin:5px 0;">🔁 Recurring Transactions: <strong><%= item.recurring_transactions.count %></strong></li>
-          </ul>
-        </div>
-        
-        <ul>
-          <% item.holdings.limit(10).each do |pos| %>
-            <li style="margin:10px 0; padding:10px; background:#334155; border-radius:8px;">
-              <strong><%= pos.symbol %> (<%= pos.name %>)</strong> — <%= number_with_delimiter(pos.quantity.to_f.round(2)) %> shares — <%= number_to_currency(pos.market_value) %>
-            </li>
-          <% end %>
-        </ul>
-        
-        <!-- PRD 7.3-7.6: Recent Transactions with Enriched Data -->
-        <% recent_transactions = Transaction.joins(account: :plaid_item).where(plaid_items: { id: item.id }).order(date: :desc).limit(10).includes(:enriched_transaction) %>
-        <% if recent_transactions.any? %>
-          <h3 style="margin-top:30px; color:#60a5fa;">Recent Transactions</h3>
-          <ul style="list-style:none; padding:0;">
-            <% recent_transactions.each do |txn| %>
-              <li style="margin:10px 0; padding:15px; background:#334155; border-radius:8px; display:flex; align-items:center; gap:15px;">
-                <% enriched = txn.enriched_transaction %>
-                <% if enriched&.use_enriched_data? && enriched.logo_url.present? %>
-                  <img src="<%= enriched.logo_url %>" alt="logo" style="width:40px; height:40px; border-radius:8px; object-fit:contain; background:white; padding:5px;">
-                <% else %>
-                  <div style="width:40px; height:40px; border-radius:8px; background:#475569; display:flex; align-items:center; justify-content:center; font-size:20px;">💳</div>
-                <% end %>
-                
-                <div style="flex:1;">
-                  <div style="font-size:18px; font-weight:bold; color:white;">
-                    <% if enriched&.use_enriched_data? %>
-                      <%= enriched.merchant_name %>
-                    <% else %>
-                      <%= txn.name %> <span style="color:#94a3b8; font-size:14px;">(unverified)</span>
-                    <% end %>
-                  </div>
-                  
-                  <% if enriched&.personal_finance_category.present? %>
-                    <div style="margin-top:5px;">
-                      <span style="background:#3b82f6; color:white; padding:4px 10px; border-radius:12px; font-size:12px;">
-                        <%= enriched.personal_finance_category %>
-                      </span>
-                    </div>
-                  <% end %>
-                  
-                  <% if enriched&.confidence_level.present? && !enriched.low_confidence? %>
-                    <div style="margin-top:5px;">
-                      <% confidence_color = case enriched.confidence_level
-                           when "VERY_HIGH", "HIGH" then "#10b981"
-                           when "MEDIUM" then "#f59e0b"
-                           else "#ef4444"
-                           end %>
-                      <span style="background:<%= confidence_color %>; color:white; padding:4px 10px; border-radius:12px; font-size:12px;">
-                        <%= enriched.confidence_level.humanize %> confidence
-                      </span>
-                    </div>
-                  <% end %>
-                </div>
-                
-                <div style="text-align:right;">
-                  <div style="font-size:20px; font-weight:bold; color:<%= txn.amount < 0 ? '#10b981' : '#ef4444' %>;">
-                    <%= number_to_currency(txn.amount.abs) %>
-                  </div>
-                  <div style="font-size:14px; color:#94a3b8;">
-                    <%= txn.date.strftime("%b %d, %Y") %>
-                  </div>
-                </div>
-              </li>
-            <% end %>
-          </ul>
-        <% end %>
-      <% end %>
-    </div>
-  <% else %>
-    <p style="color:#94a3b8; font-size:32px;">No accounts connected yet — click the button above!</p>
-  <% end %>
-</div>
-
-<!-- FINAL WORKING PLAID SCRIPT -->
+<!-- Plaid Link JS -->
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script>
-    // PRD 6.2: Re-link function for broken items
-    function getCsrfToken() {
-        return document.querySelector('meta[name="csrf-token"]').content;
-    }
+  function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]').content;
+  }
 
-    async function relinkItem(itemId) {
-        try {
-            const res = await fetch('/mission_control/relink/' + itemId, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': getCsrfToken()
-                },
-                body: JSON.stringify({})
+  async function relinkItem(itemId) {
+    try {
+      const res = await fetch('/mission_control/relink/' + itemId, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfToken()
+        },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to get link token: ' + (err.error || res.statusText));
+        return;
+      }
+      const data = await res.json();
+      const handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: async function(public_token, metadata) {
+          try {
+            await fetch('/mission_control/relink_success/' + itemId, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+              },
+              body: JSON.stringify({ public_token: public_token })
             });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                alert('Failed to get link token: ' + (err.error || res.statusText));
-                return;
-            }
-            const data = await res.json();
-            const handler = Plaid.create({
-                token: data.link_token,
-                onSuccess: async function(public_token, metadata) {
-                    try {
-                        await fetch('/mission_control/relink_success/' + itemId, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-Token': getCsrfToken()
-                            },
-                            body: JSON.stringify({ public_token: public_token })
-                        });
-                    } catch (e) {
-                        console.warn('Failed to notify relink success:', e);
-                    }
-                    window.location.reload();
-                },
-                onExit: function(err, metadata) {
-                    if (err) {
-                        console.warn('Plaid Link exit:', err);
-                    }
-                }
-            });
-            handler.open();
-        } catch (e) {
-            alert('Error: ' + (e && e.message ? e.message : e));
+          } catch (e) {
+            console.warn('Failed to notify relink success:', e);
+          }
+          window.location.reload();
+        },
+        onExit: function(err, metadata) {
+          if (err) {
+            console.warn('Plaid Link exit:', err);
+          }
         }
+      });
+      handler.open();
+    } catch (e) {
+      console.error('Failed to relink:', e);
+      alert('Failed to connect to Plaid');
     }
+  }
 
-    document.getElementById('plaid-link-button').addEventListener('click', async () => {
-        try {
-            const response = await fetch('/plaid/link_token', {
-                method: 'POST',
-                headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }
-            });
-            const data = await response.json();
+  document.addEventListener('DOMContentLoaded', function() {
+    const button = document.getElementById('plaid-link-button');
+    if (!button) return;
 
-            const handler = Plaid.create({
-                token: data.link_token,
-                onSuccess: (public_token, metadata) => {
-                    console.log('Plaid success!', public_token, metadata);
-                    fetch('/plaid/exchange', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
-                        },
-                        body: JSON.stringify({ public_token })
-                    })
-                        .then(() => location.reload())
-                        .catch(err => console.error('Exchange failed', err));
-                },
-                onExit: (err, metadata) => {
-                    console.log('Plaid exited', err, metadata);
-                }
-            });
-            handler.open();
-        } catch (err) {
-            console.error('Link failed', err);
+    fetch('/plaid/link_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      body: JSON.stringify({})
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to get link token');
+      return res.json();
+    })
+    .then(data => {
+      const handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: function(public_token, metadata) {
+          fetch('/plaid/exchange_token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': getCsrfToken()
+            },
+            body: JSON.stringify({
+              public_token: public_token,
+              institution: metadata.institution
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            console.log('Link success:', data);
+            window.location.reload();
+          })
+          .catch(err => {
+            console.error('Exchange failed:', err);
+            alert('Failed to save account');
+          });
+        },
+        onExit: function(err, metadata) {
+          if (err) {
+            console.warn('Plaid Link exit:', err);
+          }
         }
+      });
+      button.onclick = function() {
+        handler.open();
+      };
+    })
+    .catch(err => {
+      console.error('Link token failed:', err);
+      button.disabled = true;
+      button.textContent = 'Connection unavailable';
     });
+  });
 </script>
