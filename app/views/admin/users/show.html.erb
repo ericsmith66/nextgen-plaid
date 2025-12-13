@@ -1,0 +1,43 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6">
+    <%= link_to "← Back to Users", admin_users_path, class: "text-blue-600 hover:text-blue-800 font-medium" %>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-md">
+    <div class="border-b pb-4 mb-4">
+      <h2 class="text-2xl font-bold text-gray-900">User Details</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Email</label>
+        <p class="text-gray-900"><%= @user.email %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Roles</label>
+        <p class="text-gray-900"><%= @user.roles || "N/A" %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Family ID</label>
+        <p class="text-gray-900"><%= @user.family_id || "N/A" %></p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-500">Created At</label>
+        <p class="text-gray-900"><%= @user.created_at.strftime("%B %d, %Y") %></p>
+      </div>
+    </div>
+
+    <div class="mt-6 pt-4 border-t">
+      <label class="block text-sm font-medium text-gray-500 mb-2">Plaid Items</label>
+      <p class="text-lg font-semibold text-gray-900"><%= @user.plaid_items.count %></p>
+    </div>
+  </div>
+
+  <div class="mt-6 flex gap-3">
+    <%= link_to "Edit", edit_admin_user_path(@user), class: "bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded" %>
+    <%= button_to "Delete", admin_user_path(@user), method: :delete, data: { confirm: "Are you sure?" }, class: "bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded" %>
+  </div>
+</div>

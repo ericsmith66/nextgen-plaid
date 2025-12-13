@@ -1,0 +1,35 @@
+<div class="overflow-x-auto">
+  <table class="table-auto border-collapse w-full bg-white shadow-md rounded-lg">
+    <thead>
+      <tr class="bg-gray-100 border-b">
+        <% @columns.each do |column| %>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700"><%= column.to_s.humanize %></th>
+        <% end %>
+        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @items.each do |item| %>
+        <tr class="border-b hover:bg-gray-50">
+          <% @columns.each do |column| %>
+            <td class="px-4 py-3 text-sm text-gray-900">
+              <%= item.send(column) %>
+            </td>
+          <% end %>
+          <td class="px-4 py-3 text-sm text-center">
+            <%= link_to "View", [:admin, item], class: "text-blue-600 hover:text-blue-800 font-medium mr-2" %>
+            <%= link_to "Edit", [:edit, :admin, item], class: "text-yellow-600 hover:text-yellow-800 font-medium mr-2" %>
+            <%= button_to "Delete", [:admin, item], method: :delete, data: { confirm: "Are you sure?" }, class: "text-red-600 hover:text-red-800 font-medium inline" %>
+          </td>
+        </tr>
+      <% end %>
+      <% if @items.empty? %>
+        <tr>
+          <td colspan="<%= @columns.length + 1 %>" class="px-4 py-8 text-center text-gray-500">
+            No <%= @model_name.pluralize.downcase %> found
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
