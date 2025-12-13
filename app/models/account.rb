@@ -2,7 +2,6 @@ class Account < ApplicationRecord
   belongs_to :plaid_item
   has_many :holdings, dependent: :destroy
   has_many :transactions, dependent: :destroy
-  has_many :liabilities, dependent: :destroy
 
   # THIS LINE DISABLES STI — type column is just data
   self.inheritance_column = :_type_disabled
@@ -45,5 +44,30 @@ class Account < ApplicationRecord
   # PRD 9: HNW Hook - Get all Non-Profit sector holdings
   def nonprofit_holdings
     holdings.select { |h| h.sector&.downcase&.include?("non-profit") || h.sector&.downcase&.include?("nonprofit") }
+  end
+
+  # PRD 12: HNW Hook - Check if account has overdue payments (for "Owner" level tax simulations)
+  # Used in curriculum for trust/generational transfer penalty impacts
+  def overdue_payment?
+    is_overdue == true
+  end
+
+  # PRD 12: HNW Hook - Check if account has high debt risk (APR > 5% or overdue)
+  # Used in "Investor" and "Principal" levels for debt cost analysis in family LLCs
+  def high_debt_risk?
+    debt_risk_flag == true
+  end
+
+  # PRD 12: HNW Hook - Get liability summary for curriculum (debt prioritization simulations)
+  def liability_summary
+    return nil unless apr_percentage.present? || min_payment_amount.present?
+    
+    {
+      apr_percentage: apr_percentage,
+      min_payment_amount: min_payment_amount,
+      next_payment_due_date: next_payment_due_date,
+      is_overdue: is_overdue,
+      debt_risk_flag: debt_risk_flag
+    }
   end
 end
