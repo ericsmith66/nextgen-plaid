@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_12_194918) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_13_125709) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_12_194918) do
     t.decimal "market_value"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "vested_value", precision: 10, scale: 2
+    t.decimal "institution_price", precision: 10, scale: 2
+    t.datetime "institution_price_as_of"
+    t.boolean "high_cost_flag", default: false, null: false
     t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
     t.index ["account_id"], name: "index_holdings_on_account_id"
   end
