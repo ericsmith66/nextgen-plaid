@@ -1,0 +1,12 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Users Management</h1>
+    <%= link_to "New User", new_admin_user_path, class: "bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded" %>
+  </div>
+
+  <%= render AdminTableComponent.new(items: @users, columns: [:email, :roles, :family_id], model_name: "User") %>
+
+  <div class="mt-6 flex justify-center">
+    <%= paginate @users %>
+  </div>
+</div>

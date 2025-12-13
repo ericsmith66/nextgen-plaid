@@ -8,6 +8,32 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
+# PRD UI-4: Admin/Parent/Kid users for CRUD testing
+puts "Seeding users for UI-4 CRUD operations..."
+
+admin_user = User.find_or_create_by!(email: "admin@example.com") do |u|
+  u.password = "password123"
+  u.password_confirmation = "password123"
+  u.roles = "admin"
+  u.family_id = "family_001"
+end
+
+parent_user = User.find_or_create_by!(email: "parent@example.com") do |u|
+  u.password = "password123"
+  u.password_confirmation = "password123"
+  u.roles = "parent"
+  u.family_id = "family_001"
+end
+
+kid_user = User.find_or_create_by!(email: "kid@example.com") do |u|
+  u.password = "password123"
+  u.password_confirmation = "password123"
+  u.roles = "kid"
+  u.family_id = "family_001"
+end
+
+puts "Created admin, parent, and kid users for family_001"
+
 # PRD UI-2: Mocked data for Model Inspection Views
 puts "Seeding data for UI preview..."
 
@@ -15,6 +41,8 @@ puts "Seeding data for UI preview..."
 user = User.find_or_create_by!(email: "demo@example.com") do |u|
   u.password = "password123"
   u.password_confirmation = "password123"
+  u.roles = "parent"
+  u.family_id = "family_002"
 end
 
 # Create a sample PlaidItem
