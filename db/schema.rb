@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_13_165629) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -178,8 +178,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_13_155435) do
     t.string "iso_currency_code"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "fees", precision: 15, scale: 8
+    t.string "subtype"
+    t.decimal "price", precision: 15, scale: 8
+    t.string "dividend_type"
+    t.boolean "wash_sale_risk_flag", default: false
     t.index ["account_id", "transaction_id"], name: "index_transactions_on_account_id_and_transaction_id", unique: true
     t.index ["account_id"], name: "index_transactions_on_account_id"
+    t.index ["subtype"], name: "index_transactions_on_subtype"
   end
 
   create_table "users", force: :cascade do |t|
