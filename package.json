@@ -23,6 +23,8 @@
   },
   "homepage": "https://github.com/ericsmith66/nextgen-plaid#readme",
   "devDependencies": {
-    "daisyui": "^5.5.13"
+    "@tailwindcss/cli": "^4.1.18",
+    "daisyui": "^5.5.13",
+    "tailwindcss": "^4.1.18"
   }
 }

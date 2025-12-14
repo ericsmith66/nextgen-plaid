@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "daisyui/daisyui.css";
 
 /* PRD UI-1: Blue theme for wealth branding */
 @theme {
