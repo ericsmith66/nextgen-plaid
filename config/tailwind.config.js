@@ -46,5 +46,22 @@ module.exports = {
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
-  ]
+    require('daisyui'),
+  ],
+  daisyui: {
+    themes: [
+      {
+        business: {
+          ...require("daisyui/src/theming/themes")["business"],
+          primary: "#1E3A8A",
+          secondary: "#3B82F6",
+          accent: "#60A5FA",
+          neutral: "#1F2937",
+          "base-100": "#FFFFFF",
+          "base-200": "#F3F4F6",
+          "base-300": "#E5E7EB",
+        },
+      },
+    ],
+  },
 }
