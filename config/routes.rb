@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  get "plaid_oauth/initiate"
+  get "plaid_oauth/callback"
   devise_for :users
 
   # Authenticated users get dashboard FIRST
