@@ -75,7 +75,7 @@
       const handler = Plaid.create({
         token: data.link_token,
         onSuccess: function(public_token, metadata) {
-          fetch('/plaid/exchange_token', {
+          fetch('/plaid/exchange', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -83,7 +83,7 @@
             },
             body: JSON.stringify({
               public_token: public_token,
-              institution: metadata.institution
+              institution_name: metadata.institution?.name || 'Unknown Institution'
             })
           })
           .then(res => res.json())
@@ -110,6 +110,44 @@
       console.error('Link token failed:', err);
       button.disabled = true;
       button.textContent = 'Connection unavailable';
+    });
+
+    // OAuth Button Handler
+    const oauthButton = document.getElementById('plaid-oauth-button');
+    if (!oauthButton) return;
+
+    fetch('/plaid_oauth/initiate', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      }
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to get OAuth link token');
+      return res.json();
+    })
+    .then(data => {
+      const oauthHandler = Plaid.create({
+        token: data.link_token,
+        onSuccess: function(public_token, metadata) {
+          // Redirect to OAuth callback with public_token and user_id
+          window.location.href = `/plaid_oauth/callback?public_token=${public_token}&client_user_id=<%= current_user.id %>`;
+        },
+        onExit: function(err, metadata) {
+          if (err) {
+            console.warn('Plaid OAuth Link exit:', err);
+          }
+        }
+      });
+      oauthButton.onclick = function() {
+        oauthHandler.open();
+      };
+    })
+    .catch(err => {
+      console.error('OAuth link token failed:', err);
+      oauthButton.disabled = true;
+      oauthButton.textContent = 'OAuth unavailable';
     });
   });
 </script>

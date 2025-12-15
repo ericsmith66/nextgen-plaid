@@ -23,6 +23,7 @@ end
 
 class ActionDispatch::IntegrationTest
   include Warden::Test::Helpers
+  include Devise::Test::IntegrationHelpers
 
   def setup
     super
