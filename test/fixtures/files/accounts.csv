@@ -1,0 +1,7 @@
+Account Number,Accounts,Type,Account Description,Balance,Trust
+1234567008,Smith Family Checking,Checking,Personal Checking,"$16,581.33",
+9876543210,Investment Account,Invt Mgmt,Brokerage Account,"$125,000.00",SFRT
+5555556789,Savings Account,Savings,High Yield Savings,"$50,000.00",
+1111112345,Trust Checking,Checking,Trust Operating Account,"$25,500.75",GRAT
+0000000001,Invalid Account,InvalidType,Should Skip,"$1,000.00",
+2222223456,Zero Balance,Checking,Should Skip Zero,"$0.00",
