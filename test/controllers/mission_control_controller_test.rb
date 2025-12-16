@@ -298,4 +298,83 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     body = JSON.parse(@response.body)
     assert_equal "Not found", body["error"]
   end
+
+  # Remove Item endpoint tests (PRD: Plaid Item Removal)
+  test "owner can POST remove_item to delete item and cascade data" do
+    login_as(@owner, scope: :user)
+    
+    item = PlaidItem.create!(user: @owner, item_id: "it_remove", institution_name: "Test Bank", access_token: "test_token", status: "good")
+    account = item.accounts.create!(account_id: "acc_remove", name: "Test Account", type: "investment", subtype: "brokerage")
+    account.holdings.create!(security_id: "sec_remove", symbol: "AAPL", name: "Apple", quantity: 10.0)
+    item.recurring_transactions.create!(stream_id: "stream_remove", description: "Test", frequency: "MONTHLY", average_amount: 10.0)
+    item.sync_logs.create!(job_type: "holdings", status: "success")
+    
+    # Stub Plaid API call
+    fake_response = OpenStruct.new(request_id: "req_123")
+    with_stubbed_plaid_client(item_remove: fake_response) do
+      assert_difference ["PlaidItem.count", "Account.count", "Holding.count", "RecurringTransaction.count", "SyncLog.count"], -1 do
+        post mission_control_remove_item_path(id: item.id)
+        assert_redirected_to mission_control_path
+        follow_redirect!
+        assert_response :success
+        assert_includes @response.body, "Item removed successfully"
+      end
+    end
+    
+    # Verify item is gone
+    assert_nil PlaidItem.find_by(id: item.id)
+  end
+
+  test "owner remove_item returns 404 flash for invalid item ID" do
+    login_as(@owner, scope: :user)
+    
+    assert_no_difference "PlaidItem.count" do
+      post mission_control_remove_item_path(id: 999_999)
+      assert_redirected_to mission_control_path
+      follow_redirect!
+      assert_response :success
+      assert_includes @response.body, "Item not found"
+    end
+  end
+
+  test "owner remove_item handles Plaid API error gracefully" do
+    login_as(@owner, scope: :user)
+    
+    item = PlaidItem.create!(user: @owner, item_id: "it_error", institution_name: "Test Bank", access_token: "bad_token", status: "good")
+    
+    # Stub Plaid API to raise error
+    plaid_error = Plaid::ApiError.new(
+      error_type: "INVALID_REQUEST",
+      error_code: "INVALID_ACCESS_TOKEN",
+      error_message: "Invalid access token",
+      display_message: "Invalid access token"
+    )
+    
+    with_stubbed_plaid_client_error(:item_remove, plaid_error) do
+      assert_no_difference "PlaidItem.count" do
+        post mission_control_remove_item_path(id: item.id)
+        assert_redirected_to mission_control_path
+        follow_redirect!
+        assert_response :success
+        assert_includes @response.body, "Removal failed"
+      end
+    end
+    
+    # Verify item still exists
+    assert_not_nil PlaidItem.find_by(id: item.id)
+  end
+
+  test "non-owner cannot POST remove_item" do
+    login_as(@user, scope: :user)
+    
+    item = PlaidItem.create!(user: @owner, item_id: "it_protected", institution_name: "Bank", access_token: "tok", status: "good")
+    
+    assert_no_difference "PlaidItem.count" do
+      post mission_control_remove_item_path(id: item.id)
+      assert_redirected_to authenticated_root_path
+    end
+    
+    # Verify item still exists
+    assert_not_nil PlaidItem.find_by(id: item.id)
+  end
 end

@@ -21,6 +21,7 @@
               <th class="px-4 py-3 text-left">Accounts</th>
               <th class="px-4 py-3 text-left">Holdings</th>
               <th class="px-4 py-3 text-left">Last Synced</th>
+              <th class="px-4 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-700">
@@ -36,6 +37,9 @@
                 <td class="px-4 py-3"><%= item.holdings.count %></td>
                 <td class="px-4 py-3 text-sm text-slate-400">
                   <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
+                </td>
+                <td class="px-4 py-3">
+                  <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded transition" %>
                 </td>
               </tr>
             <% end %>
