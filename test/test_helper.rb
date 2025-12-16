@@ -19,6 +19,18 @@ class ActiveSupport::TestCase
   ensure
     Rails.application.config.x.plaid_client = original
   end
+
+  def with_stubbed_plaid_client_error(method_name, error)
+    original = Rails.application.config.x.plaid_client
+    stub_client = Object.new
+    stub_client.define_singleton_method(method_name) do |*args|
+      raise error
+    end
+    Rails.application.config.x.plaid_client = stub_client
+    yield
+  ensure
+    Rails.application.config.x.plaid_client = original
+  end
 end
 
 class ActionDispatch::IntegrationTest

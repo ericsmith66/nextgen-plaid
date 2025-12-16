@@ -173,6 +173,46 @@ class MissionControlController < ApplicationController
     render json: { status: "ok" }
   end
 
+  # PRD: Plaid Item Removal - Remove a PlaidItem and invalidate on Plaid's side
+  def remove_item
+    start_time = Time.current
+    item = PlaidItem.find_by(id: params[:id])
+    
+    unless item
+      flash[:alert] = "Item not found"
+      redirect_to mission_control_path
+      return
+    end
+
+    begin
+      # Call Plaid API to invalidate the item on their side
+      client = Rails.application.config.x.plaid_client
+      request = Plaid::ItemRemoveRequest.new(access_token: item.access_token)
+      client.item_remove(request)
+      
+      # Log successful removal (without exposing token)
+      Rails.logger.info "Item removed from Plaid: item_id=#{item.item_id}, institution=#{item.institution_name}"
+      
+      # Destroy the PlaidItem (cascades to accounts, holdings, transactions, etc.)
+      item.destroy!
+      
+      # Benchmark operation
+      elapsed = ((Time.current - start_time) * 1000).round
+      Rails.logger.info "Item removal completed in #{elapsed}ms"
+      
+      flash[:notice] = "Item removed successfully"
+      redirect_to mission_control_path
+    rescue Plaid::ApiError => e
+      Rails.logger.error "Plaid API error removing item #{item.id}: #{e.message}"
+      flash[:alert] = "Removal failed: #{e.message}"
+      redirect_to mission_control_path
+    rescue StandardError => e
+      Rails.logger.error "Error removing item #{item.id}: #{e.message}"
+      flash[:alert] = "Removal failed: #{e.message}"
+      redirect_to mission_control_path
+    end
+  end
+
   # Returns last 20 sync logs as JSON (owner-only)
   def logs
     logs = SyncLog.includes(:plaid_item).order(created_at: :desc).limit(20)
