@@ -4,7 +4,7 @@ class HoldingTest < ActiveSupport::TestCase
   def setup
     @user = User.create!(email: "test@example.com", password: "password123")
     @item = PlaidItem.create!(user: @user, item_id: "item_test", institution_name: "Test Bank", access_token: "tok", status: "good")
-    @account = Account.create!(plaid_item: @item, account_id: "acc_test")
+    @account = Account.create!(plaid_item: @item, account_id: "acc_test", mask: "1234")
   end
 
   test "should create holding with valid attributes" do
@@ -26,11 +26,18 @@ class HoldingTest < ActiveSupport::TestCase
     assert_includes holding.errors[:security_id], "can't be blank"
   end
 
-  test "should enforce uniqueness of security_id scoped to account_id" do
-    Holding.create!(account: @account, security_id: "sec_dup")
-    duplicate = Holding.new(account: @account, security_id: "sec_dup")
+  test "should enforce uniqueness of security_id scoped to account_id and source" do
+    Holding.create!(account: @account, security_id: "sec_dup", symbol: "TEST", quantity: 1, market_value: 100, source: :plaid)
+    duplicate = Holding.new(account: @account, security_id: "sec_dup", symbol: "TEST", quantity: 1, market_value: 100, source: :plaid)
     assert_not duplicate.valid?
     assert_includes duplicate.errors[:security_id], "has already been taken"
+  end
+
+  test "should allow same security_id for different sources" do
+    Holding.create!(account: @account, security_id: "sec_multi", symbol: "TEST", quantity: 1, market_value: 100, source: :plaid)
+    csv_holding = Holding.new(account: @account, security_id: "sec_multi", symbol: "TEST", quantity: 2, market_value: 200, source: :csv)
+    assert csv_holding.valid?
+    assert csv_holding.save
   end
 
   test "should belong to account" do
@@ -165,5 +172,137 @@ class HoldingTest < ActiveSupport::TestCase
     )
     
     assert_equal "Unknown", holding.sector
+  end
+
+  # CSV-2: Test source enum
+  test "should have source enum with plaid and csv values" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_enum",
+      symbol: "TEST",
+      quantity: 1,
+      market_value: 100
+    )
+    
+    assert_equal "plaid", holding.source
+    
+    holding.source = :csv
+    assert holding.save
+    assert_equal "csv", holding.source
+  end
+
+  test "source should default to plaid" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_default",
+      symbol: "TEST",
+      quantity: 1,
+      market_value: 100
+    )
+    
+    assert_equal "plaid", holding.source
+  end
+
+  # CSV-2: Test CSV-specific fields
+  test "should accept CSV import fields" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_csv",
+      symbol: "NVDA",
+      name: "NVIDIA CORP",
+      quantity: 100,
+      market_value: 20249.00,
+      unrealized_gl: 5710.00,
+      acquisition_date: Date.parse("2024-01-15"),
+      ytm: 2.50,
+      maturity_date: Date.parse("2028-06-01"),
+      disclaimers: { cost: "X", quantity: "Y" },
+      source: :csv,
+      source_institution: "jpmc",
+      import_timestamp: Time.current
+    )
+    
+    assert_equal 5710.00, holding.unrealized_gl.to_f
+    assert_equal Date.parse("2024-01-15"), holding.acquisition_date
+    assert_equal 2.50, holding.ytm.to_f
+    assert_equal Date.parse("2028-06-01"), holding.maturity_date
+    assert_equal({ "cost" => "X", "quantity" => "Y" }, holding.disclaimers)
+    assert_equal "csv", holding.source
+    assert_equal "jpmc", holding.source_institution
+    assert_not_nil holding.import_timestamp
+  end
+
+  test "CSV fields should be nullable" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_nullable_csv",
+      symbol: "TEST",
+      quantity: 1,
+      market_value: 100,
+      source: :csv
+    )
+    
+    assert_nil holding.unrealized_gl
+    assert_nil holding.acquisition_date
+    assert_nil holding.ytm
+    assert_nil holding.maturity_date
+    assert_nil holding.disclaimers
+    assert_nil holding.source_institution
+    assert_nil holding.import_timestamp
+  end
+
+  test "disclaimers should parse JSON correctly" do
+    holding = Holding.create!(
+      account: @account,
+      security_id: "sec_json",
+      symbol: "TEST",
+      quantity: 1,
+      market_value: 100,
+      disclaimers: { cost: "Estimated", quantity: "Approximate" }
+    )
+    
+    assert_instance_of Hash, holding.disclaimers
+    assert_equal "Estimated", holding.disclaimers["cost"]
+    assert_equal "Approximate", holding.disclaimers["quantity"]
+  end
+
+  # CSV-2: Test validations for CSV imports
+  test "should require symbol for CSV holdings" do
+    holding = Holding.new(
+      account: @account,
+      security_id: "sec_no_symbol",
+      quantity: 1,
+      market_value: 100,
+      source: :csv
+    )
+    
+    assert_not holding.valid?
+    assert_includes holding.errors[:symbol], "can't be blank"
+  end
+
+  test "should require quantity for CSV holdings" do
+    holding = Holding.new(
+      account: @account,
+      security_id: "sec_no_qty",
+      symbol: "TEST",
+      market_value: 100,
+      source: :csv
+    )
+    
+    assert_not holding.valid?
+    assert_includes holding.errors[:quantity], "can't be blank"
+  end
+
+  test "should require market_value for CSV holdings" do
+    holding = Holding.new(
+      account: @account,
+      security_id: "sec_no_value",
+      symbol: "TEST",
+      quantity: 1,
+      source: :csv
+    )
+    
+    assert_not holding.valid?
+    assert_includes holding.errors[:market_value], "can't be blank"
   end
 end

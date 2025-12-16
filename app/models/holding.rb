@@ -6,8 +6,17 @@ class Holding < ApplicationRecord
   # PRD 10: Disable STI — type column is for security type data, not inheritance
   self.inheritance_column = :_type_disabled
 
+  # CSV-2: Source enum for tracking data origin
+  attribute :source, :integer, default: 0
+  enum :source, { plaid: 0, csv: 1 }
+
   validates :security_id, presence: true
-  validates :security_id, uniqueness: { scope: :account_id }
+  validates :security_id, uniqueness: { scope: [ :account_id, :source ] }
+  
+  # CSV-2: Validations for CSV imports
+  validates :symbol, presence: true, if: :csv?
+  validates :quantity, presence: true, if: :csv?
+  validates :market_value, presence: true, if: :csv?
 
   # Decimal fields that require fixed notation formatting
   DECIMAL_FIELDS = %w[quantity cost_basis market_value vested_value institution_price].freeze

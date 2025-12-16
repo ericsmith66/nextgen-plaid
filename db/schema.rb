@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_16_173923) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_16_183533) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -85,7 +85,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_16_173923) do
     t.string "industry"
     t.string "type"
     t.string "subtype"
-    t.index ["account_id", "security_id"], name: "index_positions_on_account_and_security", unique: true
+    t.decimal "unrealized_gl", precision: 15, scale: 2
+    t.date "acquisition_date"
+    t.decimal "ytm", precision: 15, scale: 2
+    t.date "maturity_date"
+    t.jsonb "disclaimers"
+    t.integer "source", default: 0, null: false
+    t.datetime "import_timestamp"
+    t.string "source_institution"
+    t.index ["account_id", "security_id", "source"], name: "index_holdings_on_account_security_source", unique: true
     t.index ["account_id"], name: "index_holdings_on_account_id"
     t.index ["sector"], name: "index_holdings_on_sector"
   end
