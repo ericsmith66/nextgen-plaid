@@ -96,3 +96,23 @@ Update PRDs to include this (e.g., add to CSV-4 draft). Defer permanent archive 
 
 ## Workflow for Junie
 Use Claude Sonnet 4.5 (default for Rails reliability). Pull master: `git pull origin main`. Branch: `git checkout -b feature/csv-3-accounts-import`. Plan: Review PRD, ask questions (e.g., "Confirm type enum mappings? Add balances validation?"). Prototype in Ruby (CSV.foreach in service; optional Python pandas script for parse check if preferred—run via terminal). Use generators for migration. Test: `rake test`. Commit green only: `git commit -m "CSV-3: Account extensions and import service"`. Push, open PR.
+
+### Answers to Clarifying Questions
+
+1. **Uniqueness Constraint**: Option A – Drop the existing unique index and create a new one with `account_id + security_id + source` in the migration. This ensures database-level enforcement while allowing CSV/Plaid coexistence.
+
+2. **Type Mapping Complexity**: Option A – Map "Asset Class" to `type` (e.g., "Equity") and "Asset Strategy Detail" to `subtype` (e.g., "Core"). This leverages existing schema fields without concatenation.
+
+3. **Cash Handling**: Option A – Create holdings with `type: 'cash_equivalent'`; skip Account balance updates to avoid duplication risks. We can add balance reconciliation later if needed.
+
+4. **Price Field Mapping**: Option A – Map "Price" to `institution_price` (decimal) and "Pricing Date" to `institution_price_as_of` (datetime). This aligns with current schema—no new fields required.
+
+5. **Migration Strategy**: Option A – Create a single migration adding only missing fields (e.g., unrealized_gl, acquisition_date, ytm, maturity_date, disclaimers, source, import_timestamp, source_institution). Skip existing ones like `isin`.
+
+6. **Test Coverage**: Option A – Create a minimal test fixture CSV (5-10 rows) for efficiency; reference full 6002.csv in manual testing notes if needed.
+
+7. **PlaidItem Association**: Option B – Require the account to already exist (fail/log if not found via mask match). This assumes CSV-3 runs first; no auto-creation to avoid orphan risks.
+
+### Next Steps
+- Proceed to implement CSV-02 on branch `feature/csv-2-holdings-import` using Claude Sonnet 4.5.
+- Questions: Confirm Holding model rename (schema shows "holdings" table—update any lingering "Position" refs)? Add enum for Holding.type (e.g., stock, cash_equivalent, fixed_income) in migration?
