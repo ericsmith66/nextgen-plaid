@@ -4,7 +4,7 @@ class AccountTest < ActiveSupport::TestCase
   def setup
     @user = User.create!(email: "test@example.com", password: "password123")
     @item = PlaidItem.create!(user: @user, item_id: "item_test", institution_name: "Test Bank", access_token: "tok", status: "good")
-    @account = Account.create!(plaid_item: @item, account_id: "acc_test")
+    @account = Account.create!(plaid_item: @item, account_id: "acc_test", mask: "0000")
   end
 
   # PRD 9: Test diversification_risk? method
@@ -195,5 +195,52 @@ class AccountTest < ActiveSupport::TestCase
     assert_equal 24.99, summary[:apr_percentage]
     assert_equal true, summary[:is_overdue]
     assert_equal true, summary[:debt_risk_flag]
+  end
+
+  # CSV-3: Test source enum
+  test "source enum should default to plaid" do
+    account = Account.create!(plaid_item: @item, account_id: "acc_enum_test", mask: "1234")
+    assert_equal "plaid", account.source
+    assert account.plaid?
+  end
+
+  test "source enum should accept csv value" do
+    account = Account.create!(plaid_item: @item, account_id: "acc_csv_test", mask: "5678", source: :csv)
+    assert_equal "csv", account.source
+    assert account.csv?
+  end
+
+  test "should allow trust_code field" do
+    account = Account.create!(plaid_item: @item, account_id: "acc_trust_test", mask: "9012", trust_code: "SFRT")
+    assert_equal "SFRT", account.trust_code
+  end
+
+  test "should allow source_institution field" do
+    account = Account.create!(plaid_item: @item, account_id: "acc_inst_test", mask: "3456", source_institution: "jpmc")
+    assert_equal "jpmc", account.source_institution
+  end
+
+  test "should allow import_timestamp field" do
+    timestamp = Time.current
+    account = Account.create!(plaid_item: @item, account_id: "acc_time_test", mask: "7890", import_timestamp: timestamp)
+    assert_equal timestamp.to_i, account.import_timestamp.to_i
+  end
+
+  test "should validate presence of mask" do
+    account = Account.new(plaid_item: @item, account_id: "acc_no_mask")
+    assert_not account.valid?
+    assert_includes account.errors[:mask], "can't be blank"
+  end
+
+  test "should enforce uniqueness of account_id scoped to plaid_item_id and source" do
+    Account.create!(plaid_item: @item, account_id: "acc_unique", mask: "1111", source: :plaid)
+    # Same account_id with different source should be allowed
+    account_csv = Account.new(plaid_item: @item, account_id: "acc_unique", mask: "1111", source: :csv)
+    assert account_csv.valid?
+
+    # Same account_id with same source should not be allowed
+    account_duplicate = Account.new(plaid_item: @item, account_id: "acc_unique", mask: "1111", source: :plaid)
+    assert_not account_duplicate.valid?
+    assert_includes account_duplicate.errors[:account_id], "has already been taken"
   end
 end

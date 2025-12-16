@@ -6,8 +6,13 @@ class Account < ApplicationRecord
   # THIS LINE DISABLES STI — type column is just data
   self.inheritance_column = :_type_disabled
 
+  # CSV-3: Source enum for tracking data origin
+  attribute :source, :integer, default: 0
+  enum :source, { plaid: 0, csv: 1 }
+
   validates :account_id, presence: true
-  validates :account_id, uniqueness: { scope: :plaid_item_id }
+  validates :mask, presence: true
+  validates :account_id, uniqueness: { scope: [ :plaid_item_id, :source ] }
 
   # PRD 9: Check if any sector exceeds 30% concentration (diversification risk)
   def diversification_risk?
