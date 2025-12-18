@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_16_183533) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -172,7 +172,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_16_183533) do
 
   create_table "transactions", force: :cascade do |t|
     t.bigint "account_id", null: false
-    t.string "transaction_id", null: false
+    t.string "transaction_id"
     t.string "name"
     t.decimal "amount", precision: 14, scale: 4
     t.date "date"
@@ -188,6 +188,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_16_183533) do
     t.decimal "price", precision: 15, scale: 8
     t.string "dividend_type"
     t.boolean "wash_sale_risk_flag", default: false
+    t.string "cusip"
+    t.string "ticker"
+    t.decimal "quantity", precision: 20, scale: 6
+    t.decimal "cost_usd", precision: 15, scale: 2
+    t.decimal "income_usd", precision: 15, scale: 2
+    t.string "tran_code"
+    t.string "source", default: "manual", null: false
+    t.datetime "import_timestamp"
+    t.string "source_institution"
+    t.string "dedupe_key"
+    t.index ["account_id", "dedupe_key"], name: "index_transactions_on_account_and_dedupe", unique: true
     t.index ["account_id", "transaction_id"], name: "index_transactions_on_account_id_and_transaction_id", unique: true
     t.index ["account_id"], name: "index_transactions_on_account_id"
     t.index ["subtype"], name: "index_transactions_on_subtype"
