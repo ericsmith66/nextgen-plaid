@@ -1,0 +1,7 @@
+Trade Date,Post Date,Amount USD,Description,Type,Tran Code Description,Settlement Date,Cusip,Ticker,Quantity,Cost USD,Income USD,Tran Code,Account Number
+12/01/2024,12/03/2024,100.00,Dividend Payment,Dividend,Div Domest,12/04/2024,123456789,ABC,0.000000,0.00,5.00,DIV,****1234
+12/05/2024,12/06/2024,-2500.00,Sell Shares,Sale,Sale of Sec,12/07/2026,987654321,XYZ,10.000000,2000.00,0.00,SALE,****1234
+12/07/2024,12/08/2024,0.00,Zero Sum Test,Interest,Int on Bal,12/09/2024,,,,,0.00,INT,****1234
+12/09/2024,12/10/2024,150.00,Unknown Type,Unknown,Not In Map,12/11/2024,,,,,0.00,UNK,****1234
+12/11/2024,12/12/2024,200.00,No Account Row,Dividend,Div Domest,12/13/2024,,,,,0.00,DIV,****9999
+13/01/2024,13/02/2024,25.00,Invalid Date,Dividend,Div Domest,12/13/2024,,,,,0.00,DIV,****1234
