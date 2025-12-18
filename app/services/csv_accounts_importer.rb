@@ -75,8 +75,9 @@ class CsvAccountsImporter
 
     # Parse balance
     balance = parse_balance(row[:balance])
-    if balance.nil? || balance.zero?
-      skip_row(line_num, "Invalid or zero balance")
+    # Allow zero balances; only skip when balance is missing or non-numeric
+    if balance.nil?
+      skip_row(line_num, "Invalid balance")
       return
     end
 
