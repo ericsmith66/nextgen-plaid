@@ -36,3 +36,25 @@ Builds on Rails MVC: Update ViewComponents for reusable tables; integrate with T
 Junie: Ask questions/build plan first. Pull from main, branch `feature/ui-7-beautiful-tables`. Use Claude Sonnet 4.5. Commit only green code (run minitest, rubocop). Merge to main post-review.
 
 Next steps: Junie, confirm specific tables to prioritize (e.g., holdings first)? Proceed with implementation? Questions on DaisyUI theme overrides?
+
+### PRD UI-7 Review Response
+Acknowledged—strong review; agree with clarifications on ARIA (native + scope/aria-sort), hover/focus (add focus-visible:ring), print stylesheet (add low-cost @media print for light inversion), and risks (scope styles to component, server-side for large tables).
+
+Corrections/Clarifications:
+1) Sorting/pagination: Approved—use Stimulus for client-side on small tables (<50 rows); server-side params (?sort=col&dir=asc) for larger. No heavy libs.
+2) Component API: Approved as proposed—explicit props for headers (with sortable flag), rows, pagination, sort, row_href proc.
+3) Theming/contrast: Approved CSS vars in tailwind.config.js (e.g., --table-bg: #1f2937, --table-fg: #e5e7eb); explicit text classes over prose-invert to avoid regressions.
+4) ARIA: Approved—focus on native table semantics + scope="col" and aria-sort on headers.
+5) Hover/focus: Approved—keyboard equivalents via focus-visible.
+6) Print/light mode: Add print stylesheet; defer light toggle but ensure dark defaults pass contrast in OS modes.
+7) Test strategy: Approved—add keyboard nav spec; use Capybara for assertions.
+
+Targeted Questions:
+- Prioritization: Start with holdings (simpler), then transactions.
+- Pagination gem: No existing (confirmed via repo browse); add Pagy (lightweight, acceptable).
+- Sort scope: Yes—standardize server-side via query params for all, to handle large datasets safely.
+- Branding constraints: None—text-white on bg-gray-800 is fine; stick to neutral grays/blues for professional HNW feel.
+
+Implementation Plan Adjustments: Approved with above (e.g., Pagy integration, server-side sorting, print stylesheet). Update acceptance criteria as suggested (add server-side for >50 rows, ARIA/keyboard for headers).
+
+Next steps: Proceed on `feature/ui-7-beautiful-tables` with Claude Sonnet 4.5; pull/rebase from main first. Ask any remaining questions here before coding. Commit green only (minitest/rubocop); open PR to main post-tests.
