@@ -109,9 +109,20 @@ class SyncTransactionsJob < ApplicationJob
               t.price = inv_txn.price
               
               # PRD 11: Dividend type for HNW tax hooks
-              if inv_txn.subtype&.downcase&.include?("dividend")
-                t.dividend_type = inv_txn.subtype
-                Rails.logger.info "SyncTransactionsJob: Dividend detected for HNW tax hook: #{inv_txn.investment_transaction_id} (#{inv_txn.subtype})"
+              if inv_txn.subtype.present?
+                subtype_down = inv_txn.subtype.to_s.downcase
+                case subtype_down
+                when "qualified dividend"
+                  t.dividend_type = "qualified"
+                when "non-qualified dividend"
+                  t.dividend_type = "non_qualified"
+                when "dividend", "dividend reinvestment"
+                  # Plaid does not specify domestic/foreign here; mark unknown
+                  t.dividend_type = "unknown"
+                else
+                  # do not assign dividend_type for unrelated subtypes
+                end
+                Rails.logger.info "SyncTransactionsJob: Dividend-related subtype detected for HNW tax hook: #{inv_txn.investment_transaction_id} (#{inv_txn.subtype})" if subtype_down.include?("dividend")
               end
             end
             transaction.save!
