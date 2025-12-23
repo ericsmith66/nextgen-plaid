@@ -32,7 +32,7 @@ class Transaction < ApplicationRecord
     qualified: "qualified",
     non_qualified: "non_qualified",
     unknown: "unknown"
-  }, _prefix: true
+  }, prefix: true
 
   enum :personal_finance_category_confidence_level, {
     very_high: "very_high",
@@ -40,7 +40,7 @@ class Transaction < ApplicationRecord
     medium: "medium",
     low: "low",
     unknown: "unknown"
-  }, _prefix: true
+  }, prefix: true
 
   # Investments subtype (string-backed). Accept any string, but provide helper scope.
   scope :investment, -> { where.not(subtype: nil) }
