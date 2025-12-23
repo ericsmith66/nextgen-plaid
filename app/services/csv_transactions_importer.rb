@@ -124,7 +124,7 @@ class CsvTransactionsImporter
     end
 
     # Amount sum
-    amount_sum = to_decimal(row["Amount USD"]) + to_decimal(row["Income USD"]) 
+    amount_sum = to_decimal(row["Amount USD"]) + to_decimal(row["Income USD"])
     if amount_sum.round(2) == 0.to_d
       @result.skipped_zero += 1
       return append_error(row, "skipped_zero_amount")
@@ -153,8 +153,9 @@ class CsvTransactionsImporter
     cost_usd = to_decimal(row["Cost USD"]).round(2)
     income_usd = to_decimal(row["Income USD"]).round(2)
     tran_code = row["Tran Code"].to_s&.strip
+    tran_code_desc = row["Tran Code Description"].to_s&.strip
 
-    account = resolve_account(row["Account Number"]) 
+    account = resolve_account(row["Account Number"])
     unless account
       @result.no_account += 1
       return append_error(row, "no_account_match")
@@ -166,7 +167,13 @@ class CsvTransactionsImporter
       return append_error(row, "duplicate_core_match")
     end
 
-    dedupe_key = build_dedupe_key(date, amount_sum, description, tran_code, ticker, cusip, account.id)
+    dedupe_fingerprint = build_dedupe_key(date, amount_sum, description, tran_code, ticker, cusip, account.id)
+
+    subtype = map_subtype(category_sym)
+    dividend_type = map_dividend_type(category_sym)
+    txn_code_provenance = (tran_code.presence || tran_code_desc.presence)
+    txn_code_lookup = txn_code_provenance&.downcase
+    txn_code_id = txn_code_lookup && TransactionCode.find_by(code: txn_code_lookup)&.id
 
     payload = {
       account_id: account.id,
@@ -178,13 +185,17 @@ class CsvTransactionsImporter
       cusip: (cusip.presence),
       ticker: (ticker.presence),
       quantity: quantity,
+      subtype: subtype,
+      dividend_type: dividend_type,
+      transaction_code: txn_code_provenance,
+      transaction_code_id: txn_code_id,
       cost_usd: cost_usd,
       income_usd: income_usd,
       tran_code: tran_code,
       source: Transaction.sources[:manual],
       import_timestamp: @now,
       source_institution: "jpmc",
-      dedupe_key: dedupe_key,
+      dedupe_fingerprint: dedupe_fingerprint,
       updated_at: @now,
       created_at: @now
     }
@@ -193,22 +204,45 @@ class CsvTransactionsImporter
     @result.processed_rows += 1
   end
 
+  SUBTYPE_MAP = {
+    sell: "sell",
+    buy: "buy",
+    dividend_domestic: "dividend",
+    dividend_foreign: "dividend",
+    interest_income: "interest",
+    distribution: "distribution",
+    stock_split: "split",
+    capital_gain_st: "short-term capital gain",
+    capital_gain_lt: "long-term capital gain"
+  }.freeze
+
+  def map_subtype(category_sym)
+    SUBTYPE_MAP[category_sym]
+  end
+
+  def map_dividend_type(category_sym)
+    case category_sym
+    when :dividend_domestic then "domestic"
+    when :dividend_foreign then "foreign"
+    else nil
+    end
+  end
+
   def flush!
     return if @rows_buffer.empty?
 
-    # upsert by unique index on account_id + dedupe_key
+    # upsert by unique index on account_id + dedupe_fingerprint
     result = Transaction.upsert_all(
       @rows_buffer,
-      unique_by: :index_transactions_on_account_and_dedupe
+      unique_by: :index_txn_on_account_and_fingerprint
     )
 
     # ActiveRecord 7 returns number of inserts/updates via result.rows? Fallback to counts
     # We approximate: any pre-existing rows with same unique key count as updates
     # Compute updates by checking how many dedupe_keys already exist
-    keys = @rows_buffer.map { |r| [ r[:account_id], r[:dedupe_key] ] }
-    existing = Transaction.where(account_id: keys.map(&:first), dedupe_key: keys.map(&:last)).count
-    # After upsert, count again to detect total affected
-    total_after = existing # approximate; exact split is hard to infer without RETURNING clause
+    keys = @rows_buffer.map { |r| [ r[:account_id], r[:dedupe_fingerprint] ] }
+    existing = Transaction.where(account_id: keys.map(&:first), dedupe_fingerprint: keys.map(&:last)).count
+    # After upsert, we do not rely on exact split here; 'existing' approximates updates
     # We will conservatively count all as inserted if we can't determine split
     @result.inserted += @rows_buffer.size
 
