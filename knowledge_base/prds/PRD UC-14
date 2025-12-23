@@ -1,0 +1,79 @@
+**PRD: UC-14 – Extend Transactions Model with Full Plaid Schema**
+
+**Overview**
+Extend the Transaction model to fully support all fields from Plaid's /transactions/get, /investments/transactions/get, and /transactions/enrich endpoints, including sub-objects as JSONB and lookup tables for reusable data like personal finance categories (PFC), transaction codes, and merchant details. This enables comprehensive data storage for HNW syncs (JPMC, Schwab, Amex, Stellar), supporting AI enrichments via local Ollama for curriculum simulations (e.g., tax optimizations, philanthropy tracking).
+
+**Log Requirements**
+Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards (e.g., structured JSON logs via Rails.logger for migrations/syncs, audit trails with user_id/timestamp/redacted details; include post-migration summaries with row counts affected).
+
+**Requirements**
+- **Functional**:
+  - Migration: Add missing columns to `transactions` table for core/enriched fields: `pending_transaction_id` (string), `account_owner` (string), `unofficial_currency_code` (string), `check_number` (string), `datetime` (datetime), `authorized_date` (date), `authorized_datetime` (datetime), `original_description` (string), `logo_url` (string), `website` (string), `merchant_entity_id` (string), `transaction_type` (string, deprecated—allow null), `transaction_code` (string), `personal_finance_category_icon_url` (string), `personal_finance_category_confidence_level` (string, enum: {very_high: "very_high", high: "high", medium: "medium", low: "low", unknown: "unknown"}), `personal_finance_category_version` (string, default: "v2").
+  - Sub-objects as JSONB: Add `location` (jsonb, e.g., {address, city, region, postal_code, country, lat, lon, store_number}), `payment_meta` (jsonb, e.g., {reference_number, ppd_id, payee, by_order_of, payer, payment_method, payment_processor, reason}), `counterparties` (jsonb, array of objects: {name, entity_id, type, website, logo_url, confidence_level, account_numbers}).
+  - Investment extensions: Add `fees` (decimal(15,2)), `subtype` (string, enum from Plaid investment subtypes—see mapping table below), `price` (decimal(15,6)), `quantity` (decimal(20,6)), `dividend_type` (string, enum: {domestic: "domestic", foreign: "foreign", qualified: "qualified", non_qualified: "non_qualified", unknown: "unknown"}), `wash_sale_risk_flag` (boolean, default: false).
+  - Lookup tables: Create new models/tables for reusable data:
+    - `PersonalFinanceCategories` (table: personal_finance_categories): Fields: `primary` (string, e.g., "FOOD_AND_DRINK"), `detailed` (string, e.g., "FOOD_AND_DRINK_FAST_FOOD"), `long_description` (text, e.g., "Fast food restaurants and quick service establishments"). Belongs_to :transaction (optional). Seed with full Plaid PFC taxonomy (use rake task to import from CSV/JSON—fetch via browse_page if needed).
+    - `TransactionCodes` (table: transaction_codes): Fields: `code` (string, e.g., "adjustment"), `name` (string, e.g., "Bank adjustment"), `long_description` (text). Enum for code if desired; seed with EU codes from Plaid docs.
+    - `Merchants` (table: merchants): Fields: `merchant_entity_id` (string, unique), `name` (string), `logo_url` (string), `website` (string), `long_description` (text, enriched via Ollama prompt if available). Has_many :transactions.
+  - Update Transaction model: Add associations (belongs_to :personal_finance_category, optional; has_one :transaction_code, optional; belongs_to :merchant, optional). Validations: Uniqueness on (account_id, transaction_id) for plaid source; allow nulls for optional fields. Scopes: e.g., scope :investment, -> { where.not(subtype: nil) }.
+  - Service updates: Extend CsvTransactionsImporter and future Plaid sync services (TRANS-1) to populate new fields where applicable (e.g., map CSV "Type + Tran Code" to subtype/code lookups). For enrich: Add optional call to /transactions/enrich in sync (sandbox/prod toggle).
+- **Non-Functional**:
+  - Performance: Batch migrations (e.g., add_column with default/null); use upsert_all in importers for large datasets. Limit JSONB size (validate <1MB per row).
+  - Rails Guidance: Use generators (rails g model PersonalFinanceCategory ...); enums as string-backed for flexibility (e.g., enum subtype: PlaidInvestmentSubtypes.constants.map { |c| [c, c] }.to_h, _default: "unknown"). Routes: None (model-only); Service: TransactionEnricher (app/services) for populating lookups via Ollama (prompt: "Categorize transaction: [details]" starting with 0_AI_THINKING_CONTEXT.md). Tests: WebMock/VCR for Plaid mocks; factory_bot for lookups.
+
+**Architectural Context**
+Builds on Rails MVC: Extend Transaction model (belongs_to :account); new lookup models for normalization (e.g., avoid duplicating PFC strings). PostgreSQL with RLS/attr_encrypted for HNW privacy; plaid-ruby for endpoint mappings (e.g., parse response['transactions'] into attributes/JSONB). For AI: Append enriched fields to daily FinancialSnapshotJob JSON blobs (e.g., totals by subtype/PFC); prompt Ollama via AiFinancialAdvisor with snapshot + static docs for summaries (e.g., "Analyze investment transactions for tax risks"). Reference schema: User → PlaidItem → Account → Transaction (now with lookups). Avoid vector DBs—use JSON snapshots + seeded lookups for 95% RAG value.
+
+**Acceptance Criteria**
+- Migration runs without errors; new columns/enums populated with defaults (e.g., personal_finance_category_version: "v2").
+- Seeded lookups: PersonalFinanceCategories has ~100 rows from Plaid taxonomy; TransactionCodes covers all EU codes.
+- CSV import: Populates subtype/fees/quantity from mappings; links to new Merchant if entity_id matches.
+- Plaid sync (stubbed): Parses full response into JSONB (e.g., location as hash); sets subtype enum for investments.
+- Validations: Saves transaction with minimal core fields; rejects duplicates on (account_id, transaction_id) for plaid.
+- Scopes/Queries: Transaction.investment returns only those with subtype; gin index allows fast location['city'] searches.
+- AI integration: Snapshot JSON includes new fields (e.g., counterparties array); Ollama prompt returns enriched description without hallucination.
+- Backfill: Existing transactions get default enums (e.g., subtype: "unknown").
+
+**Test Cases**
+- Unit (RSpec): Transaction.new(attributes_from_plaid).valid? → true; expect(t.subtype).to eq("buy"); mock JSONB access (t.location['lat']).to be_present. Factory: create(:transaction, :with_pfc, :with_merchant).
+- Integration: rake 'csv:import_transactions[path,1]' → new fields populated, lookups created/associated; expect(Merchant.count).to change.by(1). WebMock stub Plaid /transactions/get → parses JSONB/counterparties correctly. VCR cassette for enrich endpoint.
+
+**Workflow**
+Junie: Ask questions/build plan first. Pull from main, branch `feature/uc-14-transactions-extended`. Use Claude Sonnet 4.5. Commit only green code (run rspec, rubocop). Merge to main post-review.
+
+Next steps: Junie, confirm PFC taxonomy seeding (e.g., via rake from Plaid CSV URL)? Proceed with implementation? Questions on lookup associations or enum mappings?
+
+Answers to quesitons:
+
+1. Lookup associations direction: Confirmed—use the inverse as proposed:
+   - Transaction belongs_to :personal_finance_category (optional)
+   - PersonalFinanceCategory has_many :transactions
+   - Transaction belongs_to :transaction_code (optional)
+   - TransactionCode has_many :transactions
+   - Transaction belongs_to :merchant (optional) with FK; retain merchant_entity_id string for provenance.
+
+2. Test framework mismatch: Confirmed—update to Minitest (project standard); use fixtures/factories equivalents.
+
+3. Enum sources and defaults: Subtype enum from Plaid investment subtypes (string-backed, default "unknown"): account fee, adjustment, assignment, buy, buy to cover, contribution, deposit, distribution, dividend, dividend reinvestment, exercise, expire, fund fee, interest, interest receivable, interest reinvestment, legal fee, loan payment, long-term capital gain, long-term capital gain reinvestment, management fee, margin expense, merger, miscellaneous fee, non-qualified dividend, non-resident tax, pending credit, pending debit, qualified dividend, rebalance, return of principal, request, sell, sell short, send, short-term capital gain, short-term capital gain reinvestment, spin off, split, stock distribution, tax, tax withheld, trade, transfer, transfer fee, trust fee, unqualified gain, withdrawal. For confidence_level, handle unknown with default "unknown" in backfill/parsing.
+
+4. Uniqueness and idempotency across sources: Use dedupe_fingerprint (string column, derived from MD5 of normalized date|amount|payee|check_number); add unique index on (account_id, dedupe_fingerprint). Compute in service for CSV; ignore for Plaid if transaction_id present.
+
+5. JSONB indexing details: Approved—GIN on location (jsonb_path_ops); GIN on counterparties for name/entity_id filters.
+
+6. Column types/precision: Approved—use t.datetime with precision: 6, null: true for datetime/authorized_datetime (timezone-aware per Rails config.time_zone).
+
+7. Data sensitivity: Allowed with RLS; encrypt account_numbers in counterparties JSONB via attr_encrypted on the field.
+
+8. Enrichment endpoint toggle: Approved—ENV['PLAID_ENRICH_ENABLED'] (default false in dev/test, true in prod); add Sidekiq retry (3 attempts, exponential backoff) and daily limit guard (e.g., 1000 requests/user via Redis counter).
+
+9. Migrations on large tables: Approved—concurrent indexes; no rewriting defaults; staged backfills via Sidekiq job (BatchBackfillJob) with 1000-row batches.
+
+10. Naming consistency: Approved—transaction_type nullable; set only if provided by Plaid, document deprecation.
+
+PFC Taxonomy Seeding: Use rake to fetch and seed from https://plaid.com/documents/transactions-personal-finance-category-taxonomy.csv (no license issues for internal use; no attribution needed in code).
+
+Transaction Codes: Seed with EU list from Plaid docs: adjustment, atm, bank charge, bill payment, cash, cashback, cheque, direct debit, interest, purchase, standing order, transfer. Include US equivalents if available (none standard); source: https://plaid.com/docs/api/products/transactions/.
+
+Implementation Plan Adjustments: Approved with above clarifications (e.g., associations, Minitest, dedupe_fingerprint). Add gin indexes in migration; encrypt counterparties account_numbers.
+
+Next steps: Junie, update PRD inline with these (e.g., associations, Minitest, dedupe_fingerprint, URL for seeding), then build detailed plan (e.g., migration SQL chunks, model code snippets if needed). Ask remaining questions here before coding on branch `feature/uc-14-transactions-extended` using Claude Sonnet 4.5. Commit green only.
