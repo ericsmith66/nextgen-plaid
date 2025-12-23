@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_23_102800) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -98,6 +98,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
     t.index ["sector"], name: "index_holdings_on_sector"
   end
 
+  create_table "merchants", force: :cascade do |t|
+    t.string "merchant_entity_id", null: false
+    t.string "name"
+    t.string "logo_url"
+    t.string "website"
+    t.text "long_description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["merchant_entity_id"], name: "index_merchants_on_merchant_entity_id", unique: true
+  end
+
   create_table "option_contracts", force: :cascade do |t|
     t.bigint "holding_id", null: false
     t.string "contract_type"
@@ -107,6 +118,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["holding_id"], name: "index_option_contracts_on_holding_id", unique: true
+  end
+
+  create_table "personal_finance_categories", force: :cascade do |t|
+    t.string "primary", null: false
+    t.string "detailed", null: false
+    t.text "long_description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["primary", "detailed"], name: "index_pfc_on_primary_and_detailed", unique: true
   end
 
   create_table "plaid_api_calls", force: :cascade do |t|
@@ -170,6 +190,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
     t.index ["plaid_item_id"], name: "index_sync_logs_on_plaid_item_id"
   end
 
+  create_table "transaction_codes", force: :cascade do |t|
+    t.string "code", null: false
+    t.string "name"
+    t.text "long_description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_transaction_codes_on_code", unique: true
+  end
+
   create_table "transactions", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.string "transaction_id"
@@ -183,9 +212,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
     t.string "iso_currency_code"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.decimal "fees", precision: 15, scale: 8
+    t.decimal "fees", precision: 15, scale: 2
     t.string "subtype"
-    t.decimal "price", precision: 15, scale: 8
+    t.decimal "price", precision: 15, scale: 6
     t.string "dividend_type"
     t.boolean "wash_sale_risk_flag", default: false
     t.string "cusip"
@@ -198,10 +227,40 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
     t.datetime "import_timestamp"
     t.string "source_institution"
     t.string "dedupe_key"
+    t.string "pending_transaction_id"
+    t.string "account_owner"
+    t.string "unofficial_currency_code"
+    t.string "check_number"
+    t.datetime "datetime"
+    t.date "authorized_date"
+    t.datetime "authorized_datetime"
+    t.string "original_description"
+    t.string "logo_url"
+    t.string "website"
+    t.string "merchant_entity_id"
+    t.string "transaction_type"
+    t.string "transaction_code"
+    t.string "personal_finance_category_icon_url"
+    t.string "personal_finance_category_confidence_level"
+    t.string "personal_finance_category_version", default: "v2"
+    t.jsonb "location"
+    t.jsonb "payment_meta"
+    t.jsonb "counterparties"
+    t.string "dedupe_fingerprint"
+    t.bigint "merchant_id"
+    t.bigint "personal_finance_category_id"
+    t.bigint "transaction_code_id"
+    t.index ["account_id", "dedupe_fingerprint"], name: "index_txn_on_account_and_fingerprint", unique: true, where: "(dedupe_fingerprint IS NOT NULL)"
     t.index ["account_id", "dedupe_key"], name: "index_transactions_on_account_and_dedupe", unique: true
     t.index ["account_id", "transaction_id"], name: "index_transactions_on_account_id_and_transaction_id", unique: true
+    t.index ["account_id", "transaction_id"], name: "index_txn_on_account_and_transaction_id", unique: true, where: "(transaction_id IS NOT NULL)"
     t.index ["account_id"], name: "index_transactions_on_account_id"
+    t.index ["counterparties"], name: "index_transactions_on_counterparties_gin", using: :gin
+    t.index ["location"], name: "index_transactions_on_location_gin", opclass: :jsonb_path_ops, using: :gin
+    t.index ["merchant_id"], name: "index_transactions_on_merchant_id"
+    t.index ["personal_finance_category_id"], name: "index_transactions_on_personal_finance_category_id"
     t.index ["subtype"], name: "index_transactions_on_subtype"
+    t.index ["transaction_code_id"], name: "index_transactions_on_transaction_code_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -226,4 +285,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_18_160630) do
   add_foreign_key "recurring_transactions", "plaid_items"
   add_foreign_key "sync_logs", "plaid_items"
   add_foreign_key "transactions", "accounts"
+  add_foreign_key "transactions", "merchants"
+  add_foreign_key "transactions", "personal_finance_categories"
+  add_foreign_key "transactions", "transaction_codes"
 end
