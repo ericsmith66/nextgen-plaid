@@ -9,7 +9,7 @@ class PlaidOauthService
     request = Plaid::LinkTokenCreateRequest.new(
       user: { client_user_id: @user.id.to_s },
       client_name: "NextGen Plaid",
-      products: %w[investments transactions],
+      products: %w[investments transactions liabilities],
       country_codes: ["US"],
       language: "en",
       redirect_uri: ENV["PLAID_REDIRECT_URI"]

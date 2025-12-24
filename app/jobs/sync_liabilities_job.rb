@@ -54,6 +54,19 @@ class SyncLiabilitiesJob < ApplicationJob
     rescue Plaid::ApiError => e
       # PRD 6.1: Detect expired/broken tokens
       error_code = self.class.extract_plaid_error_code(e)
+      if error_code == "ADDITIONAL_CONSENT_REQUIRED"
+        # Graceful handling: mark item for reauth (consent), log, and do not re-raise
+        item.update!(status: :needs_reauth, last_error: e.message)
+        SyncLog.create!(
+          plaid_item: item,
+          job_type: "liabilities",
+          status: "failure",
+          error_message: "ADDITIONAL_CONSENT_REQUIRED - user must grant Liabilities access",
+          job_id: self.job_id
+        )
+        Rails.logger.warn({ event: "liabilities.consent_required", item_id: item.id, request_id: (JSON.parse(e.response_body)["request_id"] rescue nil) }.to_json)
+        return
+      end
       if error_code == "ITEM_LOGIN_REQUIRED" || error_code == "INVALID_ACCESS_TOKEN"
         new_attempts = item.reauth_attempts + 1
         # PRD 6.6: After 3 failed attempts, mark as failed

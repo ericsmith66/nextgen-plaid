@@ -1,35 +1,59 @@
 <div class="overflow-x-auto">
-  <table class="table-auto border-collapse w-full bg-white shadow-md rounded-lg">
+  <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
     <thead>
-      <tr class="bg-gray-100 border-b">
-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subtype</th>
-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Fees</th>
-        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+      <tr role="row" class="bg-base-300 text-white sticky top-0">
+        <% current_sort = (params[:sort] || 'date').to_s %>
+        <% current_dir  = (params[:dir] || 'desc').to_s %>
+        <% def next_dir_for(col, current_sort, current_dir); (current_sort == col && current_dir == 'asc') ? 'desc' : 'asc'; end %>
+
+        <th scope="col" role="columnheader"
+            aria-sort="<%= current_sort == 'date' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
+            class="px-4 py-3 text-left text-sm font-semibold">
+          <%= link_to 'Date', url_for(params.permit!.to_h.merge(sort: 'date', dir: next_dir_for('date', current_sort, current_dir))), class: "link link-hover text-white" %>
+        </th>
+        <th scope="col" role="columnheader"
+            aria-sort="<%= current_sort == 'name' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
+            class="px-4 py-3 text-left text-sm font-semibold">
+          <%= link_to 'Name', url_for(params.permit!.to_h.merge(sort: 'name', dir: next_dir_for('name', current_sort, current_dir))), class: "link link-hover text-white" %>
+        </th>
+        <th scope="col" role="columnheader"
+            aria-sort="<%= current_sort == 'amount' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
+            class="px-4 py-3 text-right text-sm font-semibold">
+          <%= link_to 'Amount', url_for(params.permit!.to_h.merge(sort: 'amount', dir: next_dir_for('amount', current_sort, current_dir))), class: "link link-hover text-white" %>
+        </th>
+        <th scope="col" role="columnheader"
+            aria-sort="<%= current_sort == 'subtype' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
+            class="px-4 py-3 text-left text-sm font-semibold"> 
+          <%= link_to 'Subtype', url_for(params.permit!.to_h.merge(sort: 'subtype', dir: next_dir_for('subtype', current_sort, current_dir))), class: "link link-hover text-white" %>
+        </th>
+        <th scope="col" role="columnheader"
+            aria-sort="<%= current_sort == 'fees' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
+            class="px-4 py-3 text-right text-sm font-semibold">
+          <%= link_to 'Fees', url_for(params.permit!.to_h.merge(sort: 'fees', dir: next_dir_for('fees', current_sort, current_dir))), class: "link link-hover text-white" %>
+        </th>
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-center text-sm font-semibold">Actions</th>
       </tr>
     </thead>
     <tbody>
       <% @transactions.each do |transaction| %>
-        <tr class="border-b hover:bg-gray-50">
-          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.date&.strftime("%Y-%m-%d") %></td>
-          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.name %></td>
-          <td class="px-4 py-3 text-sm text-right <%= transaction.amount.to_f >= 0 ? 'text-green-600' : 'text-red-600' %> font-medium">
+        <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
+          <td role="cell" class="px-4 py-3 text-sm"><%= transaction.date&.strftime("%Y-%m-%d") %></td>
+          <td role="cell" class="px-4 py-3 text-sm"><%= transaction.name %></td>
+          <td role="cell" class="px-4 py-3 text-sm text-right <%= transaction.amount.to_f >= 0 ? 'text-green-400' : 'text-red-400' %> font-medium">
             $<%= number_to_currency(transaction.amount || 0, precision: 2, unit: "") %>
           </td>
-          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.subtype %></td>
-          <td class="px-4 py-3 text-sm text-right text-gray-900">
+          <td role="cell" class="px-4 py-3 text-sm"><%= transaction.subtype %></td>
+          <td role="cell" class="px-4 py-3 text-sm text-right">
             <%= transaction.respond_to?(:fees) ? "$#{number_to_currency(transaction.fees || 0, precision: 2, unit: '')}" : "N/A" %>
           </td>
-          <td class="px-4 py-3 text-sm text-center">
-            <%= link_to "View", transaction_path(transaction), class: "text-blue-600 hover:text-blue-800 font-medium" %>
+          <td role="cell" class="px-4 py-3 text-sm text-center">
+            <%= link_to "View", transaction_path(transaction), class: "link link-primary font-medium focus-visible:ring focus-visible:ring-primary" %>
           </td>
         </tr>
       <% end %>
       <% if @transactions.empty? %>
-        <tr>
-          <td colspan="6" class="px-4 py-8 text-center text-gray-500">No transactions found</td>
+        <tr role="row">
+          <td role="cell" colspan="6" class="px-4 py-8 text-center text-gray-400">No transactions found</td>
         </tr>
       <% end %>
     </tbody>
