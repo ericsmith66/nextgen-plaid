@@ -62,4 +62,53 @@
       alert('Failed to connect to Plaid');
     }
   }
+
+  // Request product-specific consent (e.g., liabilities)
+  async function relinkLiabilities(id) {
+    try {
+      const relinkUrl = '<%= mission_control_relink_path(id: "__ID__") %>'.replace('__ID__', id) + '?products=liabilities';
+      const res = await fetch(relinkUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken()
+        },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to get liabilities link token: ' + (err.error || res.statusText));
+        return;
+      }
+      const data = await res.json();
+      const handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: async function(public_token, metadata) {
+          try {
+            const successUrl = '<%= mission_control_relink_success_path(id: "__ID__") %>'.replace('__ID__', id);
+            await fetch(successUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken()
+              },
+              body: JSON.stringify({ public_token: public_token, products: 'liabilities' })
+            });
+          } catch (e) {
+            console.warn('Failed to notify liabilities relink success:', e);
+          }
+          window.location.reload();
+        },
+        onExit: function(err, metadata) {
+          if (err) {
+            console.warn('Plaid Link exit:', err);
+          }
+        }
+      });
+      handler.open();
+    } catch (e) {
+      console.error('Failed to relink liabilities:', e);
+      alert('Failed to connect to Plaid');
+    }
+  }
 </script>

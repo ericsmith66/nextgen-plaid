@@ -84,6 +84,11 @@ class MissionControlController < ApplicationController
   end
 
   def sync_liabilities_now
+    # Optional gate
+    if ENV.fetch("LIABILITIES_ENABLED", "true").to_s != "true"
+      flash[:alert] = "Liabilities sync is disabled by configuration."
+      return redirect_to mission_control_path
+    end
     count = 0
     PlaidItem.find_each do |item|
       SyncLiabilitiesJob.perform_later(item.id)
@@ -112,13 +117,21 @@ class MissionControlController < ApplicationController
     return render json: { error: "Not found" }, status: :not_found unless item
 
     client = Rails.application.config.x.plaid_client
-    
+    # Allow product-specific consent flows (e.g., liabilities)
+    requested_products = params[:products].to_s.split(',').map(&:strip).reject(&:blank?)
+    # Default to all configured products if none specified
+    products = if requested_products.any?
+                 requested_products
+               else
+                 ["investments", "transactions", "liabilities"]
+               end
+
     # Try update mode first with the existing access token
     begin
       request = Plaid::LinkTokenCreateRequest.new(
         user: { client_user_id: item.user_id.to_s },
         client_name: "NextGen Wealth Advisor",
-        products: ["investments", "transactions", "liabilities"],
+        products: products,
         country_codes: ["US"],
         language: "en",
         access_token: item.access_token
@@ -133,7 +146,7 @@ class MissionControlController < ApplicationController
         request = Plaid::LinkTokenCreateRequest.new(
           user: { client_user_id: item.user_id.to_s },
           client_name: "NextGen Wealth Advisor",
-          products: ["investments", "transactions", "liabilities"],
+          products: products,
           country_codes: ["US"],
           language: "en"
         )
@@ -150,6 +163,8 @@ class MissionControlController < ApplicationController
   def relink_success
     item = PlaidItem.find_by(id: params[:id])
     return render json: { error: "Not found" }, status: :not_found unless item
+
+    products = params[:products].to_s.split(',').map(&:strip)
 
     # If public_token is provided (fallback to standard link mode), exchange it for a new access_token
     if params[:public_token].present?
@@ -169,6 +184,10 @@ class MissionControlController < ApplicationController
       item.update!(status: :good, reauth_attempts: 0, last_error: nil)
     end
 
+    # Enqueue follow-up syncs based on products
+    if products.include?("liabilities")
+      SyncLiabilitiesJob.perform_later(item.id)
+    end
     SyncHoldingsJob.perform_later(item.id)
     render json: { status: "ok" }
   end

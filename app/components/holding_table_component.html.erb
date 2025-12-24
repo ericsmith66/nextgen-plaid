@@ -1,31 +1,31 @@
 <div class="overflow-x-auto">
-  <table class="table-auto border-collapse w-full bg-white shadow-md rounded-lg">
+  <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
     <thead>
-      <tr class="bg-gray-100 border-b">
-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Symbol</th>
-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Quantity</th>
-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Market Value</th>
-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sector</th>
-        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+      <tr role="row" class="bg-base-300 text-white sticky top-0">
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Name</th>
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Symbol</th>
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Quantity</th>
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Market Value</th>
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Sector</th>
+        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-center text-sm font-semibold">Actions</th>
       </tr>
     </thead>
     <tbody>
       <% @holdings.each do |holding| %>
-        <tr class="border-b hover:bg-gray-50">
-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.name %></td>
-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.symbol %></td>
-          <td class="px-4 py-3 text-sm text-right text-gray-900"><%= holding.quantity_s %></td>
-          <td class="px-4 py-3 text-sm text-right text-gray-900">$<%= number_to_currency(holding.market_value || 0, precision: 2, unit: "") %></td>
-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.sector %></td>
-          <td class="px-4 py-3 text-sm text-center">
-            <%= link_to "View", holding_path(holding), class: "text-blue-600 hover:text-blue-800 font-medium" %>
+        <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
+          <td role="cell" class="px-4 py-3 text-sm"><%= holding.name %></td>
+          <td role="cell" class="px-4 py-3 text-sm"><%= holding.symbol %></td>
+          <td role="cell" class="px-4 py-3 text-sm text-right"><%= holding.quantity_s %></td>
+          <td role="cell" class="px-4 py-3 text-sm text-right">$<%= number_to_currency(holding.market_value || 0, precision: 2, unit: "") %></td>
+          <td role="cell" class="px-4 py-3 text-sm"><%= holding.sector %></td>
+          <td role="cell" class="px-4 py-3 text-sm text-center">
+            <%= link_to "View", holding_path(holding), class: "link link-primary font-medium focus-visible:ring focus-visible:ring-primary" %>
           </td>
         </tr>
       <% end %>
       <% if @holdings.empty? %>
-        <tr>
-          <td colspan="6" class="px-4 py-8 text-center text-gray-500">No holdings found</td>
+        <tr role="row">
+          <td role="cell" colspan="6" class="px-4 py-8 text-center text-gray-400">No holdings found</td>
         </tr>
       <% end %>
     </tbody>
