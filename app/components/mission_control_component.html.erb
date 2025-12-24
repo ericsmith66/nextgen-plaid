@@ -12,39 +12,46 @@
   <div>
     <h3 class="text-2xl font-bold text-primary-400 mb-4">Plaid Items (<%= @plaid_items.count %>)</h3>
     <% if @plaid_items.any? %>
-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-        <table class="w-full">
-          <thead class="bg-slate-700">
-            <tr>
-              <th class="px-4 py-3 text-left">Institution</th>
-              <th class="px-4 py-3 text-left">Status</th>
-              <th class="px-4 py-3 text-left">Accounts</th>
-              <th class="px-4 py-3 text-left">Holdings</th>
-              <th class="px-4 py-3 text-left">Last Synced</th>
-              <th class="px-4 py-3 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-700">
-            <% @plaid_items.each do |item| %>
-              <tr class="hover:bg-slate-700/50">
-                <td class="px-4 py-3"><%= item.institution_name %></td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded text-sm <%= item.status == 'good' ? 'bg-green-600' : 'bg-red-600' %>">
-                    <%= item.status.humanize %>
-                  </span>
-                </td>
-                <td class="px-4 py-3"><%= item.accounts.count %></td>
-                <td class="px-4 py-3"><%= item.holdings.count %></td>
-                <td class="px-4 py-3 text-sm text-slate-400">
-                  <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
-                </td>
-                <td class="px-4 py-3">
-                  <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded transition" %>
-                </td>
+      <div class="rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
+            <thead>
+              <tr role="row" class="bg-base-300 text-white sticky top-0">
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Institution</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Accounts</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Holdings</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Last Synced</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Actions</th>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% @plaid_items.each do |item| %>
+                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
+                  <td role="cell" class="px-4 py-3 text-sm"><%= item.institution_name %></td>
+                  <td role="cell" class="px-4 py-3 text-sm">
+                    <span class="px-2 py-1 rounded text-sm <%= item.status == 'good' ? 'bg-green-600' : 'bg-red-600' %>">
+                      <%= item.status.humanize %>
+                    </span>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm"><%= item.accounts.count %></td>
+                  <td role="cell" class="px-4 py-3 text-sm"><%= item.holdings.count %></td>
+                  <td role="cell" class="px-4 py-3 text-sm text-gray-300">
+                    <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm space-x-2">
+                    <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded transition focus-visible:ring focus-visible:ring-primary" %>
+                    <% if item.status == 'needs_reauth' %>
+                      <button type="button" onclick="relinkLiabilities(<%= item.id %>)" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded transition focus-visible:ring focus-visible:ring-primary">
+                        Grant Liabilities Access
+                      </button>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
       </div>
     <% else %>
       <p class="text-slate-400">No Plaid items yet.</p>
@@ -55,32 +62,49 @@
   <div>
     <h3 class="text-2xl font-bold text-primary-400 mb-4">Holdings (<%= @holdings.count %>)</h3>
     <% if @holdings.any? %>
-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-700">
-            <tr>
-              <th class="px-4 py-3 text-left">Symbol</th>
-              <th class="px-4 py-3 text-left">Name</th>
-              <th class="px-4 py-3 text-right">Quantity</th>
-              <th class="px-4 py-3 text-right">Market Value</th>
-              <th class="px-4 py-3 text-left">Account</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-700">
-            <% @holdings.each do |holding| %>
-              <tr class="hover:bg-slate-700/50">
-                <td class="px-4 py-3 font-semibold"><%= holding.symbol %></td>
-                <td class="px-4 py-3"><%= holding.name %></td>
-                <td class="px-4 py-3 text-right"><%= number_with_delimiter(holding.quantity) %></td>
-                <td class="px-4 py-3 text-right"><%= number_to_currency(holding.market_value) if holding.market_value %></td>
-                <td class="px-4 py-3"><%= holding.account&.name || holding.account&.account_id %></td>
+      <div class="rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
+            <thead>
+              <tr role="row" class="bg-base-300 text-white sticky top-0">
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Symbol</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Name</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Quantity</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Market Value</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Account</th>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% @holdings.each do |holding| %>
+                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
+                  <td role="cell" class="px-4 py-3 text-sm font-semibold"><%= holding.symbol %></td>
+                  <td role="cell" class="px-4 py-3 text-sm"><%= holding.name %></td>
+                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= number_with_delimiter(holding.quantity) %></td>
+                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= number_to_currency(holding.market_value) if holding.market_value %></td>
+                  <td role="cell" class="px-4 py-3 text-sm"><%= holding.account&.name || holding.account&.account_id %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
       </div>
     <% else %>
       <p class="text-slate-400">No holdings yet. Link a Plaid item and sync holdings.</p>
+    <% end %>
+  </div>
+
+  <!-- Recent Transactions -->
+  <div>
+    <h3 class="text-2xl font-bold text-primary-400 mb-4">Recent Transactions (<%= @transactions.size %>)</h3>
+    <% if @transactions.any? %>
+      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+        <%= render TransactionTableComponent.new(transactions: @transactions) %>
+      </div>
+      <div class="mt-4 text-right">
+        <%= link_to "View all transactions →", transactions_path, class: "link link-primary" %>
+      </div>
+    <% else %>
+      <p class="text-slate-400">No transactions yet. Click "Sync Transactions" to fetch data.</p>
     <% end %>
   </div>
 
@@ -89,31 +113,33 @@
     <h3 class="text-2xl font-bold text-primary-400 mb-4">Liabilities</h3>
     <% liability_accounts = @accounts.select { |a| a.respond_to?(:apr_percentage) && (a.apr_percentage.present? || a.min_payment_amount.present?) } %>
     <% if liability_accounts.any? %>
-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-700">
-            <tr>
-              <th class="px-4 py-3 text-left">Account</th>
-              <th class="px-4 py-3 text-right">Min Payment</th>
-              <th class="px-4 py-3 text-right">APR %</th>
-              <th class="px-4 py-3 text-left">Due Date</th>
-              <th class="px-4 py-3 text-center">Overdue?</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-700">
-            <% liability_accounts.each do |account| %>
-              <tr class="hover:bg-slate-700/50">
-                <td class="px-4 py-3"><%= account.name || account.account_id %></td>
-                <td class="px-4 py-3 text-right"><%= number_to_currency(account.min_payment_amount) if account.min_payment_amount %></td>
-                <td class="px-4 py-3 text-right"><%= account.apr_percentage ? "#{account.apr_percentage}%" : '-' %></td>
-                <td class="px-4 py-3"><%= account.next_payment_due_date || '-' %></td>
-                <td class="px-4 py-3 text-center">
-                  <%= account.is_overdue ? '<span class="text-red-400">⚠️ YES</span>'.html_safe : '<span class="text-green-400">No</span>'.html_safe %>
-                </td>
+      <div class="rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
+            <thead>
+              <tr role="row" class="bg-base-300 text-white sticky top-0">
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Account</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Min Payment</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">APR %</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-center text-sm font-semibold">Overdue?</th>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% liability_accounts.each do |account| %>
+                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
+                  <td role="cell" class="px-4 py-3 text-sm"><%= account.name || account.account_id %></td>
+                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= number_to_currency(account.min_payment_amount) if account.min_payment_amount %></td>
+                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= account.apr_percentage ? "#{account.apr_percentage}%" : '-' %></td>
+                  <td role="cell" class="px-4 py-3 text-sm"><%= account.next_payment_due_date || '-' %></td>
+                  <td role="cell" class="px-4 py-3 text-sm text-center">
+                    <%= account.is_overdue ? '<span class="text-red-400">⚠️ YES</span>'.html_safe : '<span class="text-green-400">No</span>'.html_safe %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
       </div>
     <% else %>
       <p class="text-slate-400">No liabilities yet. Click "Sync Liabilities" to fetch data.</p>
@@ -174,53 +200,55 @@
 
     <!-- Logs Table -->
     <% if @sync_logs.any? %>
-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-700">
-            <tr>
-              <th class="px-4 py-3 text-left">Time</th>
-              <th class="px-4 py-3 text-left">Institution</th>
-              <th class="px-4 py-3 text-left">Job Type</th>
-              <th class="px-4 py-3 text-left">Status</th>
-              <th class="px-4 py-3 text-left">Error</th>
-              <th class="px-4 py-3 text-left">Job ID</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-700">
-            <% @sync_logs.each do |log| %>
-              <tr class="hover:bg-slate-700/50">
-                <td class="px-4 py-3 text-slate-300">
-                  <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
-                </td>
-                <td class="px-4 py-3">
-                  <%= log.plaid_item&.institution_name || "N/A" %>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 rounded text-xs bg-slate-600">
-                    <%= log.job_type %>
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <% if log.status == "success" %>
-                    <span class="px-2 py-1 rounded text-xs bg-green-600">✓ Success</span>
-                  <% elsif log.status == "failure" %>
-                    <span class="px-2 py-1 rounded text-xs bg-red-600">✗ Failure</span>
-                  <% elsif log.status == "started" %>
-                    <span class="px-2 py-1 rounded text-xs bg-blue-600">⟳ Started</span>
-                  <% else %>
-                    <span class="px-2 py-1 rounded text-xs bg-slate-600"><%= log.status %></span>
-                  <% end %>
-                </td>
-                <td class="px-4 py-3 text-slate-400 max-w-xs truncate">
-                  <%= log.error_message || "-" %>
-                </td>
-                <td class="px-4 py-3 text-slate-500 font-mono text-xs">
-                  <%= log.job_id&.first(8) || "-" %>
-                </td>
+      <div class="rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
+            <thead>
+              <tr role="row" class="bg-base-300 text-white sticky top-0">
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Time</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Institution</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Job Type</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Error</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Job ID</th>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% @sync_logs.each do |log| %>
+                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
+                  <td role="cell" class="px-4 py-3 text-sm text-gray-300">
+                    <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm">
+                    <%= log.plaid_item&.institution_name || "N/A" %>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm">
+                    <span class="px-2 py-1 rounded text-xs bg-slate-600">
+                      <%= log.job_type %>
+                    </span>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm">
+                    <% if log.status == "success" %>
+                      <span class="px-2 py-1 rounded text-xs bg-green-600">✓ Success</span>
+                    <% elsif log.status == "failure" %>
+                      <span class="px-2 py-1 rounded text-xs bg-red-600">✗ Failure</span>
+                    <% elsif log.status == "started" %>
+                      <span class="px-2 py-1 rounded text-xs bg-blue-600">⟳ Started</span>
+                    <% else %>
+                      <span class="px-2 py-1 rounded text-xs bg-slate-600"><%= log.status %></span>
+                    <% end %>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm text-gray-300 max-w-xs truncate">
+                    <%= log.error_message || "-" %>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm text-gray-400 font-mono text-xs">
+                    <%= log.job_id&.first(8) || "-" %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Pagination -->
