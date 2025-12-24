@@ -4,7 +4,12 @@ class TransactionsController < ApplicationController
   # GET /transactions
   def index
     @transactions = Transaction.includes(:account)
+    # Filtering
     @transactions = @transactions.where(subtype: params[:subtype]) if params[:subtype].present?
+    # Sorting (server-side, whitelist)
+    sort_col = safe_sort_column(params[:sort])
+    sort_dir = %w[asc desc].include?(params[:dir].to_s.downcase) ? params[:dir].to_s.downcase : 'desc'
+    @transactions = @transactions.order(Arel.sql("#{sort_col} #{sort_dir}"))
     @transactions = @transactions.page(params[:page]).per(25)
   end
 
@@ -56,5 +61,17 @@ class TransactionsController < ApplicationController
       params.require(:transaction).permit(:account_id, :transaction_id, :amount, :date,
                                           :name, :merchant_name, :subtype, :category,
                                           :pending, :payment_channel)
+    end
+
+    # Only allow ordering by these columns to avoid SQL injection
+    def safe_sort_column(param)
+      allowed = {
+        'date' => 'date',
+        'name' => 'name',
+        'amount' => 'amount',
+        'subtype' => 'subtype',
+        'fees' => 'fees'
+      }
+      allowed[param.to_s] || 'date'
     end
 end
