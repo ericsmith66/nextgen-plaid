@@ -45,10 +45,6 @@ test:
   primary:
     <<: *default
     database: nextgen_plaid_test
-  queue:
-    <<: *default
-    database: nextgen_plaid_test_queue
-    migrations_paths: db/queue_migrate
   solid_queue:
     <<: *default
     database: nextgen_plaid_test_queue
@@ -79,7 +75,7 @@ production:
     <<: *default
     database: nextgen_plaid_production
     username: nextgen_plaid
-    password: <%= ENV["NEXTGEN_PLAID_DATABASE_PASSWORD"] %>
+    password: "<%= ENV["NEXTGEN_PLAID_DATABASE_PASSWORD"] %>"
   cache:
     <<: *primary_production
     database: nextgen_plaid_production_cache

@@ -6,6 +6,6 @@ class DashboardController < ApplicationController
     flash.now[:success] = "SECURE DASHBOARD – Connect Brokerage Account below"
     
     # Preload associations for efficient count queries
-    @plaid_items = current_user.plaid_items.includes(:accounts, :positions, :recurring_transactions)
+    @plaid_items = current_user.plaid_items.includes(:accounts, :holdings, :recurring_transactions)
   end
 end

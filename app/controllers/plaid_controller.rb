@@ -2,17 +2,26 @@ class PlaidController < ApplicationController
   before_action :authenticate_user!
 
   def link_token
-    request = Plaid::LinkTokenCreateRequest.new(
-      user: { client_user_id: current_user.id.to_s },
-      client_name: "NextGen Wealth Advisor",
-      products: ["investments", "transactions", "liabilities"],
-      country_codes: ["US"],
-      language: "en"
-    )
+    begin
+      request = Plaid::LinkTokenCreateRequest.new(
+        user: { client_user_id: current_user.id.to_s },
+        client_name: "NextGen Wealth Advisor",
+        products: ["investments", "transactions", "liabilities"],
+        country_codes: ["US"],
+        language: "en",
+        redirect_uri: ENV["PLAID_REDIRECT_URI"]
+      )
 
-    client = Rails.application.config.x.plaid_client
-    response = client.link_token_create(request)
-    render json: { link_token: response.link_token }
+      client = Rails.application.config.x.plaid_client
+      response = client.link_token_create(request)
+      render json: { link_token: response.link_token }
+    rescue Plaid::ApiError => e
+      Rails.logger.error "Plaid Link Token Error: #{e.message} | Body: #{e.response_body}"
+      render json: { error: e.message, code: "PLAID_ERROR" }, status: :unprocessable_entity
+    rescue => e
+      Rails.logger.error "Internal Link Token Error: #{e.message}"
+      render json: { error: "Internal Server Error" }, status: :internal_server_error
+    end
   end
 
   def exchange

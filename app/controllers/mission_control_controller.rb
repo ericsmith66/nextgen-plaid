@@ -134,7 +134,8 @@ class MissionControlController < ApplicationController
         products: products,
         country_codes: ["US"],
         language: "en",
-        access_token: item.access_token
+        access_token: item.access_token,
+        redirect_uri: ENV["PLAID_REDIRECT_URI"]
       )
       response = client.link_token_create(request)
       render json: { link_token: response.link_token }
@@ -148,7 +149,8 @@ class MissionControlController < ApplicationController
           client_name: "NextGen Wealth Advisor",
           products: products,
           country_codes: ["US"],
-          language: "en"
+          language: "en",
+          redirect_uri: ENV["PLAID_REDIRECT_URI"]
         )
         response = client.link_token_create(request)
         render json: { link_token: response.link_token }

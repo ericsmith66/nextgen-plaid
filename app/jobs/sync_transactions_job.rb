@@ -26,6 +26,9 @@ class SyncTransactionsJob < ApplicationJob
     item = PlaidItem.find_by(id: plaid_item_id)
     return unless item
 
+    # PRD PROD-TEST-01: Guard production API calls
+    return if !production_plaid? && skip_non_prod!(item, "transactions")
+
     # PRD 6.6: Skip syncing items with failed status
     if item.status == 'failed'
       Rails.logger.warn "SyncTransactionsJob: Skipping PlaidItem #{plaid_item_id} with failed status"

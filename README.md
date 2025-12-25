@@ -54,6 +54,50 @@ A private, owner-only control panel to manage Plaid items and background syncs.
 - Each job runs independently; one failure doesn't block others (graceful error handling).
 - Secrets are filtered from logs (`filter_parameter_logging.rb`).
 
+## Production Setup (PROD-TEST-01)
+
+### 1. Configure Environment
+Create a `.env.production` file at the root of the project and fill in your keys (use `.env.production.example` as a template). This file is ignored by git for security.
+
+```bash
+RAILS_ENV=production
+PLAID_ENV=production
+PLAID_CLIENT_ID=your_production_client_id
+PLAID_SECRET=your_production_secret
+PLAID_REDIRECT_URI=https://api.higroundsolutions.com/plaid_oauth/callback
+ENCRYPTION_KEY=64_char_hex_string_here
+SEED_USER_PASSWORD=secure_password_for_seeded_user # (or PROD_USER_PASSWORD)
+NEXTGEN_PLAID_DATABASE_PASSWORD=your_db_password
+SEED_LOOKUPS=true # (optional, for first run)
+```
+
+### 2. Database Initialization
+```bash
+# Install PostgreSQL 16 if needed: brew install postgresql@16
+RAILS_ENV=production bin/rails db:prepare
+RAILS_ENV=production bin/rails db:create
+RAILS_ENV=production bin/rails db:migrate
+# Include shards if applicable (db:migrate:cache, etc.)
+```
+
+### 3. Production Seeding
+```bash
+# Seed the test user (ericsmith66@me.com) and optional lookups
+RAILS_ENV=production bin/rails prod_setup:seed SEED_PFC=true SEED_TCODES=true
+```
+
+### 4. Smoke Test
+Verify the configuration without making real API calls:
+```bash
+RAILS_ENV=production bin/rails prod_setup:smoke_plaid
+```
+
+### 5. First Production Run
+1. Start the server: `RAILS_ENV=production bin/rails server`
+2. Navigate to `/mission_control`
+3. Link your first production account.
+4. Verify sync via Mission Control logs.
+
 ## Quick Start (Development)
 
 ```bash

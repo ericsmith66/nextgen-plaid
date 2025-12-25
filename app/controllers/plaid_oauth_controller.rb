@@ -17,13 +17,6 @@ class PlaidOauthController < ApplicationController
   end
 
   def callback
-    # Log Cloudflare detection
-    if cloudflare_request?
-      Rails.logger.info "OAuth callback via Cloudflare | CF-Ray: #{request.headers['CF-Ray']} | IP: #{cloudflare_client_ip}"
-    else
-      Rails.logger.warn "OAuth callback NOT via Cloudflare | Direct IP: #{request.remote_ip}"
-    end
-
     public_token = params[:public_token]
     client_user_id = params[:client_user_id]
 
@@ -37,6 +30,9 @@ class PlaidOauthController < ApplicationController
       redirect_to root_path, alert: "OAuth failed: Invalid user"
       return
     end
+
+    # Log connection info
+    Rails.logger.info "OAuth callback received for user: #{user.email} | Cloudflare: #{request.headers['CF-Ray'].present?}"
 
     service = PlaidOauthService.new(user)
     result = service.exchange_token(public_token)

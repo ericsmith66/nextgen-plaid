@@ -1,17 +1,22 @@
 require "plaid"
 
+# config/initializers/plaid.rb
+env_name = ENV.fetch("PLAID_ENV", Rails.env.production? ? "production" : "sandbox")
 config = Plaid::Configuration.new
-config.server_index = Plaid::Configuration::Environment[ENV['PLAID_ENV'] || 'sandbox']
-config.api_key['PLAID-CLIENT-ID'] = ENV['PLAID_CLIENT_ID']
-config.api_key['PLAID-SECRET'] = ENV['PLAID_SECRET']
+config.server_index = Plaid::Configuration::Environment[env_name]
+
+if env_name == "production" && (ENV["PLAID_CLIENT_ID"].blank? || ENV["PLAID_SECRET"].blank?)
+  raise "Missing Plaid Production Credentials! Ensure PLAID_CLIENT_ID and PLAID_SECRET are set."
+end
+
+config.api_key["PLAID-CLIENT-ID"] = ENV.fetch("PLAID_CLIENT_ID", nil)
+config.api_key["PLAID-SECRET"] = ENV.fetch("PLAID_SECRET", nil)
 
 api_client = Plaid::ApiClient.new(config)
 client = Plaid::PlaidApi.new(api_client)
 
-# Preferred access point for app code (easier to stub in tests)
 Rails.application.config.x.plaid_client = client
-
 # Backwards-compatibility constant (will be removed later)
 PLAID_CLIENT = client
 
-Rails.logger.info "PLAID READY | Env: #{ENV['PLAID_ENV']} | Client-ID: #{ENV['PLAID_CLIENT_ID']&.first(8)}...#{ENV['PLAID_CLIENT_ID']&.last(4)}"
+Rails.logger.info({ event: "plaid.ready", env: env_name, client_id_present: ENV["PLAID_CLIENT_ID"].present? }.to_json)
