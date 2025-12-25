@@ -1,0 +1,1226 @@
+Index: db/solid_queue_schema.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/db/solid_queue_schema.rb b/db/solid_queue_schema.rb
+new file mode 100644
+--- /dev/null	(date 1766662708325)
++++ b/db/solid_queue_schema.rb	(date 1766662708325)
+@@ -0,0 +1,144 @@
++# This file is auto-generated from the current state of the database. Instead
++# of editing this file, please use the migrations feature of Active Record to
++# incrementally modify your database, and then regenerate this schema definition.
++#
++# This file is the source Rails uses to define your schema when running `bin/rails
++# db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
++# be faster and is potentially less error prone than running all of your
++# migrations from scratch. Old migrations may fail to apply correctly if those
++# migrations use external dependencies or application code.
++#
++# It's strongly recommended that you check this file into your version control system.
++
++ActiveRecord::Schema[8.0].define(version: 1) do
++  # These are extensions that must be enabled in order to support this database
++  enable_extension "pg_catalog.plpgsql"
++
++  create_table "solid_queue_blocked_executions", force: :cascade do |t|
++    t.bigint "job_id", null: false
++    t.string "queue_name", null: false
++    t.integer "priority", default: 0, null: false
++    t.string "concurrency_key", null: false
++    t.datetime "expires_at", null: false
++    t.datetime "created_at", null: false
++    t.index ["concurrency_key", "priority", "job_id"], name: "index_solid_queue_blocked_executions_for_release"
++    t.index ["expires_at", "concurrency_key"], name: "index_solid_queue_blocked_executions_for_maintenance"
++    t.index ["job_id"], name: "index_solid_queue_blocked_executions_on_job_id", unique: true
++  end
++
++  create_table "solid_queue_claimed_executions", force: :cascade do |t|
++    t.bigint "job_id", null: false
++    t.bigint "process_id"
++    t.datetime "created_at", null: false
++    t.index ["job_id"], name: "index_solid_queue_claimed_executions_on_job_id", unique: true
++    t.index ["process_id", "job_id"], name: "index_solid_queue_claimed_executions_on_process_id_and_job_id"
++  end
++
++  create_table "solid_queue_failed_executions", force: :cascade do |t|
++    t.bigint "job_id", null: false
++    t.text "error"
++    t.datetime "created_at", null: false
++    t.index ["job_id"], name: "index_solid_queue_failed_executions_on_job_id", unique: true
++  end
++
++  create_table "solid_queue_jobs", force: :cascade do |t|
++    t.string "queue_name", null: false
++    t.string "class_name", null: false
++    t.text "arguments"
++    t.integer "priority", default: 0, null: false
++    t.string "active_job_id"
++    t.datetime "scheduled_at"
++    t.datetime "finished_at"
++    t.string "concurrency_key"
++    t.datetime "created_at", null: false
++    t.datetime "updated_at", null: false
++    t.index ["active_job_id"], name: "index_solid_queue_jobs_on_active_job_id"
++    t.index ["class_name"], name: "index_solid_queue_jobs_on_class_name"
++    t.index ["finished_at"], name: "index_solid_queue_jobs_on_finished_at"
++    t.index ["queue_name", "finished_at"], name: "index_solid_queue_jobs_for_filtering"
++    t.index ["scheduled_at", "finished_at"], name: "index_solid_queue_jobs_for_alerting"
++  end
++
++  create_table "solid_queue_pauses", force: :cascade do |t|
++    t.string "queue_name", null: false
++    t.datetime "created_at", null: false
++    t.index ["queue_name"], name: "index_solid_queue_pauses_on_queue_name", unique: true
++  end
++
++  create_table "solid_queue_processes", force: :cascade do |t|
++    t.string "kind", null: false
++    t.datetime "last_heartbeat_at", null: false
++    t.bigint "supervisor_id"
++    t.integer "pid", null: false
++    t.string "hostname"
++    t.text "metadata"
++    t.datetime "created_at", null: false
++    t.string "name", null: false
++    t.index ["last_heartbeat_at"], name: "index_solid_queue_processes_on_last_heartbeat_at"
++    t.index ["name", "supervisor_id"], name: "index_solid_queue_processes_on_name_and_supervisor_id", unique: true
++    t.index ["supervisor_id"], name: "index_solid_queue_processes_on_supervisor_id"
++  end
++
++  create_table "solid_queue_ready_executions", force: :cascade do |t|
++    t.bigint "job_id", null: false
++    t.string "queue_name", null: false
++    t.integer "priority", default: 0, null: false
++    t.datetime "created_at", null: false
++    t.index ["job_id"], name: "index_solid_queue_ready_executions_on_job_id", unique: true
++    t.index ["priority", "job_id"], name: "index_solid_queue_poll_all"
++    t.index ["queue_name", "priority", "job_id"], name: "index_solid_queue_poll_by_queue"
++  end
++
++  create_table "solid_queue_recurring_executions", force: :cascade do |t|
++    t.bigint "job_id", null: false
++    t.string "task_key", null: false
++    t.datetime "run_at", null: false
++    t.datetime "created_at", null: false
++    t.index ["job_id"], name: "index_solid_queue_recurring_executions_on_job_id", unique: true
++    t.index ["task_key", "run_at"], name: "index_solid_queue_recurring_executions_on_task_key_and_run_at", unique: true
++  end
++
++  create_table "solid_queue_recurring_tasks", force: :cascade do |t|
++    t.string "key", null: false
++    t.string "schedule", null: false
++    t.string "command", limit: 2048
++    t.string "class_name"
++    t.text "arguments"
++    t.string "queue_name"
++    t.integer "priority", default: 0
++    t.boolean "static", default: true, null: false
++    t.text "description"
++    t.datetime "created_at", null: false
++    t.datetime "updated_at", null: false
++    t.index ["key"], name: "index_solid_queue_recurring_tasks_on_key", unique: true
++    t.index ["static"], name: "index_solid_queue_recurring_tasks_on_static"
++  end
++
++  create_table "solid_queue_scheduled_executions", force: :cascade do |t|
++    t.bigint "job_id", null: false
++    t.string "queue_name", null: false
++    t.integer "priority", default: 0, null: false
++    t.datetime "scheduled_at", null: false
++    t.datetime "created_at", null: false
++    t.index ["job_id"], name: "index_solid_queue_scheduled_executions_on_job_id", unique: true
++    t.index ["scheduled_at", "priority", "job_id"], name: "index_solid_queue_dispatch_all"
++  end
++
++  create_table "solid_queue_semaphores", force: :cascade do |t|
++    t.string "key", null: false
++    t.integer "value", default: 1, null: false
++    t.datetime "expires_at", null: false
++    t.datetime "created_at", null: false
++    t.datetime "updated_at", null: false
++    t.index ["expires_at"], name: "index_solid_queue_semaphores_on_expires_at"
++    t.index ["key", "value"], name: "index_solid_queue_semaphores_on_key_and_value"
++    t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
++  end
++
++  add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
++  add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
++  add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
++  add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
++  add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
++  add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
++end
+Index: app/jobs/sync_liabilities_job.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/jobs/sync_liabilities_job.rb b/app/jobs/sync_liabilities_job.rb
+--- a/app/jobs/sync_liabilities_job.rb
++++ b/app/jobs/sync_liabilities_job.rb	(date 1766662708323)
+@@ -54,6 +54,19 @@
+     rescue Plaid::ApiError => e
+       # PRD 6.1: Detect expired/broken tokens
+       error_code = self.class.extract_plaid_error_code(e)
++      if error_code == "ADDITIONAL_CONSENT_REQUIRED"
++        # Graceful handling: mark item for reauth (consent), log, and do not re-raise
++        item.update!(status: :needs_reauth, last_error: e.message)
++        SyncLog.create!(
++          plaid_item: item,
++          job_type: "liabilities",
++          status: "failure",
++          error_message: "ADDITIONAL_CONSENT_REQUIRED - user must grant Liabilities access",
++          job_id: self.job_id
++        )
++        Rails.logger.warn({ event: "liabilities.consent_required", item_id: item.id, request_id: (JSON.parse(e.response_body)["request_id"] rescue nil) }.to_json)
++        return
++      end
+       if error_code == "ITEM_LOGIN_REQUIRED" || error_code == "INVALID_ACCESS_TOKEN"
+         new_attempts = item.reauth_attempts + 1
+         # PRD 6.6: After 3 failed attempts, mark as failed
+Index: app/views/mission_control/index.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/views/mission_control/index.html.erb b/app/views/mission_control/index.html.erb
+--- a/app/views/mission_control/index.html.erb
++++ b/app/views/mission_control/index.html.erb	(date 1766664549346)
+@@ -62,4 +62,53 @@
+       alert('Failed to connect to Plaid');
+     }
+   }
++
++  // Request product-specific consent (e.g., liabilities)
++  async function relinkLiabilities(id) {
++    try {
++      const relinkUrl = '<%= mission_control_relink_path(id: "__ID__") %>'.replace('__ID__', id) + '?products=liabilities';
++      const res = await fetch(relinkUrl, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          'X-CSRF-Token': csrfToken()
++        },
++        body: JSON.stringify({})
++      });
++      if (!res.ok) {
++        const err = await res.json().catch(() => ({}));
++        alert('Failed to get liabilities link token: ' + (err.error || res.statusText));
++        return;
++      }
++      const data = await res.json();
++      const handler = Plaid.create({
++        token: data.link_token,
++        onSuccess: async function(public_token, metadata) {
++          try {
++            const successUrl = '<%= mission_control_relink_success_path(id: "__ID__") %>'.replace('__ID__', id);
++            await fetch(successUrl, {
++              method: 'POST',
++              headers: {
++                'Content-Type': 'application/json',
++                'X-CSRF-Token': csrfToken()
++              },
++              body: JSON.stringify({ public_token: public_token, products: 'liabilities' })
++            });
++          } catch (e) {
++            console.warn('Failed to notify liabilities relink success:', e);
++          }
++          window.location.reload();
++        },
++        onExit: function(err, metadata) {
++          if (err) {
++            console.warn('Plaid Link exit:', err);
++          }
++        }
++      });
++      handler.open();
++    } catch (e) {
++      console.error('Failed to relink liabilities:', e);
++      alert('Failed to connect to Plaid');
++    }
++  }
+ </script>
+Index: app/views/agents/monitor/index.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/views/agents/monitor/index.html.erb b/app/views/agents/monitor/index.html.erb
+--- a/app/views/agents/monitor/index.html.erb
++++ b/app/views/agents/monitor/index.html.erb	(date 1766664549345)
+@@ -1,47 +1,52 @@
+-<div class="container mx-auto px-4 py-8">
+-  <h1 class="text-3xl font-bold mb-8 text-white">Agent POC Monitor</h1>
+-
+-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+-    <% @queues.each do |name, count| %>
+-      <div class="bg-slate-800 rounded-lg shadow p-6 border-l-4 <%= name == 'cso_to_cwa' ? 'border-red-500' : 'border-blue-500' %>">
+-        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider"><%= name %></h2>
+-        <p class="text-3xl font-bold mt-2 text-white"><%= count %></p>
+-        <p class="text-xs text-gray-500 mt-1">Pending Jobs</p>
+-      </div>
+-    <% end %>
+-  </div>
+-
+-  <div class="bg-slate-800 rounded-lg shadow overflow-hidden">
+-    <div class="px-6 py-4 border-b border-slate-700">
+-      <h2 class="text-xl font-semibold text-white">Agent Activity Log</h2>
++<%= render(LayoutComponent.new(title: "Agent POC Monitor", current_user: current_user)) do %>
++  <div class="space-y-8">
++    <!-- Queue Status -->
++    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
++      <% @queues.each do |name, count| %>
++        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 <%= name == 'cso_to_cwa' ? 'border-red-500' : 'border-blue-500' %>">
++          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider"><%= name %></h2>
++          <p class="text-3xl font-bold mt-2 text-gray-900"><%= count %></p>
++          <p class="text-xs text-gray-400 mt-1">Pending Jobs</p>
++        </div>
++      <% end %>
+     </div>
+-    <div class="overflow-x-auto">
+-      <table class="min-w-full divide-y divide-slate-700">
+-        <thead class="bg-slate-900">
+-          <tr>
+-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Timestamp</th>
+-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Persona</th>
+-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Action</th>
+-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Task ID</th>
+-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Details</th>
+-          </tr>
+-        </thead>
+-        <tbody class="bg-slate-800 divide-y divide-slate-700">
+-          <% @logs.each do |log| %>
+-            <tr>
+-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400"><%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %></td>
+-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+-                <span class="px-2 py-1 rounded text-xs <%= persona_color(log.persona) %>">
+-                  <%= log.persona %>
+-                </span>
+-              </td>
+-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200"><%= log.action %></td>
+-              <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-400"><%= log.task_id.first(8) %>...</td>
+-              <td class="px-6 py-4 text-sm text-gray-400 truncate max-w-xs"><%= log.details %></td>
+-            </tr>
+-          <% end %>
+-        </tbody>
+-      </table>
+-    </div>
+-  </div>
+-</div>
++
++    <!-- Agent Activity Log -->
++    <div>
++      <h3 class="text-2xl font-bold text-gray-800 mb-4">Agent Activity Log</h3>
++      <div class="bg-white rounded-lg shadow-md overflow-hidden">
++        <table class="w-full text-sm">
++          <thead class="bg-gray-100 border-b">
++            <tr>
++              <th class="px-4 py-3 text-left font-semibold text-gray-700">Timestamp</th>
++              <th class="px-4 py-3 text-left font-semibold text-gray-700">Persona</th>
++              <th class="px-4 py-3 text-left font-semibold text-gray-700">Action</th>
++              <th class="px-4 py-3 text-left font-semibold text-gray-700">Task ID</th>
++              <th class="px-4 py-3 text-left font-semibold text-gray-700">Details</th>
++            </tr>
++          </thead>
++          <tbody class="divide-y divide-gray-200">
++            <% @logs.each do |log| %>
++              <tr class="hover:bg-gray-50">
++                <td class="px-4 py-3 text-gray-600"><%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %></td>
++                <td class="px-4 py-3 font-medium">
++                  <span class="px-2 py-1 rounded text-xs <%= persona_color(log.persona) %>">
++                    <%= log.persona %>
++                  </span>
++                </td>
++                <td class="px-4 py-3 text-gray-800"><%= log.action %></td>
++                <td class="px-4 py-3 font-mono text-gray-500 text-xs"><%= log.task_id.first(8) %>...</td>
++                <td class="px-4 py-3 text-gray-600 truncate max-w-xs"><%= log.details %></td>
++              </tr>
++            <% end %>
++            <% if @logs.empty? %>
++              <tr>
++                <td colspan="5" class="px-4 py-8 text-center text-gray-500">No agent logs found</td>
++              </tr>
++            <% end %>
++          </tbody>
++        </table>
++      </div>
++    </div>
++  </div>
++<% end %>
+Index: app/services/plaid_oauth_service.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/services/plaid_oauth_service.rb b/app/services/plaid_oauth_service.rb
+--- a/app/services/plaid_oauth_service.rb
++++ b/app/services/plaid_oauth_service.rb	(date 1766662708324)
+@@ -9,7 +9,7 @@
+     request = Plaid::LinkTokenCreateRequest.new(
+       user: { client_user_id: @user.id.to_s },
+       client_name: "NextGen Plaid",
+-      products: %w[investments transactions],
++      products: %w[investments transactions liabilities],
+       country_codes: ["US"],
+       language: "en",
+       redirect_uri: ENV["PLAID_REDIRECT_URI"]
+Index: app/components/layout_component.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/components/layout_component.html.erb b/app/components/layout_component.html.erb
+--- a/app/components/layout_component.html.erb
++++ b/app/components/layout_component.html.erb	(date 1766662708322)
+@@ -57,6 +57,7 @@
+             </details>
+           </li>
+           <li><a href="/mission_control"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> Mission Control</a></li>
++          <li><a href="/agents/monitor"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> Agent Monitor</a></li>
+         <% end %>
+       </ul>
+     </aside>
+Index: app/components/dashboard_component.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/components/dashboard_component.html.erb b/app/components/dashboard_component.html.erb
+--- a/app/components/dashboard_component.html.erb
++++ b/app/components/dashboard_component.html.erb	(date 1766664549344)
+@@ -7,10 +7,10 @@
+ 
+   <!-- Connect Buttons -->
+   <div class="flex justify-center gap-4">
+-    <button id="plaid-link-button" class="bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 px-12 rounded-lg text-2xl shadow-lg transition">
++    <button id="plaid-link-button" class="bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 px-12 rounded-lg text-2xl shadow-lg transition focus-visible:ring focus-visible:ring-primary">
+       CONNECT BROKERAGE ACCOUNT
+     </button>
+-    <button id="plaid-oauth-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-12 rounded-lg text-2xl shadow-lg transition">
++    <button id="plaid-oauth-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-12 rounded-lg text-2xl shadow-lg transition focus-visible:ring focus-visible:ring-primary">
+       CONNECT CHASE (OAUTH)
+     </button>
+   </div>
+@@ -19,12 +19,12 @@
+   <% if @current_user.plaid_items.any? %>
+     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+       <% @current_user.plaid_items.each do |item| %>
+-        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
++        <div class="bg-base-200 text-gray-200 rounded-lg p-6 border border-base-300 shadow">
+           <h3 class="text-2xl font-bold text-primary-400 mb-2"><%= item.institution_name || "Sandbox Brokerage" %></h3>
+-          <p class="text-lg mb-4">Total Value: <%= number_to_currency(item.accounts.sum(:current_balance) || 0) %></p>
++          <p class="text-lg mb-4">Total Value: <span class="font-semibold"><%= number_to_currency(item.accounts.sum(:current_balance) || 0) %></span></p>
+           
+           <!-- Data Summary -->
+-          <div class="bg-slate-700 rounded-lg p-4 mb-4">
++          <div class="bg-base-300 rounded-lg p-4 mb-4 border border-base-300/50">
+             <h4 class="font-semibold text-primary-300 mb-2">Data Summary</h4>
+             <ul class="space-y-1 text-sm">
+               <li>📊 Accounts: <strong><%= item.accounts.count %></strong></li>
+@@ -40,9 +40,9 @@
+             <h4 class="font-semibold text-primary-300 mb-2">Top Holdings</h4>
+             <ul class="space-y-2">
+               <% item.holdings.limit(5).each do |holding| %>
+-                <li class="bg-slate-700 rounded p-3 text-sm">
++                <li class="bg-base-300 rounded p-3 text-sm border border-base-300/50 hover:bg-base-300/80">
+                   <strong><%= holding.symbol %></strong> — <%= number_with_delimiter(holding.quantity.to_f.round(2)) %> shares
+-                  <span class="float-right text-primary-300"><%= number_to_currency(holding.market_value) %></span>
++                  <span class="float-right text-primary-300 font-medium"><%= number_to_currency(holding.market_value) %></span>
+                 </li>
+               <% end %>
+             </ul>
+Index: app/components/holding_table_component.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/components/holding_table_component.html.erb b/app/components/holding_table_component.html.erb
+--- a/app/components/holding_table_component.html.erb
++++ b/app/components/holding_table_component.html.erb	(date 1766664549345)
+@@ -1,31 +1,31 @@
+ <div class="overflow-x-auto">
+-  <table class="table-auto border-collapse w-full bg-white shadow-md rounded-lg">
++  <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
+     <thead>
+-      <tr class="bg-gray-100 border-b">
+-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Symbol</th>
+-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Quantity</th>
+-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Market Value</th>
+-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sector</th>
+-        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
++      <tr role="row" class="bg-base-300 text-white sticky top-0">
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Name</th>
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Symbol</th>
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Quantity</th>
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Market Value</th>
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Sector</th>
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-center text-sm font-semibold">Actions</th>
+       </tr>
+     </thead>
+     <tbody>
+       <% @holdings.each do |holding| %>
+-        <tr class="border-b hover:bg-gray-50">
+-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.name %></td>
+-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.symbol %></td>
+-          <td class="px-4 py-3 text-sm text-right text-gray-900"><%= holding.quantity_s %></td>
+-          <td class="px-4 py-3 text-sm text-right text-gray-900">$<%= number_to_currency(holding.market_value || 0, precision: 2, unit: "") %></td>
+-          <td class="px-4 py-3 text-sm text-gray-900"><%= holding.sector %></td>
+-          <td class="px-4 py-3 text-sm text-center">
+-            <%= link_to "View", holding_path(holding), class: "text-blue-600 hover:text-blue-800 font-medium" %>
++        <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
++          <td role="cell" class="px-4 py-3 text-sm"><%= holding.name %></td>
++          <td role="cell" class="px-4 py-3 text-sm"><%= holding.symbol %></td>
++          <td role="cell" class="px-4 py-3 text-sm text-right"><%= holding.quantity_s %></td>
++          <td role="cell" class="px-4 py-3 text-sm text-right">$<%= number_to_currency(holding.market_value || 0, precision: 2, unit: "") %></td>
++          <td role="cell" class="px-4 py-3 text-sm"><%= holding.sector %></td>
++          <td role="cell" class="px-4 py-3 text-sm text-center">
++            <%= link_to "View", holding_path(holding), class: "link link-primary font-medium focus-visible:ring focus-visible:ring-primary" %>
+           </td>
+         </tr>
+       <% end %>
+       <% if @holdings.empty? %>
+-        <tr>
+-          <td colspan="6" class="px-4 py-8 text-center text-gray-500">No holdings found</td>
++        <tr role="row">
++          <td role="cell" colspan="6" class="px-4 py-8 text-center text-gray-400">No holdings found</td>
+         </tr>
+       <% end %>
+     </tbody>
+Index: app/components/mission_control_component.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/components/mission_control_component.html.erb b/app/components/mission_control_component.html.erb
+--- a/app/components/mission_control_component.html.erb
++++ b/app/components/mission_control_component.html.erb	(date 1766664549345)
+@@ -12,39 +12,46 @@
+   <div>
+     <h3 class="text-2xl font-bold text-primary-400 mb-4">Plaid Items (<%= @plaid_items.count %>)</h3>
+     <% if @plaid_items.any? %>
+-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+-        <table class="w-full">
+-          <thead class="bg-slate-700">
+-            <tr>
+-              <th class="px-4 py-3 text-left">Institution</th>
+-              <th class="px-4 py-3 text-left">Status</th>
+-              <th class="px-4 py-3 text-left">Accounts</th>
+-              <th class="px-4 py-3 text-left">Holdings</th>
+-              <th class="px-4 py-3 text-left">Last Synced</th>
+-              <th class="px-4 py-3 text-left">Actions</th>
+-            </tr>
+-          </thead>
+-          <tbody class="divide-y divide-slate-700">
+-            <% @plaid_items.each do |item| %>
+-              <tr class="hover:bg-slate-700/50">
+-                <td class="px-4 py-3"><%= item.institution_name %></td>
+-                <td class="px-4 py-3">
+-                  <span class="px-2 py-1 rounded text-sm <%= item.status == 'good' ? 'bg-green-600' : 'bg-red-600' %>">
+-                    <%= item.status.humanize %>
+-                  </span>
+-                </td>
+-                <td class="px-4 py-3"><%= item.accounts.count %></td>
+-                <td class="px-4 py-3"><%= item.holdings.count %></td>
+-                <td class="px-4 py-3 text-sm text-slate-400">
+-                  <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
+-                </td>
+-                <td class="px-4 py-3">
+-                  <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded transition" %>
+-                </td>
+-              </tr>
+-            <% end %>
+-          </tbody>
+-        </table>
++      <div class="rounded-lg overflow-hidden">
++        <div class="overflow-x-auto">
++          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
++            <thead>
++              <tr role="row" class="bg-base-300 text-white sticky top-0">
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Institution</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Status</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Accounts</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Holdings</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Last Synced</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Actions</th>
++              </tr>
++            </thead>
++            <tbody>
++              <% @plaid_items.each do |item| %>
++                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
++                  <td role="cell" class="px-4 py-3 text-sm"><%= item.institution_name %></td>
++                  <td role="cell" class="px-4 py-3 text-sm">
++                    <span class="px-2 py-1 rounded text-sm <%= item.status == 'good' ? 'bg-green-600' : 'bg-red-600' %>">
++                      <%= item.status.humanize %>
++                    </span>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm"><%= item.accounts.count %></td>
++                  <td role="cell" class="px-4 py-3 text-sm"><%= item.holdings.count %></td>
++                  <td role="cell" class="px-4 py-3 text-sm text-gray-300">
++                    <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm space-x-2">
++                    <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded transition focus-visible:ring focus-visible:ring-primary" %>
++                    <% if item.status == 'needs_reauth' %>
++                      <button type="button" onclick="relinkLiabilities(<%= item.id %>)" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded transition focus-visible:ring focus-visible:ring-primary">
++                        Grant Liabilities Access
++                      </button>
++                    <% end %>
++                  </td>
++                </tr>
++              <% end %>
++            </tbody>
++          </table>
++        </div>
+       </div>
+     <% else %>
+       <p class="text-slate-400">No Plaid items yet.</p>
+@@ -55,65 +62,84 @@
+   <div>
+     <h3 class="text-2xl font-bold text-primary-400 mb-4">Holdings (<%= @holdings.count %>)</h3>
+     <% if @holdings.any? %>
+-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+-        <table class="w-full text-sm">
+-          <thead class="bg-slate-700">
+-            <tr>
+-              <th class="px-4 py-3 text-left">Symbol</th>
+-              <th class="px-4 py-3 text-left">Name</th>
+-              <th class="px-4 py-3 text-right">Quantity</th>
+-              <th class="px-4 py-3 text-right">Market Value</th>
+-              <th class="px-4 py-3 text-left">Account</th>
+-            </tr>
+-          </thead>
+-          <tbody class="divide-y divide-slate-700">
+-            <% @holdings.each do |holding| %>
+-              <tr class="hover:bg-slate-700/50">
+-                <td class="px-4 py-3 font-semibold"><%= holding.symbol %></td>
+-                <td class="px-4 py-3"><%= holding.name %></td>
+-                <td class="px-4 py-3 text-right"><%= number_with_delimiter(holding.quantity) %></td>
+-                <td class="px-4 py-3 text-right"><%= number_to_currency(holding.market_value) if holding.market_value %></td>
+-                <td class="px-4 py-3"><%= holding.account&.name || holding.account&.account_id %></td>
+-              </tr>
+-            <% end %>
+-          </tbody>
+-        </table>
++      <div class="rounded-lg overflow-hidden">
++        <div class="overflow-x-auto">
++          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
++            <thead>
++              <tr role="row" class="bg-base-300 text-white sticky top-0">
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Symbol</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Name</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Quantity</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Market Value</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Account</th>
++              </tr>
++            </thead>
++            <tbody>
++              <% @holdings.each do |holding| %>
++                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
++                  <td role="cell" class="px-4 py-3 text-sm font-semibold"><%= holding.symbol %></td>
++                  <td role="cell" class="px-4 py-3 text-sm"><%= holding.name %></td>
++                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= number_with_delimiter(holding.quantity) %></td>
++                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= number_to_currency(holding.market_value) if holding.market_value %></td>
++                  <td role="cell" class="px-4 py-3 text-sm"><%= holding.account&.name || holding.account&.account_id %></td>
++                </tr>
++              <% end %>
++            </tbody>
++          </table>
++        </div>
+       </div>
+     <% else %>
+       <p class="text-slate-400">No holdings yet. Link a Plaid item and sync holdings.</p>
+     <% end %>
+   </div>
++
++  <!-- Recent Transactions -->
++  <div>
++    <h3 class="text-2xl font-bold text-primary-400 mb-4">Recent Transactions (<%= @transactions.size %>)</h3>
++    <% if @transactions.any? %>
++      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
++        <%= render TransactionTableComponent.new(transactions: @transactions) %>
++      </div>
++      <div class="mt-4 text-right">
++        <%= link_to "View all transactions →", transactions_path, class: "link link-primary" %>
++      </div>
++    <% else %>
++      <p class="text-slate-400">No transactions yet. Click "Sync Transactions" to fetch data.</p>
++    <% end %>
++  </div>
+ 
+   <!-- Liabilities -->
+   <div>
+     <h3 class="text-2xl font-bold text-primary-400 mb-4">Liabilities</h3>
+     <% liability_accounts = @accounts.select { |a| a.respond_to?(:apr_percentage) && (a.apr_percentage.present? || a.min_payment_amount.present?) } %>
+     <% if liability_accounts.any? %>
+-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+-        <table class="w-full text-sm">
+-          <thead class="bg-slate-700">
+-            <tr>
+-              <th class="px-4 py-3 text-left">Account</th>
+-              <th class="px-4 py-3 text-right">Min Payment</th>
+-              <th class="px-4 py-3 text-right">APR %</th>
+-              <th class="px-4 py-3 text-left">Due Date</th>
+-              <th class="px-4 py-3 text-center">Overdue?</th>
+-            </tr>
+-          </thead>
+-          <tbody class="divide-y divide-slate-700">
+-            <% liability_accounts.each do |account| %>
+-              <tr class="hover:bg-slate-700/50">
+-                <td class="px-4 py-3"><%= account.name || account.account_id %></td>
+-                <td class="px-4 py-3 text-right"><%= number_to_currency(account.min_payment_amount) if account.min_payment_amount %></td>
+-                <td class="px-4 py-3 text-right"><%= account.apr_percentage ? "#{account.apr_percentage}%" : '-' %></td>
+-                <td class="px-4 py-3"><%= account.next_payment_due_date || '-' %></td>
+-                <td class="px-4 py-3 text-center">
+-                  <%= account.is_overdue ? '<span class="text-red-400">⚠️ YES</span>'.html_safe : '<span class="text-green-400">No</span>'.html_safe %>
+-                </td>
+-              </tr>
+-            <% end %>
+-          </tbody>
+-        </table>
++      <div class="rounded-lg overflow-hidden">
++        <div class="overflow-x-auto">
++          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
++            <thead>
++              <tr role="row" class="bg-base-300 text-white sticky top-0">
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Account</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">Min Payment</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-right text-sm font-semibold">APR %</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-center text-sm font-semibold">Overdue?</th>
++              </tr>
++            </thead>
++            <tbody>
++              <% liability_accounts.each do |account| %>
++                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
++                  <td role="cell" class="px-4 py-3 text-sm"><%= account.name || account.account_id %></td>
++                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= number_to_currency(account.min_payment_amount) if account.min_payment_amount %></td>
++                  <td role="cell" class="px-4 py-3 text-sm text-right"><%= account.apr_percentage ? "#{account.apr_percentage}%" : '-' %></td>
++                  <td role="cell" class="px-4 py-3 text-sm"><%= account.next_payment_due_date || '-' %></td>
++                  <td role="cell" class="px-4 py-3 text-sm text-center">
++                    <%= account.is_overdue ? '<span class="text-red-400">⚠️ YES</span>'.html_safe : '<span class="text-green-400">No</span>'.html_safe %>
++                  </td>
++                </tr>
++              <% end %>
++            </tbody>
++          </table>
++        </div>
+       </div>
+     <% else %>
+       <p class="text-slate-400">No liabilities yet. Click "Sync Liabilities" to fetch data.</p>
+@@ -174,53 +200,55 @@
+ 
+     <!-- Logs Table -->
+     <% if @sync_logs.any? %>
+-      <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+-        <table class="w-full text-sm">
+-          <thead class="bg-slate-700">
+-            <tr>
+-              <th class="px-4 py-3 text-left">Time</th>
+-              <th class="px-4 py-3 text-left">Institution</th>
+-              <th class="px-4 py-3 text-left">Job Type</th>
+-              <th class="px-4 py-3 text-left">Status</th>
+-              <th class="px-4 py-3 text-left">Error</th>
+-              <th class="px-4 py-3 text-left">Job ID</th>
+-            </tr>
+-          </thead>
+-          <tbody class="divide-y divide-slate-700">
+-            <% @sync_logs.each do |log| %>
+-              <tr class="hover:bg-slate-700/50">
+-                <td class="px-4 py-3 text-slate-300">
+-                  <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
+-                </td>
+-                <td class="px-4 py-3">
+-                  <%= log.plaid_item&.institution_name || "N/A" %>
+-                </td>
+-                <td class="px-4 py-3">
+-                  <span class="px-2 py-1 rounded text-xs bg-slate-600">
+-                    <%= log.job_type %>
+-                  </span>
+-                </td>
+-                <td class="px-4 py-3">
+-                  <% if log.status == "success" %>
+-                    <span class="px-2 py-1 rounded text-xs bg-green-600">✓ Success</span>
+-                  <% elsif log.status == "failure" %>
+-                    <span class="px-2 py-1 rounded text-xs bg-red-600">✗ Failure</span>
+-                  <% elsif log.status == "started" %>
+-                    <span class="px-2 py-1 rounded text-xs bg-blue-600">⟳ Started</span>
+-                  <% else %>
+-                    <span class="px-2 py-1 rounded text-xs bg-slate-600"><%= log.status %></span>
+-                  <% end %>
+-                </td>
+-                <td class="px-4 py-3 text-slate-400 max-w-xs truncate">
+-                  <%= log.error_message || "-" %>
+-                </td>
+-                <td class="px-4 py-3 text-slate-500 font-mono text-xs">
+-                  <%= log.job_id&.first(8) || "-" %>
+-                </td>
+-              </tr>
+-            <% end %>
+-          </tbody>
+-        </table>
++      <div class="rounded-lg overflow-hidden">
++        <div class="overflow-x-auto">
++          <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
++            <thead>
++              <tr role="row" class="bg-base-300 text-white sticky top-0">
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Time</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Institution</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Job Type</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Status</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Error</th>
++                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Job ID</th>
++              </tr>
++            </thead>
++            <tbody>
++              <% @sync_logs.each do |log| %>
++                <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
++                  <td role="cell" class="px-4 py-3 text-sm text-gray-300">
++                    <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm">
++                    <%= log.plaid_item&.institution_name || "N/A" %>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm">
++                    <span class="px-2 py-1 rounded text-xs bg-slate-600">
++                      <%= log.job_type %>
++                    </span>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm">
++                    <% if log.status == "success" %>
++                      <span class="px-2 py-1 rounded text-xs bg-green-600">✓ Success</span>
++                    <% elsif log.status == "failure" %>
++                      <span class="px-2 py-1 rounded text-xs bg-red-600">✗ Failure</span>
++                    <% elsif log.status == "started" %>
++                      <span class="px-2 py-1 rounded text-xs bg-blue-600">⟳ Started</span>
++                    <% else %>
++                      <span class="px-2 py-1 rounded text-xs bg-slate-600"><%= log.status %></span>
++                    <% end %>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm text-gray-300 max-w-xs truncate">
++                    <%= log.error_message || "-" %>
++                  </td>
++                  <td role="cell" class="px-4 py-3 text-sm text-gray-400 font-mono text-xs">
++                    <%= log.job_id&.first(8) || "-" %>
++                  </td>
++                </tr>
++              <% end %>
++            </tbody>
++          </table>
++        </div>
+       </div>
+ 
+       <!-- Pagination -->
+Index: app/components/transaction_table_component.html.erb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/components/transaction_table_component.html.erb b/app/components/transaction_table_component.html.erb
+--- a/app/components/transaction_table_component.html.erb
++++ b/app/components/transaction_table_component.html.erb	(date 1766664549345)
+@@ -1,35 +1,59 @@
+ <div class="overflow-x-auto">
+-  <table class="table-auto border-collapse w-full bg-white shadow-md rounded-lg">
++  <table role="table" class="table table-zebra w-full border border-base-300 bg-base-200 text-gray-200">
+     <thead>
+-      <tr class="bg-gray-100 border-b">
+-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+-        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subtype</th>
+-        <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Fees</th>
+-        <th class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
++      <tr role="row" class="bg-base-300 text-white sticky top-0">
++        <% current_sort = (params[:sort] || 'date').to_s %>
++        <% current_dir  = (params[:dir] || 'desc').to_s %>
++        <% def next_dir_for(col, current_sort, current_dir); (current_sort == col && current_dir == 'asc') ? 'desc' : 'asc'; end %>
++
++        <th scope="col" role="columnheader"
++            aria-sort="<%= current_sort == 'date' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
++            class="px-4 py-3 text-left text-sm font-semibold">
++          <%= link_to 'Date', url_for(params.permit!.to_h.merge(sort: 'date', dir: next_dir_for('date', current_sort, current_dir))), class: "link link-hover text-white" %>
++        </th>
++        <th scope="col" role="columnheader"
++            aria-sort="<%= current_sort == 'name' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
++            class="px-4 py-3 text-left text-sm font-semibold">
++          <%= link_to 'Name', url_for(params.permit!.to_h.merge(sort: 'name', dir: next_dir_for('name', current_sort, current_dir))), class: "link link-hover text-white" %>
++        </th>
++        <th scope="col" role="columnheader"
++            aria-sort="<%= current_sort == 'amount' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
++            class="px-4 py-3 text-right text-sm font-semibold">
++          <%= link_to 'Amount', url_for(params.permit!.to_h.merge(sort: 'amount', dir: next_dir_for('amount', current_sort, current_dir))), class: "link link-hover text-white" %>
++        </th>
++        <th scope="col" role="columnheader"
++            aria-sort="<%= current_sort == 'subtype' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
++            class="px-4 py-3 text-left text-sm font-semibold"> 
++          <%= link_to 'Subtype', url_for(params.permit!.to_h.merge(sort: 'subtype', dir: next_dir_for('subtype', current_sort, current_dir))), class: "link link-hover text-white" %>
++        </th>
++        <th scope="col" role="columnheader"
++            aria-sort="<%= current_sort == 'fees' ? (current_dir == 'asc' ? 'ascending' : 'descending') : 'none' %>"
++            class="px-4 py-3 text-right text-sm font-semibold">
++          <%= link_to 'Fees', url_for(params.permit!.to_h.merge(sort: 'fees', dir: next_dir_for('fees', current_sort, current_dir))), class: "link link-hover text-white" %>
++        </th>
++        <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-center text-sm font-semibold">Actions</th>
+       </tr>
+     </thead>
+     <tbody>
+       <% @transactions.each do |transaction| %>
+-        <tr class="border-b hover:bg-gray-50">
+-          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.date&.strftime("%Y-%m-%d") %></td>
+-          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.name %></td>
+-          <td class="px-4 py-3 text-sm text-right <%= transaction.amount.to_f >= 0 ? 'text-green-600' : 'text-red-600' %> font-medium">
++        <tr role="row" class="border-t border-base-300 hover:bg-base-300 focus-within:ring-2 focus-within:ring-primary">
++          <td role="cell" class="px-4 py-3 text-sm"><%= transaction.date&.strftime("%Y-%m-%d") %></td>
++          <td role="cell" class="px-4 py-3 text-sm"><%= transaction.name %></td>
++          <td role="cell" class="px-4 py-3 text-sm text-right <%= transaction.amount.to_f >= 0 ? 'text-green-400' : 'text-red-400' %> font-medium">
+             $<%= number_to_currency(transaction.amount || 0, precision: 2, unit: "") %>
+           </td>
+-          <td class="px-4 py-3 text-sm text-gray-900"><%= transaction.subtype %></td>
+-          <td class="px-4 py-3 text-sm text-right text-gray-900">
++          <td role="cell" class="px-4 py-3 text-sm"><%= transaction.subtype %></td>
++          <td role="cell" class="px-4 py-3 text-sm text-right">
+             <%= transaction.respond_to?(:fees) ? "$#{number_to_currency(transaction.fees || 0, precision: 2, unit: '')}" : "N/A" %>
+           </td>
+-          <td class="px-4 py-3 text-sm text-center">
+-            <%= link_to "View", transaction_path(transaction), class: "text-blue-600 hover:text-blue-800 font-medium" %>
++          <td role="cell" class="px-4 py-3 text-sm text-center">
++            <%= link_to "View", transaction_path(transaction), class: "link link-primary font-medium focus-visible:ring focus-visible:ring-primary" %>
+           </td>
+         </tr>
+       <% end %>
+       <% if @transactions.empty? %>
+-        <tr>
+-          <td colspan="6" class="px-4 py-8 text-center text-gray-500">No transactions found</td>
++        <tr role="row">
++          <td role="cell" colspan="6" class="px-4 py-8 text-center text-gray-400">No transactions found</td>
+         </tr>
+       <% end %>
+     </tbody>
+Index: app/controllers/transactions_controller.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/controllers/transactions_controller.rb b/app/controllers/transactions_controller.rb
+--- a/app/controllers/transactions_controller.rb
++++ b/app/controllers/transactions_controller.rb	(date 1766662708323)
+@@ -4,7 +4,12 @@
+   # GET /transactions
+   def index
+     @transactions = Transaction.includes(:account)
++    # Filtering
+     @transactions = @transactions.where(subtype: params[:subtype]) if params[:subtype].present?
++    # Sorting (server-side, whitelist)
++    sort_col = safe_sort_column(params[:sort])
++    sort_dir = %w[asc desc].include?(params[:dir].to_s.downcase) ? params[:dir].to_s.downcase : 'desc'
++    @transactions = @transactions.order(Arel.sql("#{sort_col} #{sort_dir}"))
+     @transactions = @transactions.page(params[:page]).per(25)
+   end
+ 
+@@ -57,4 +62,16 @@
+                                           :name, :merchant_name, :subtype, :category,
+                                           :pending, :payment_channel)
+     end
++
++    # Only allow ordering by these columns to avoid SQL injection
++    def safe_sort_column(param)
++      allowed = {
++        'date' => 'date',
++        'name' => 'name',
++        'amount' => 'amount',
++        'subtype' => 'subtype',
++        'fees' => 'fees'
++      }
++      allowed[param.to_s] || 'date'
++    end
+ end
+Index: app/controllers/mission_control_controller.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/controllers/mission_control_controller.rb b/app/controllers/mission_control_controller.rb
+--- a/app/controllers/mission_control_controller.rb
++++ b/app/controllers/mission_control_controller.rb	(date 1766664549345)
+@@ -84,6 +84,11 @@
+   end
+ 
+   def sync_liabilities_now
++    # Optional gate
++    if ENV.fetch("LIABILITIES_ENABLED", "true").to_s != "true"
++      flash[:alert] = "Liabilities sync is disabled by configuration."
++      return redirect_to mission_control_path
++    end
+     count = 0
+     PlaidItem.find_each do |item|
+       SyncLiabilitiesJob.perform_later(item.id)
+@@ -112,13 +117,21 @@
+     return render json: { error: "Not found" }, status: :not_found unless item
+ 
+     client = Rails.application.config.x.plaid_client
+-    
++    # Allow product-specific consent flows (e.g., liabilities)
++    requested_products = params[:products].to_s.split(',').map(&:strip).reject(&:blank?)
++    # Default to all configured products if none specified
++    products = if requested_products.any?
++                 requested_products
++               else
++                 ["investments", "transactions", "liabilities"]
++               end
++
+     # Try update mode first with the existing access token
+     begin
+       request = Plaid::LinkTokenCreateRequest.new(
+         user: { client_user_id: item.user_id.to_s },
+         client_name: "NextGen Wealth Advisor",
+-        products: ["investments", "transactions", "liabilities"],
++        products: products,
+         country_codes: ["US"],
+         language: "en",
+         access_token: item.access_token
+@@ -133,7 +146,7 @@
+         request = Plaid::LinkTokenCreateRequest.new(
+           user: { client_user_id: item.user_id.to_s },
+           client_name: "NextGen Wealth Advisor",
+-          products: ["investments", "transactions", "liabilities"],
++          products: products,
+           country_codes: ["US"],
+           language: "en"
+         )
+@@ -151,6 +164,8 @@
+     item = PlaidItem.find_by(id: params[:id])
+     return render json: { error: "Not found" }, status: :not_found unless item
+ 
++    products = params[:products].to_s.split(',').map(&:strip)
++
+     # If public_token is provided (fallback to standard link mode), exchange it for a new access_token
+     if params[:public_token].present?
+       client = Rails.application.config.x.plaid_client
+@@ -169,6 +184,10 @@
+       item.update!(status: :good, reauth_attempts: 0, last_error: nil)
+     end
+ 
++    # Enqueue follow-up syncs based on products
++    if products.include?("liabilities")
++      SyncLiabilitiesJob.perform_later(item.id)
++    end
+     SyncHoldingsJob.perform_later(item.id)
+     render json: { status: "ok" }
+   end
+Index: app/controllers/agents/monitor_controller.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/controllers/agents/monitor_controller.rb b/app/controllers/agents/monitor_controller.rb
+--- a/app/controllers/agents/monitor_controller.rb
++++ b/app/controllers/agents/monitor_controller.rb	(date 1766662708322)
+@@ -14,8 +14,9 @@
+   private
+ 
+   def ensure_owner!
+-    # Simple owner check for POC: ericsmith@gmail.com
+-    unless current_user.email == "ericsmith@gmail.com"
++    # Simple owner check for POC
++    authorized_emails = %w[ ericsmith@gmail.com ericsmith66@me.com ]
++    unless authorized_emails.include?(current_user.email)
+       redirect_to root_path, alert: "Not authorized."
+     end
+   end
+Index: lib/tasks/agents.rake
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/lib/tasks/agents.rake b/lib/tasks/agents.rake
+--- a/lib/tasks/agents.rake
++++ b/lib/tasks/agents.rake	(date 1766662708327)
+@@ -24,7 +24,7 @@
+     # In Phased implementation, we start with SAP
+     SapAgent.new.decompose(task_id, user_id, query)
+     puts "Phased Step: AGENT-02 (SAP Agent) has processed the query and enqueued for CWA."
+-    puts "Monitor the task here: http://localhost:3000/agents/monitor"
++    puts "Monitor the task here: http://localhost:80/agents/monitor"
+   end
+ 
+   desc "Monitor agent task in terminal"
+Index: test/fixtures/agent_logs.yml
+===================================================================
+diff --git a/test/fixtures/agent_logs.yml b/test/fixtures/agent_logs.yml
+deleted file mode 100644
+--- a/test/fixtures/agent_logs.yml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+-
+-one:
+-  task_id: MyString
+-  persona: MyString
+-  action: MyString
+-  details: MyText
+-  user: one
+-
+-two:
+-  task_id: MyString
+-  persona: MyString
+-  action: MyString
+-  details: MyText
+-  user: two
+Index: test/controllers/mission_control_controller_test.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/test/controllers/mission_control_controller_test.rb b/test/controllers/mission_control_controller_test.rb
+--- a/test/controllers/mission_control_controller_test.rb
++++ b/test/controllers/mission_control_controller_test.rb	(date 1766662708327)
+@@ -1,4 +1,5 @@
+ require "test_helper"
++require "ostruct"
+ 
+ class MissionControlControllerTest < ActionDispatch::IntegrationTest
+   include ActiveJob::TestHelper
+@@ -31,8 +32,8 @@
+ 
+     # Create sample data
+     item = PlaidItem.create!(user: @owner, item_id: "it_123", institution_name: "Test Bank", access_token: "tok", status: "good")
+-    a1 = item.accounts.create!(account_id: "acc_1")
+-    item.accounts.create!(account_id: "acc_2")
++    a1 = item.accounts.create!(account_id: "acc_1", mask: "1111")
++    item.accounts.create!(account_id: "acc_2", mask: "2222")
+     a1.holdings.create!(security_id: "sec_1")
+     a1.holdings.create!(security_id: "sec_2")
+ 
+@@ -50,7 +51,7 @@
+ 
+     # Seed some data
+     item = PlaidItem.create!(user: @owner, item_id: "it_nuke", institution_name: "Bank", access_token: "tok", status: "good")
+-    acc  = item.accounts.create!(account_id: "acc_nuke")
++    acc  = item.accounts.create!(account_id: "acc_nuke", mask: "0000")
+     acc.holdings.create!(security_id: "sec_nuke")
+ 
+     assert_difference [
+@@ -70,7 +71,7 @@
+     login_as(@user, scope: :user)
+ 
+     item = PlaidItem.create!(user: @owner, item_id: "it_safe", institution_name: "Bank", access_token: "tok", status: "good")
+-    acc  = item.accounts.create!(account_id: "acc_safe")
++    acc  = item.accounts.create!(account_id: "acc_safe", mask: "0000")
+     acc.holdings.create!(security_id: "sec_safe")
+ 
+     assert_no_difference [
+@@ -304,7 +305,7 @@
+     login_as(@owner, scope: :user)
+     
+     item = PlaidItem.create!(user: @owner, item_id: "it_remove", institution_name: "Test Bank", access_token: "test_token", status: "good")
+-    account = item.accounts.create!(account_id: "acc_remove", name: "Test Account", type: "investment", subtype: "brokerage")
++    account = item.accounts.create!(account_id: "acc_remove", name: "Test Account", type: "investment", subtype: "brokerage", mask: "0000")
+     account.holdings.create!(security_id: "sec_remove", symbol: "AAPL", name: "Apple", quantity: 10.0)
+     item.recurring_transactions.create!(stream_id: "stream_remove", description: "Test", frequency: "MONTHLY", average_amount: 10.0)
+     item.sync_logs.create!(job_type: "holdings", status: "success")
+Index: test/controllers/agents/monitor_controller_test.rb
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/test/controllers/agents/monitor_controller_test.rb b/test/controllers/agents/monitor_controller_test.rb
+--- a/test/controllers/agents/monitor_controller_test.rb
++++ b/test/controllers/agents/monitor_controller_test.rb	(date 1766662708327)
+@@ -1,8 +1,26 @@
+ require "test_helper"
+ 
+ class Agents::MonitorControllerTest < ActionDispatch::IntegrationTest
+-  test "should get index" do
+-    get agents_monitor_index_url
++  setup do
++    @authorized_user = User.create!(email: "ericsmith66@me.com", password: "password", password_confirmation: "password")
++    @unauthorized_user = User.create!(email: "other@example.com", password: "password", password_confirmation: "password")
++  end
++
++  test "should get index if authorized" do
++    sign_in @authorized_user, scope: :user
++    get agents_monitor_path
+     assert_response :success
+   end
++
++  test "should redirect if unauthorized" do
++    sign_in @unauthorized_user, scope: :user
++    get agents_monitor_path
++    assert_redirected_to root_path
++    assert_equal "Not authorized.", flash[:alert]
++  end
++
++  test "should redirect if not logged in" do
++    get agents_monitor_path
++    assert_redirected_to new_user_session_path
++  end
+ end
+Index: config/database.yml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/config/database.yml b/config/database.yml
+--- a/config/database.yml
++++ b/config/database.yml	(date 1766664549346)
+@@ -42,8 +42,17 @@
+ # re-generated from your development database when you run "rake".
+ # Do not set this db to the same as development or production.
+ test:
+-  <<: *default
+-  database: nextgen_plaid_test
++  primary:
++    <<: *default
++    database: nextgen_plaid_test
++  queue:
++    <<: *default
++    database: nextgen_plaid_test_queue
++    migrations_paths: db/queue_migrate
++  solid_queue:
++    <<: *default
++    database: nextgen_plaid_test_queue
++    migrations_paths: db/queue_migrate
+ 
+ # As with config/credentials.yml, you never want to store sensitive information,
+ # like your database password, in your source code. If your source code is
+Index: knowledge_base/prds/PRD UI-7.md
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/knowledge_base/prds/PRD UI-7.md b/knowledge_base/prds/PRD UI-7.md
+--- a/knowledge_base/prds/PRD UI-7.md
++++ b/knowledge_base/prds/PRD UI-7.md	(date 1766662708327)
+@@ -35,4 +35,26 @@
+ **Workflow**  
+ Junie: Ask questions/build plan first. Pull from main, branch `feature/ui-7-beautiful-tables`. Use Claude Sonnet 4.5. Commit only green code (run minitest, rubocop). Merge to main post-review.
+ 
+-Next steps: Junie, confirm specific tables to prioritize (e.g., holdings first)? Proceed with implementation? Questions on DaisyUI theme overrides?
+\ No newline at end of file
++Next steps: Junie, confirm specific tables to prioritize (e.g., holdings first)? Proceed with implementation? Questions on DaisyUI theme overrides?
++
++### PRD UI-7 Review Response
++Acknowledged—strong review; agree with clarifications on ARIA (native + scope/aria-sort), hover/focus (add focus-visible:ring), print stylesheet (add low-cost @media print for light inversion), and risks (scope styles to component, server-side for large tables).
++
++Corrections/Clarifications:
++1) Sorting/pagination: Approved—use Stimulus for client-side on small tables (<50 rows); server-side params (?sort=col&dir=asc) for larger. No heavy libs.
++2) Component API: Approved as proposed—explicit props for headers (with sortable flag), rows, pagination, sort, row_href proc.
++3) Theming/contrast: Approved CSS vars in tailwind.config.js (e.g., --table-bg: #1f2937, --table-fg: #e5e7eb); explicit text classes over prose-invert to avoid regressions.
++4) ARIA: Approved—focus on native table semantics + scope="col" and aria-sort on headers.
++5) Hover/focus: Approved—keyboard equivalents via focus-visible.
++6) Print/light mode: Add print stylesheet; defer light toggle but ensure dark defaults pass contrast in OS modes.
++7) Test strategy: Approved—add keyboard nav spec; use Capybara for assertions.
++
++Targeted Questions:
++- Prioritization: Start with holdings (simpler), then transactions.
++- Pagination gem: No existing (confirmed via repo browse); add Pagy (lightweight, acceptable).
++- Sort scope: Yes—standardize server-side via query params for all, to handle large datasets safely.
++- Branding constraints: None—text-white on bg-gray-800 is fine; stick to neutral grays/blues for professional HNW feel.
++
++Implementation Plan Adjustments: Approved with above (e.g., Pagy integration, server-side sorting, print stylesheet). Update acceptance criteria as suggested (add server-side for >50 rows, ARIA/keyboard for headers).
++
++Next steps: Proceed on `feature/ui-7-beautiful-tables` with Claude Sonnet 4.5; pull/rebase from main first. Ask any remaining questions here before coding. Commit green only (minitest/rubocop); open PR to main post-tests.
+\ No newline at end of file

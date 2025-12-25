@@ -8,6 +8,46 @@
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
 
+# PRD PROD-TEST-01: Production seeding
+if Rails.env.production?
+  puts "Seeding production data..."
+
+  # Single idempotent test user
+  User.find_or_create_by!(email: "ericsmith66@me.com") do |u|
+    u.password = ENV["SEED_USER_PASSWORD"] || ENV["PROD_USER_PASSWORD"] || "securepassword123!"
+    u.password_confirmation = u.password
+    # u.confirmed_at = Time.current # Devise confirmable is not enabled
+  end
+  puts "  - Seeded test user: ericsmith66@me.com"
+
+  # Optional lookups via existing tasks
+  if ENV["SEED_PFC"] == "true" || ENV["SEED_LOOKUPS"] == "true"
+    puts "  - Invoking uc14:seed_pfc..."
+    Rake::Task["uc14:seed_pfc"].invoke
+  end
+
+  if ENV["SEED_TCODES"] == "true" || ENV["SEED_LOOKUPS"] == "true"
+    puts "  - Invoking uc14:seed_transaction_codes..."
+    Rake::Task["uc14:seed_transaction_codes"].invoke
+  end
+
+  # Optional Merchant samples
+  if ENV["SEED_MERCHANT"] == "true"
+    puts "  - Seeding sample merchants..."
+    [
+      { name: "Amazon", merchant_entity_id: "VQ90wKM5DgnA8LzA5ymwPuE5rovorjCZAxLR5" },
+      { name: "Apple", merchant_entity_id: "7193719" },
+      { name: "Netflix", merchant_entity_id: "54321" }
+    ].each do |m|
+      # Merchant.find_or_create_by!(merchant_entity_id: m[:merchant_entity_id]) { |merch| merch.name = m[:name] }
+      puts "    - #{m[:name]} skipped (model check required)"
+    end
+  end
+
+  puts "Production seeding complete."
+  return
+end
+
 # PRD UI-4: Admin/Parent/Kid users for CRUD testing
 puts "Seeding users for UI-4 CRUD operations..."
 
