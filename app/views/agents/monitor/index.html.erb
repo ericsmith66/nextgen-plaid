@@ -1,0 +1,52 @@
+<%= render(LayoutComponent.new(title: "Agent POC Monitor", current_user: current_user)) do %>
+  <div class="space-y-8">
+    <!-- Queue Status -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <% @queues.each do |name, count| %>
+        <div class="bg-white rounded-lg shadow-md p-6 border-l-4 <%= name == 'cso_to_cwa' ? 'border-red-500' : 'border-blue-500' %>">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider"><%= name %></h2>
+          <p class="text-3xl font-bold mt-2 text-gray-900"><%= count %></p>
+          <p class="text-xs text-gray-400 mt-1">Pending Jobs</p>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Agent Activity Log -->
+    <div>
+      <h3 class="text-2xl font-bold text-gray-800 mb-4">Agent Activity Log</h3>
+      <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100 border-b">
+            <tr>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Timestamp</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Persona</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Action</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Task ID</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-700">Details</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <% @logs.each do |log| %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-gray-600"><%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %></td>
+                <td class="px-4 py-3 font-medium">
+                  <span class="px-2 py-1 rounded text-xs <%= persona_color(log.persona) %>">
+                    <%= log.persona %>
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-gray-800"><%= log.action %></td>
+                <td class="px-4 py-3 font-mono text-gray-500 text-xs"><%= log.task_id.first(8) %>...</td>
+                <td class="px-4 py-3 text-gray-600 truncate max-w-xs"><%= log.details %></td>
+              </tr>
+            <% end %>
+            <% if @logs.empty? %>
+              <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">No agent logs found</td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<% end %>
