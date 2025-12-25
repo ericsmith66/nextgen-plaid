@@ -1,4 +1,7 @@
 Rails.application.routes.draw do
+  namespace :agents do
+    get "monitor", to: "monitor#index"
+  end
   get "plaid_oauth/initiate"
   get "plaid_oauth/callback"
   devise_for :users
