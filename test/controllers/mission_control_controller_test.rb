@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class MissionControlControllerTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
@@ -31,8 +32,8 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
 
     # Create sample data
     item = PlaidItem.create!(user: @owner, item_id: "it_123", institution_name: "Test Bank", access_token: "tok", status: "good")
-    a1 = item.accounts.create!(account_id: "acc_1")
-    item.accounts.create!(account_id: "acc_2")
+    a1 = item.accounts.create!(account_id: "acc_1", mask: "1111")
+    item.accounts.create!(account_id: "acc_2", mask: "2222")
     a1.holdings.create!(security_id: "sec_1")
     a1.holdings.create!(security_id: "sec_2")
 
@@ -50,7 +51,7 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
 
     # Seed some data
     item = PlaidItem.create!(user: @owner, item_id: "it_nuke", institution_name: "Bank", access_token: "tok", status: "good")
-    acc  = item.accounts.create!(account_id: "acc_nuke")
+    acc  = item.accounts.create!(account_id: "acc_nuke", mask: "0000")
     acc.holdings.create!(security_id: "sec_nuke")
 
     assert_difference [
@@ -70,7 +71,7 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     login_as(@user, scope: :user)
 
     item = PlaidItem.create!(user: @owner, item_id: "it_safe", institution_name: "Bank", access_token: "tok", status: "good")
-    acc  = item.accounts.create!(account_id: "acc_safe")
+    acc  = item.accounts.create!(account_id: "acc_safe", mask: "0000")
     acc.holdings.create!(security_id: "sec_safe")
 
     assert_no_difference [
@@ -304,7 +305,7 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     login_as(@owner, scope: :user)
     
     item = PlaidItem.create!(user: @owner, item_id: "it_remove", institution_name: "Test Bank", access_token: "test_token", status: "good")
-    account = item.accounts.create!(account_id: "acc_remove", name: "Test Account", type: "investment", subtype: "brokerage")
+    account = item.accounts.create!(account_id: "acc_remove", name: "Test Account", type: "investment", subtype: "brokerage", mask: "0000")
     account.holdings.create!(security_id: "sec_remove", symbol: "AAPL", name: "Apple", quantity: 10.0)
     item.recurring_transactions.create!(stream_id: "stream_remove", description: "Test", frequency: "MONTHLY", average_amount: 10.0)
     item.sync_logs.create!(job_type: "holdings", status: "success")
