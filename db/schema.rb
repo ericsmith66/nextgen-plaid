@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_23_102800) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -38,6 +38,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_23_102800) do
     t.index ["is_overdue"], name: "index_accounts_on_is_overdue"
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
+  end
+
+  create_table "agent_logs", force: :cascade do |t|
+    t.string "task_id"
+    t.string "persona"
+    t.string "action"
+    t.text "details"
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["task_id", "persona", "action"], name: "index_agent_logs_on_task_id_and_persona_and_action", unique: true
+    t.index ["task_id"], name: "index_agent_logs_on_task_id"
+    t.index ["user_id"], name: "index_agent_logs_on_user_id"
   end
 
   create_table "enriched_transactions", force: :cascade do |t|
@@ -159,6 +172,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_23_102800) do
     t.text "last_error"
     t.integer "reauth_attempts", default: 0
     t.string "institution_id"
+    t.string "plaid_env"
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"
@@ -277,6 +291,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_23_102800) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "agent_logs", "users"
   add_foreign_key "enriched_transactions", "transactions"
   add_foreign_key "fixed_incomes", "holdings"
   add_foreign_key "holdings", "accounts"
