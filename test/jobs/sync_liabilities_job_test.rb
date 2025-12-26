@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class SyncLiabilitiesJobTest < ActiveJob::TestCase
   def setup
@@ -10,7 +11,7 @@ class SyncLiabilitiesJobTest < ActiveJob::TestCase
       access_token: "tok_liab",
       status: "good"
     )
-    @account = Account.create!(plaid_item: @item, account_id: "acc_liab_job")
+    @account = Account.create!(plaid_item: @item, account_id: "acc_liab_job", mask: "9999")
   end
 
   test "job delegates to PlaidLiabilitiesService and updates Account" do
