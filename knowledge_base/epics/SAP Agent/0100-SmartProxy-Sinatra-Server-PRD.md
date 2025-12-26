@@ -4,7 +4,20 @@
 This PRD defines the setup of a standalone SmartProxy server using Sinatra as a lightweight proxy for Grok (xAI API) calls, enabling secure, anonymized routing of AI queries from the nextgen-plaid app to external Grok tools without direct API exposure in Rails. This supports the project's vision of streamlining AI-assisted PRD generation and workflow automation for HNW financial data syncing, reducing manual copy-paste bottlenecks while maintaining local privacy controls. The proxy must handle Grok's function calling for tools (e.g., web_search, browse_page, x_keyword_search, x_semantic_search) to enable dynamic capabilities like live search, X post analysis, realtime data fetching, and other tool-based enhancements in responses.
 
 #### Log Requirements
-Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards, ensuring all proxy requests/responses/tool calls are logged with timestamps, anonymized payloads, and error traces in a dedicated log file (e.g., smart_proxy.log). If the file is not found, use standard Rails logging conventions (e.g., Logger.new with INFO level, redacted sensitives).
+Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards, ensuring all proxy requests/responses/tool calls are logged with timestamps, anonymized payloads, and error traces in a dedicated log file (e.g., `smart_proxy.log`). Implement log rotation (daily or by size) as part of this PRD. If the file is not found, use standard Rails logging conventions.
+
+#### Definition of Done (DoD)
+- **Testing**: 
+  - 100% coverage of proxy endpoints using RSpec.
+  - Mandatory use of VCR and WebMock for all external Grok API calls.
+  - Sanitized VCR cassettes (redacted API keys).
+- **Logging**: 
+  - Structured JSON logging for all requests/responses.
+  - Log rotation implemented and verified.
+- **Documentation**: 
+  - API documentation updated in `smart_proxy/README.md`.
+- **Anonymization**: 
+  - Verification that no PII or sensitive financial data is logged or forwarded.
 
 #### Requirements
 **Functional Requirements:**

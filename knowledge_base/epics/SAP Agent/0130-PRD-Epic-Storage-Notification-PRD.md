@@ -1,19 +1,35 @@
 ### 0130-PRD-Epic-Storage-Notification-PRD
 
 #### Overview
-This PRD defines the output storage and notification mechanism for SAP-generated epics/PRDs, automatically saving them as Markdown files in epic-specific folders (e.g., knowledge_base/epics/sap-agent-epic/) and notifying Junie via rake output for manual dialog paste/review/implementation. It includes templates with instructions for Junie to log actions (in epic/logs/junie_actions.log) and trigger SAP reviews of changes/inputs (via rake sap:review_changes[path_to_output]), enabling bidirectional loops while automating manual copy-paste from Grok outputs to repo. This supports streamlined workflow for HNW financial data syncing by facilitating reliable handoff to Junie for atomic Plaid features.
+This PRD defines the storage and handshake mechanism between SAP and Junie. It replaces disparate logs with a unified `Inbox/Outbox` folder structure and provides a `Junie CLI` rake wrapper to streamline the "manual" handshake.
+
+#### Inbox/Outbox Registry
+Instead of disparate logs, SAP and Junie will use a shared registry:
+- `knowledge_base/epics/sap-agent-epic/inbox/`: SAP writes JSON tasks here (e.g., `new_prd.json`) for Junie.
+- `knowledge_base/epics/sap-agent-epic/outbox/`: Junie moves processed tasks here or writes responses.
+- `knowledge_base/epics/sap-agent-epic/archive/`: Completed tasks are moved here.
+
+#### Junie CLI Wrapper
+Implement `rake junie:poll_inbox` to check for new tasks, print a summary, and copy relevant info to the clipboard (via `pbcopy`).
 
 #### Log Requirements
-Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards, ensuring all storage operations, file commits, notifications, Junie action logs, and SAP review triggers are logged with timestamps, file paths, and error traces in epic-specific logs/ subdir (e.g., knowledge_base/epics/sap-agent-epic/logs/sap.log and logs/junie_actions.log; rotate daily as junie_actions-YYYY-MM-DD.log; create dir/files if missing; append entries like "Timestamp | Action | Details | Status").
+Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md`. All storage, registry movements, and notifications must be logged in `agent_logs/sap.log`.
+
+#### Definition of Done (DoD)
+- **Inbox/Outbox**: Registry folders created and used for all handshakes.
+- **Rake Task**: `rake junie:poll_inbox` functional and uses `pbcopy`.
+- **Git Hygiene**: SAP checks for dirty state and stashes before committing new PRDs.
+- **Testing**: RSpec for `Inbox/Outbox` logic and Git interaction mocks.
 
 #### Requirements
 **Functional Requirements:**
-- Extend sap_agent.rb to parse Grok responses (e.g., extract generated Markdown content from JSON "choices[0].message.content") and store as atomic files in epic folders (e.g., knowledge_base/epics/sap-agent-epic/0100-SmartProxy-Sinatra-Server-PRD.md; auto-create folder if missing; use incrementing IDs based on epic sequence).
-- Handle storage: Use File.write to save parsed content; support versioning (append -v1, -v2 on revisions, e.g., via query param or auto-detect); commit to Git (via system calls like `git add` and `git commit -m "Add/Revise PRD from SAP: [query summary] -v[version]"`) only if valid (e.g., non-empty, well-formed Markdown); push to main if ENV['AUTO_PUSH'] (default false); update 0000-Epic-Overview.md by appending new/ revised PRD entries to a list with changelogs (e.g., "0100... -v2: Added tool support").
-- Notification for Junie: Trigger a rake task (e.g., rake junie:notify_new_prd[file_path]) that outputs a clipboard-ready summary (e.g., via `pbcopy` on Mac: "New PRD ready: [path] – paste this to Junie dialog for review") for manual copy-paste into RubyMine; include embedded template instructions in the output (e.g., "Junie: Log your actions in [epic/logs/junie_actions.log] [format: Timestamp | Action | Details | Status]. After changes, run rake sap:review_changes[path_to_your_output] to trigger SAP review of inputs/changes. Append 'Validation Steps' section to this PRD.md with 3-5 bullets on manual verification (e.g., 'Run rake and confirm output'). Commit updated PRD.").
-- SAP Review Trigger: Add rake sap:review_changes[input_path] that invokes SAP to route a review query (e.g., "Review Junie's changes in [path] against PRD") via SmartProxy/Grok, parsing response for feedback, logging in epic/logs/sap_reviews.log, and optionally updating PRD with revisions (-vN).
-- Junie Logging: In notification template, instruct Junie to log every action (e.g., "Reviewed PRD", "Implemented model", "Fixed bug") with details (e.g., branch, commit hash) in epic/logs/junie_actions-YYYY-MM-DD.log using structured format; rotate logs daily via simple File.rename if over size/date.
-- Error handling: Wrap in try-catch; retry file writes/commits on conflicts (up to 2 times); stash changes if Git dirty (system("git stash push")); rollback on failure (e.g., git reset); return status hash (e.g., { "success": true, "path": "/path/to/prd.md" }); log all failures.
+- **Storage**: SAP parses Grok responses and saves them as Markdown files in epic-specific folders.
+- **Registry**: Implement logic to write to `inbox/` and read from `outbox/`.
+- **Handshake**: `rake junie:poll_inbox` outputs task summaries and copies implementation instructions to the clipboard.
+- **Git Ops**: SAP uses system calls for `git add/commit`. Must include dirty state checks and `git stash` in the workflow.
+- **Overview Update**: Auto-update `0000-Epic-Overview.md` with new entries and changelogs.
+- **Notification**: Include embedded template instructions in the rake output for Junie to follow.
+- **Error Handling**: Stash changes if Git dirty; rollback on failure; log all failures.
 
 **Non-Functional Requirements:**
 - Performance: <100ms for storage/commit; handle up to 1KB Markdown outputs; log rotation adds <50ms.
