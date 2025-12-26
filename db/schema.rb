@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_26_175458) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_26_203811) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -200,6 +200,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_26_175458) do
     t.index ["plaid_item_id"], name: "index_recurring_transactions_on_plaid_item_id"
   end
 
+  create_table "snapshots", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.jsonb "data"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_snapshots_on_user_id"
+  end
+
   create_table "sync_logs", force: :cascade do |t|
     t.bigint "plaid_item_id", null: false
     t.string "job_type", null: false
@@ -319,6 +327,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_26_175458) do
   add_foreign_key "option_contracts", "holdings"
   add_foreign_key "plaid_items", "users"
   add_foreign_key "recurring_transactions", "plaid_items"
+  add_foreign_key "snapshots", "users"
   add_foreign_key "sync_logs", "plaid_items"
   add_foreign_key "transactions", "accounts"
   add_foreign_key "transactions", "merchants"
