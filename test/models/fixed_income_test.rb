@@ -14,7 +14,7 @@ class FixedIncomeTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test-account-id",
-      name: "Test Account"
+      name: "Test Account", mask: "0000", mask: "0000"
     )
     
     holding = Holding.create!(
@@ -49,7 +49,7 @@ class FixedIncomeTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test-account-id",
-      name: "Test Account"
+      name: "Test Account", mask: "0000", mask: "0000"
     )
     
     holding = Holding.create!(
@@ -79,7 +79,7 @@ class FixedIncomeTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test-account-id",
-      name: "Test Account"
+      name: "Test Account", mask: "0000", mask: "0000"
     )
     
     holding = Holding.create!(
@@ -107,7 +107,7 @@ class FixedIncomeTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test-account-id",
-      name: "Test Account"
+      name: "Test Account", mask: "0000", mask: "0000"
     )
     
     holding = Holding.create!(

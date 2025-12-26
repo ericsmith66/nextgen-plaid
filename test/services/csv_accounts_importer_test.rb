@@ -15,15 +15,15 @@ class CsvAccountsImporterTest < ActiveSupport::TestCase
   test "imports valid accounts from CSV" do
     importer = CsvAccountsImporter.new(@csv_path)
 
-    assert_difference "Account.count", 4 do
+    assert_difference "Account.count", 5 do
       assert_difference "PlaidItem.count", 1 do
         result = importer.call(user: @user)
         assert result, "Import should succeed"
       end
     end
 
-    assert_equal 4, importer.imported_count
-    assert_equal 2, importer.skipped_count
+    assert_equal 5, importer.imported_count
+    assert_equal 1, importer.skipped_count
   end
 
   test "creates mock PlaidItem for jpmc" do
@@ -54,7 +54,7 @@ class CsvAccountsImporterTest < ActiveSupport::TestCase
 
     # Verify accounts are linked to existing item
     accounts = Account.where(source: :csv, plaid_item: existing_item)
-    assert_equal 4, accounts.count
+    assert_equal 5, accounts.count
   end
 
   test "imports account with correct attributes" do
@@ -94,14 +94,13 @@ class CsvAccountsImporterTest < ActiveSupport::TestCase
     assert_includes importer.errors.join, "Invalid account type"
   end
 
-  test "skips row with zero balance" do
+  test "imports row with zero balance" do
     importer = CsvAccountsImporter.new(@csv_path)
     importer.call(user: @user)
 
     account = Account.find_by(account_id: "2222223456", source: :csv)
-    assert_nil account
-
-    assert_includes importer.errors.join, "Invalid or zero balance"
+    assert_not_nil account
+    assert_equal 0.0, account.current_balance
   end
 
   test "handles missing file" do
@@ -128,12 +127,12 @@ class CsvAccountsImporterTest < ActiveSupport::TestCase
   test "logs completion message" do
     importer = CsvAccountsImporter.new(@csv_path)
 
-    assert_difference "Account.count", 4 do
+    assert_difference "Account.count", 5 do
       importer.call(user: @user)
     end
 
-    assert_equal 4, importer.imported_count
-    assert_equal 2, importer.skipped_count
+    assert_equal 5, importer.imported_count
+    assert_equal 1, importer.skipped_count
   end
 
   test "allows same account_id with different source" do

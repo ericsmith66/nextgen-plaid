@@ -11,7 +11,9 @@ class Transaction < ApplicationRecord
   # string-backed enum
   # values: "plaid", "manual" (default)
   attribute :source, :string
-  enum :source, { plaid: "plaid", manual: "manual" }
+  enum :source, { plaid: "plaid", manual: "manual", csv: "csv" }
+
+  default_scope { where(deleted_at: nil) }
 
   # CSV imports often do not have a Plaid transaction_id
   # Require transaction_id only for Plaid-sourced rows

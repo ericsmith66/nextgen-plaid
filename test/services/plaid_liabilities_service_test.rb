@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class PlaidLiabilitiesServiceTest < ActiveSupport::TestCase
   setup do
@@ -10,7 +11,7 @@ class PlaidLiabilitiesServiceTest < ActiveSupport::TestCase
       access_token: "tok_service",
       status: "good"
     )
-    @account = Account.create!(plaid_item: @plaid_item, account_id: "test_credit_card_account")
+    @account = Account.create!(plaid_item: @plaid_item, account_id: "test_credit_card_account", mask: "0000")
     @service = PlaidLiabilitiesService.new(@plaid_item)
   end
 

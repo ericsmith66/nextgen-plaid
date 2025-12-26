@@ -27,7 +27,7 @@ class SyncTransactionsJob < ApplicationJob
     return unless item
 
     # PRD PROD-TEST-01: Guard production API calls
-    return if !production_plaid? && skip_non_prod!(item, "transactions")
+    return if should_skip_sync? && skip_non_prod!(item, "transactions")
 
     # PRD 6.6: Skip syncing items with failed status
     if item.status == 'failed'
@@ -45,139 +45,22 @@ class SyncTransactionsJob < ApplicationJob
     SyncLog.create!(plaid_item: item, job_type: "transactions", status: "started", job_id: self.job_id)
 
     begin
-      client = Rails.application.config.x.plaid_client
+      # PRD 0020: Use PlaidTransactionSyncService for cursor-based incremental sync
+      sync_service = PlaidTransactionSyncService.new(item)
+      sync_result = sync_service.sync
+      
+      # PRD 11: Sync investment transactions
+      sync_investments(item)
+      
+      # PRD 12: Sync recurring transactions
+      sync_recurring(item)
 
-      # 1. Fetch transactions for last 730 days
-      end_date = Date.today
-      start_date = end_date - 730.days
-
-      request = Plaid::TransactionsGetRequest.new(
-        access_token: token,
-        start_date: start_date,
-        end_date: end_date
-      )
-      response = client.transactions_get(request)
-      transactions_data = response.transactions
-
-      # Upsert transactions
-      item.accounts.each do |account|
-        account_transactions = transactions_data.select { |t| t.account_id == account.account_id }
-        account_transactions.each do |txn|
-          transaction = account.transactions.find_or_initialize_by(transaction_id: txn.transaction_id).tap do |t|
-            t.name = txn.name
-            t.amount = txn.amount
-            t.date = txn.date
-            t.category = txn.category&.join(', ')
-            t.merchant_name = txn.merchant_name
-            t.pending = txn.pending
-            t.payment_channel = txn.payment_channel
-            t.iso_currency_code = txn.iso_currency_code
-          end
-          transaction.save!
-          
-          # PRD 7.1-7.2: Extract and save enrichment data (only once per transaction)
-          unless transaction.enriched_transaction.present?
-            create_enriched_transaction(transaction, txn)
-          end
-        end
-      end
-
-      # PRD 11: Fetch investment transactions for investment accounts
-      investment_accounts = item.accounts.where(type: 'investment')
-      if investment_accounts.any?
-        inv_request = Plaid::InvestmentsTransactionsGetRequest.new(
-          access_token: token,
-          start_date: start_date,
-          end_date: end_date
-        )
-        inv_response = client.investments_transactions_get(inv_request)
-        investment_transactions_data = inv_response.investment_transactions
-        securities_data = inv_response.securities
-
-        investment_accounts.each do |account|
-          account_inv_transactions = investment_transactions_data.select { |t| t.account_id == account.account_id }
-          account_inv_transactions.each do |inv_txn|
-            security = securities_data.find { |s| s.security_id == inv_txn.security_id }
-            
-            transaction = account.transactions.find_or_initialize_by(transaction_id: inv_txn.investment_transaction_id).tap do |t|
-              # Basic fields
-              t.name = inv_txn.name
-              t.amount = inv_txn.amount
-              t.date = inv_txn.date
-              t.iso_currency_code = inv_txn.iso_currency_code
-              
-              # PRD 11: Investment-specific fields
-              t.fees = inv_txn.fees
-              t.subtype = inv_txn.subtype
-              t.price = inv_txn.price
-              
-              # PRD 11: Dividend type for HNW tax hooks
-              if inv_txn.subtype.present?
-                subtype_down = inv_txn.subtype.to_s.downcase
-                case subtype_down
-                when "qualified dividend"
-                  t.dividend_type = "qualified"
-                when "non-qualified dividend"
-                  t.dividend_type = "non_qualified"
-                when "dividend", "dividend reinvestment"
-                  # Plaid does not specify domestic/foreign here; mark unknown
-                  t.dividend_type = "unknown"
-                else
-                  # do not assign dividend_type for unrelated subtypes
-                end
-                Rails.logger.info "SyncTransactionsJob: Dividend-related subtype detected for HNW tax hook: #{inv_txn.investment_transaction_id} (#{inv_txn.subtype})" if subtype_down.include?("dividend")
-              end
-            end
-            transaction.save!
-            
-            # PRD 11: Compute wash sale risk flag if sell transaction
-            if inv_txn.subtype&.downcase == "sell" && inv_txn.security_id.present?
-              compute_wash_sale_flag(transaction, inv_txn.security_id, inv_txn.date, item)
-            end
-          end
-        end
-
-        # PRD 11: Log API cost for investment transactions
-        PlaidApiCall.log_call(
-          product: 'investments_transactions',
-          endpoint: '/investments/transactions/get',
-          request_id: inv_response.request_id,
-          count: investment_transactions_data.size
-        )
-      end
-
-      # 2. Fetch recurring transactions
-      recurring_request = Plaid::TransactionsRecurringGetRequest.new(access_token: token)
-      recurring_response = client.transactions_recurring_get(recurring_request)
-      inflow_streams = recurring_response.inflow_streams || []
-      outflow_streams = recurring_response.outflow_streams || []
-
-      all_streams = inflow_streams.map { |s| { stream: s, type: 'inflow' } } +
-                    outflow_streams.map { |s| { stream: s, type: 'outflow' } }
-
-      all_streams.each do |stream_data|
-        stream = stream_data[:stream]
-        item.recurring_transactions.find_or_initialize_by(stream_id: stream.stream_id).tap do |rt|
-          rt.description = stream.description
-          rt.average_amount = stream.average_amount&.amount
-          rt.frequency = stream.frequency
-          rt.stream_type = stream_data[:type]
-        end.save!
-      end
-
-      # Mark last successful transactions sync timestamp (PRD 5.5)
+      Rails.logger.info "SyncTransactionsJob complete for Item #{item.id}: #{sync_result}"
+      
+      # Mark last successful transactions sync timestamp
       item.update!(transactions_synced_at: Time.current)
 
-      # PRD 8.2: Log API cost for transactions
-      PlaidApiCall.log_call(
-        product: 'transactions',
-        endpoint: '/transactions/get',
-        request_id: response.request_id,
-        count: transactions_data.size
-      )
-
       SyncLog.create!(plaid_item: item, job_type: "transactions", status: "success", job_id: self.job_id)
-      Rails.logger.info "Synced #{transactions_data.size} transactions & #{all_streams.size} recurring streams for PlaidItem #{item.id}"
     rescue Plaid::ApiError => e
       # PRD 6.1: Detect expired/broken tokens
       error_code = self.class.extract_plaid_error_code(e)
@@ -209,14 +92,108 @@ class SyncTransactionsJob < ApplicationJob
     end
   end
 
-  # Helper method to extract error_code from Plaid::ApiError
-  def self.extract_plaid_error_code(error)
-    return nil unless error.respond_to?(:response_body)
-    parsed = JSON.parse(error.response_body) rescue {}
-    parsed["error_code"]
+  # PRD 11: Sync investment transactions for item
+  def sync_investments(item)
+    request = Plaid::InvestmentsTransactionsGetRequest.new(
+      access_token: item.access_token,
+      start_date: (Date.today - 30.days).strftime('%Y-%m-%d'),
+      end_date: Date.today.strftime('%Y-%m-%d')
+    )
+    
+    response = Rails.application.config.x.plaid_client.investments_transactions_get(request)
+    
+    # Log API call
+    PlaidApiCall.log_call(
+      product: 'investments',
+      endpoint: '/investments/transactions/get',
+      request_id: response.request_id,
+      count: response.investment_transactions.size
+    )
+
+    process_investment_transactions(item, response.investment_transactions, response.securities)
+  rescue Plaid::ApiError => e
+    Rails.logger.error "SyncTransactionsJob: investments_transactions_get failed for Item #{item.id}: #{e.message}"
+    # Non-fatal for the whole job
+  end
+
+  # PRD 12: Sync recurring transactions for item
+  def sync_recurring(item)
+    request = Plaid::TransactionsRecurringGetRequest.new(access_token: item.access_token)
+    response = Rails.application.config.x.plaid_client.transactions_recurring_get(request)
+    
+    # Log API call
+    request_id = begin
+                   response.request_id
+                 rescue
+                   nil
+                 end
+    PlaidApiCall.log_call(
+      product: 'transactions',
+      endpoint: '/transactions/recurring/get',
+      request_id: request_id,
+      count: response.inflow_streams.size + response.outflow_streams.size
+    )
+
+    process_recurring_transactions(item, response.outflow_streams)
+  rescue Plaid::ApiError => e
+    Rails.logger.error "SyncTransactionsJob: transactions_recurring_get failed for Item #{item.id}: #{e.message}"
+    # Non-fatal for the whole job
   end
 
   private
+
+  def process_investment_transactions(item, transactions, securities)
+    transactions.each do |txn|
+      account = item.accounts.find_by(account_id: txn.account_id)
+      next unless account
+
+      transaction = account.transactions.find_or_initialize_by(transaction_id: txn.investment_transaction_id)
+      transaction.assign_attributes(
+        name: txn.name,
+        amount: txn.amount,
+        date: txn.date,
+        subtype: txn.subtype,
+        price: txn.price,
+        fees: txn.fees,
+        iso_currency_code: txn.iso_currency_code,
+        source: "plaid"
+      )
+      
+      # PRD 11: Map dividend subtypes to dividend_type
+      if txn.subtype.to_s.downcase.include?('dividend')
+        transaction.dividend_type = if txn.subtype.to_s.downcase.include?('qualified')
+          :qualified
+        elsif txn.subtype.to_s.downcase.include?('non-qualified')
+          :non_qualified
+        else
+          :unknown
+        end
+      end
+      
+      transaction.save!
+      
+      # PRD 11: Compute wash sale risk for sells
+      if txn.subtype.to_s.downcase == 'sell'
+        compute_wash_sale_flag(transaction, txn.security_id, txn.date, item)
+      end
+    end
+  end
+
+  def process_recurring_transactions(item, outflow_streams)
+    outflow_streams.each do |stream|
+      recurring = item.recurring_transactions.find_or_initialize_by(stream_id: stream.stream_id)
+      recurring.assign_attributes(
+        category: stream.category&.join(', '),
+        description: stream.description,
+        merchant_name: stream.merchant_name,
+        frequency: stream.frequency,
+        last_amount: stream.last_amount&.amount,
+        last_date: stream.last_date,
+        status: stream.status
+      )
+      recurring.save!
+    end
+  end
 
   # PRD 11: Compute wash sale risk flag
   # Detects if a sell transaction may trigger wash sale rule (buy of same security within 30 days)

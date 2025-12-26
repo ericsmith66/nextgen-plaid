@@ -12,6 +12,7 @@ class MissionControlController < ApplicationController
     
     # PRD UI-3: Load sync logs with filters
     @sync_logs = SyncLog.includes(:plaid_item).order(created_at: :desc)
+    @webhook_logs = WebhookLog.includes(:plaid_item).order(created_at: :desc).limit(10)
     
     # Filter by job type if provided
     if params[:job_type].present? && SyncLog::JOB_TYPES.include?(params[:job_type])
@@ -51,11 +52,17 @@ class MissionControlController < ApplicationController
     # Delete in dependency order
     EnrichedTransaction.delete_all
     Transaction.delete_all
+    FixedIncome.delete_all
+    OptionContract.delete_all
     Holding.delete_all
     # PRD 12: Liability model removed - data now on Account model
     RecurringTransaction.delete_all
     Account.delete_all
     SyncLog.delete_all  # Delete sync_logs to avoid foreign key constraint violation
+    WebhookLog.delete_all
+    # PRD 0020: We reset cursors before deleting items (if we were keeping them), 
+    # but since we are deleting them, this is just to be safe if the logic changes.
+    PlaidItem.update_all(sync_cursor: nil)
     PlaidItem.delete_all
     # PlaidApiCall is kept for audit trail and billing history
 
@@ -135,7 +142,8 @@ class MissionControlController < ApplicationController
         country_codes: ["US"],
         language: "en",
         access_token: item.access_token,
-        redirect_uri: ENV["PLAID_REDIRECT_URI"]
+        redirect_uri: ENV["PLAID_REDIRECT_URI"],
+        transactions: Plaid::LinkTokenTransactions.new(days_requested: 730)
       )
       response = client.link_token_create(request)
       render json: { link_token: response.link_token }
@@ -150,7 +158,8 @@ class MissionControlController < ApplicationController
           products: products,
           country_codes: ["US"],
           language: "en",
-          redirect_uri: ENV["PLAID_REDIRECT_URI"]
+          redirect_uri: ENV["PLAID_REDIRECT_URI"],
+          transactions: Plaid::LinkTokenTransactions.new(days_requested: 730)
         )
         response = client.link_token_create(request)
         render json: { link_token: response.link_token }
@@ -232,6 +241,69 @@ class MissionControlController < ApplicationController
       flash[:alert] = "Removal failed: #{e.message}"
       redirect_to mission_control_path
     end
+  end
+
+  # PRD 0030: Fire a Sandbox webhook for testing
+  def fire_webhook
+    item = PlaidItem.find_by(id: params[:id])
+    unless item
+      flash[:alert] = "Item not found"
+      return redirect_to mission_control_path
+    end
+
+    webhook_code = params[:webhook_code] || "SYNC_UPDATES_AVAILABLE"
+    webhook_type = params[:webhook_type] || "TRANSACTIONS"
+    client = Rails.application.config.x.plaid_client
+
+    begin
+      request = Plaid::SandboxItemFireWebhookRequest.new(
+        access_token: item.access_token,
+        webhook_code: webhook_code,
+        webhook_type: webhook_type
+      )
+      client.sandbox_item_fire_webhook(request)
+      
+      flash[:notice] = "Sandbox webhook '#{webhook_code}' fired for #{item.institution_name}. Check logs for receipt."
+    rescue Plaid::ApiError => e
+      error_response = JSON.parse(e.response_body) rescue {}
+      error_code = error_response['error_code']
+      
+      if error_code == "SANDBOX_WEBHOOK_INVALID"
+        flash[:alert] = "Failed to fire webhook: You must first set a Webhook URL for this item. Use 'Update Webhook URL' first."
+      else
+        flash[:alert] = "Plaid Error: #{e.message}"
+      end
+    rescue => e
+      flash[:alert] = "Error: #{e.message}"
+    end
+
+    redirect_to mission_control_path
+  end
+
+  # PRD 0030: Update the Webhook URL for a Sandbox item
+  def update_webhook_url
+    item = PlaidItem.find_by(id: params[:id])
+    unless item
+      flash[:alert] = "Item not found"
+      return redirect_to mission_control_path
+    end
+
+    webhook_url = params[:webhook_url].presence || ENV["PLAID_REDIRECT_URI"]&.gsub("/plaid_oauth/callback", "/plaid/webhook") || "https://api.higroundsolutions.com/plaid/webhook"
+    client = Rails.application.config.x.plaid_client
+
+    begin
+      request = Plaid::ItemWebhookUpdateRequest.new(
+        access_token: item.access_token,
+        webhook: webhook_url
+      )
+      client.item_webhook_update(request)
+      
+      flash[:notice] = "Webhook URL updated to #{webhook_url} for #{item.institution_name}."
+    rescue => e
+      flash[:alert] = "Error updating webhook: #{e.message}"
+    end
+
+    redirect_to mission_control_path
   end
 
   # Returns last 20 sync logs as JSON (owner-only)
