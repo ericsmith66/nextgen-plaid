@@ -41,6 +41,7 @@ group :development, :test do
   gem "pry-rails"
   gem "webmock"
   gem "vcr"
+  gem "climate_control"
 end
 
 group :development do

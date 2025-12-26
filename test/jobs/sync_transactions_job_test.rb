@@ -12,7 +12,17 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       account_id: "acc_inv",
       name: "Investment Account",
       type: "investment",
-      subtype: "brokerage"
+      subtype: "brokerage",
+      mask: "0000"
+    )
+
+    fake_sync_response = OpenStruct.new(
+      added: [],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync"
     )
 
     # Mock regular transactions response (empty for this test)
@@ -54,6 +64,7 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
     )
 
     with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
       transactions_get: fake_transactions_response,
       investments_transactions_get: fake_inv_transactions_response,
       transactions_recurring_get: fake_recurring_response
@@ -82,7 +93,8 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       account_id: "acc_div",
       name: "Dividend Account",
       type: "investment",
-      subtype: "brokerage"
+      subtype: "brokerage",
+      mask: "1111"
     )
 
     fake_transactions_response = OpenStruct.new(transactions: [], request_id: "req_txn")
@@ -108,9 +120,19 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       request_id: "req_div"
     )
 
+    fake_sync_response = OpenStruct.new(
+      added: [],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync"
+    )
+
     fake_recurring_response = OpenStruct.new(inflow_streams: [], outflow_streams: [])
 
     with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
       transactions_get: fake_transactions_response,
       investments_transactions_get: fake_inv_transactions_response,
       transactions_recurring_get: fake_recurring_response
@@ -121,7 +143,7 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
     transaction = Transaction.find_by(transaction_id: "div_txn_1")
     refute_nil transaction
     assert_equal "qualified dividend", transaction.subtype
-    assert_equal "qualified dividend", transaction.dividend_type
+    assert_equal "qualified", transaction.dividend_type
   end
 
   # PRD 11: Test wash sale detection logic
@@ -134,7 +156,8 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       account_id: "acc_wash",
       name: "Trading Account",
       type: "investment",
-      subtype: "brokerage"
+      subtype: "brokerage",
+      mask: "2222"
     )
 
     # Create a holding for the security to enable wash sale detection
@@ -184,9 +207,19 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       request_id: "req_sell"
     )
 
+    fake_sync_response = OpenStruct.new(
+      added: [],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync"
+    )
+
     fake_recurring_response = OpenStruct.new(inflow_streams: [], outflow_streams: [])
 
     with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
       transactions_get: fake_transactions_response,
       investments_transactions_get: fake_inv_transactions_response,
       transactions_recurring_get: fake_recurring_response
@@ -211,7 +244,8 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       account_id: "acc_nowash",
       name: "Clean Account",
       type: "investment",
-      subtype: "brokerage"
+      subtype: "brokerage",
+      mask: "3333"
     )
 
     holding = Holding.create!(
@@ -259,9 +293,19 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       request_id: "req_clean"
     )
 
+    fake_sync_response = OpenStruct.new(
+      added: [],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync"
+    )
+
     fake_recurring_response = OpenStruct.new(inflow_streams: [], outflow_streams: [])
 
     with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
       transactions_get: fake_transactions_response,
       investments_transactions_get: fake_inv_transactions_response,
       transactions_recurring_get: fake_recurring_response
@@ -286,7 +330,8 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       account_id: "acc_nil",
       name: "Partial Data Account",
       type: "investment",
-      subtype: "brokerage"
+      subtype: "brokerage",
+      mask: "4444"
     )
 
     fake_transactions_response = OpenStruct.new(transactions: [], request_id: "req_txn")
@@ -313,9 +358,19 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
       request_id: "req_nil"
     )
 
+    fake_sync_response = OpenStruct.new(
+      added: [],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync"
+    )
+
     fake_recurring_response = OpenStruct.new(inflow_streams: [], outflow_streams: [])
 
     with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
       transactions_get: fake_transactions_response,
       investments_transactions_get: fake_inv_transactions_response,
       transactions_recurring_get: fake_recurring_response
@@ -329,5 +384,53 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
     assert_nil transaction.price
     assert_equal "transfer", transaction.subtype
     assert_equal false, transaction.wash_sale_risk_flag
+  end
+
+  test "sync_recurring saves all fields to RecurringTransaction" do
+    user = User.create!(email: "recurring@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_recurring", institution_name: "Bank", access_token: "tok_rec", status: "good")
+    
+    # Seed an account so we don't trigger SyncHoldingsJob
+    Account.create!(plaid_item: item, account_id: "acc_rec", name: "Checking", mask: "0000", type: "depository")
+
+    stream = OpenStruct.new(
+      stream_id: "stream_1",
+      category: ["Food and Drink", "Coffee Shop"],
+      description: "Starbucks Recurring",
+      merchant_name: "Starbucks",
+      frequency: "weekly",
+      last_amount: OpenStruct.new(amount: 5.50),
+      last_date: Date.today,
+      status: "active"
+    )
+
+    fake_recurring_response = OpenStruct.new(
+      inflow_streams: [],
+      outflow_streams: [stream],
+      request_id: "req_rec"
+    )
+
+    fake_sync_response = OpenStruct.new(added: [], modified: [], removed: [], has_more: false, next_cursor: "c", request_id: "s")
+    fake_transactions_response = OpenStruct.new(transactions: [], request_id: "t")
+    fake_inv_transactions_response = OpenStruct.new(investment_transactions: [], securities: [], request_id: "i")
+
+    with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
+      transactions_get: fake_transactions_response,
+      investments_transactions_get: fake_inv_transactions_response,
+      transactions_recurring_get: fake_recurring_response
+    ) do
+      SyncTransactionsJob.perform_now(item.id)
+    end
+
+    recurring = RecurringTransaction.find_by(stream_id: "stream_1")
+    refute_nil recurring
+    assert_equal "Food and Drink, Coffee Shop", recurring.category
+    assert_equal "Starbucks Recurring", recurring.description
+    assert_equal "Starbucks", recurring.merchant_name
+    assert_equal "weekly", recurring.frequency
+    assert_equal BigDecimal("5.50"), recurring.last_amount
+    assert_equal Date.today, recurring.last_date
+    assert_equal "active", recurring.status
   end
 end

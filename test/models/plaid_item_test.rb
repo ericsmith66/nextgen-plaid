@@ -14,7 +14,7 @@ class PlaidItemTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test_account_123",
-      name: "Test Account",
+      name: "Test Account", mask: "0000",
       type: "investment",
       subtype: "brokerage"
     )
@@ -41,7 +41,7 @@ class PlaidItemTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test_account_456",
-      name: "Test Account",
+      name: "Test Account", mask: "0000",
       type: "investment",
       subtype: "brokerage"
     )
@@ -77,7 +77,7 @@ class PlaidItemTest < ActiveSupport::TestCase
     account = Account.create!(
       plaid_item: plaid_item,
       account_id: "test_account_789",
-      name: "Test Account",
+      name: "Test Account", mask: "0000",
       type: "depository",
       subtype: "checking"
     )

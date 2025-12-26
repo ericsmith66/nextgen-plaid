@@ -12,7 +12,8 @@ class PlaidOauthService
       products: %w[investments transactions liabilities],
       country_codes: ["US"],
       language: "en",
-      redirect_uri: ENV["PLAID_REDIRECT_URI"]
+      redirect_uri: ENV["PLAID_REDIRECT_URI"],
+      transactions: Plaid::LinkTokenTransactions.new(days_requested: 730)
     )
 
     response = @plaid_client.link_token_create(request)
@@ -50,6 +51,11 @@ class PlaidOauthService
     )
 
     if plaid_item.save
+      # PRD 5.1: Sync everything on connect
+      SyncHoldingsJob.perform_later(plaid_item.id)
+      SyncTransactionsJob.perform_later(plaid_item.id)
+      SyncLiabilitiesJob.perform_later(plaid_item.id)
+
       { success: true, plaid_item: plaid_item }
     else
       Rails.logger.error "Failed to save PlaidItem: #{plaid_item.errors.full_messages.join(', ')}"

@@ -38,3 +38,43 @@ Aligns with Rails MVC: New rake/task integrates with existing services (PlaidTra
 Junie, pull from main, create branch `feature/full-fetch-0050-force-full-update-feature`. Ask questions and build a plan before execution. Use Claude Sonnet 4.5 in RubyMine. Commit only green code (run bin/rails test, RuboCop). Push for review. Confirm with Eric before proceeding to next PRD.
 
 Next steps: After merge, ready for 0060-Extend-Holdings-Liabilities-PRD? Any Junie questions to append?
+
+#### Testing Instructions
+
+**1. Automated Tests**
+Run the dedicated test suites for the force sync feature:
+```bash
+# Unit tests for the job logic and rate limiting
+bin/rails test test/jobs/force_plaid_sync_job_test.rb
+
+# Integration tests for the UI controller and authorization
+bin/rails test test/controllers/plaid_refreshes_controller_test.rb
+```
+
+**2. Manual Verification (Rake Tasks)**
+You can trigger force syncs directly from the terminal. Note: The rate limit applies here too.
+```bash
+# Force refresh transactions (triggers /transactions/refresh)
+bin/rails "plaid:force_full_sync[ID, transactions]"
+
+# Force refresh holdings (triggers /investments/refresh)
+bin/rails "plaid:force_full_sync[ID, holdings]"
+
+# Force refresh liabilities (triggers full re-fetch)
+bin/rails "plaid:force_full_sync[ID, liabilities]"
+
+# Backfill history (shorthand for transactions refresh)
+bin/rails "plaid:backfill_history[ID]"
+```
+*(Replace ID with the database ID of a PlaidItem)*
+
+**3. Manual Verification (UI)**
+1.  Go to **Mission Control** (`/mission_control`).
+2.  Locate the **Plaid Items** table.
+3.  In the "Actions" column, you will see a new **Force Refresh** section with buttons: `Txns`, `Holdings`, and `Liab`.
+4.  Click a button. You should see a success flash message and a new job enqueued in your worker logs.
+5.  Try clicking the same button again immediately. You should see a **Rate limit hit** error message.
+
+**4. Logs & Monitoring**
+- Check `log/development.log` for entries like: `ForcePlaidSyncJob: Initiated /transactions/refresh for Item [ID]`.
+- Verify in the **Sync Logs** table that a follow-up sync job (e.g., `SyncTransactionsJob`) was enqueued and completed.
