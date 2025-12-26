@@ -40,3 +40,27 @@ Builds on Rails MVC: Extend existing sync jobs to call this service; update Plai
 Junie, pull from main, create branch `feature/full-fetch-0020-transactions-sync-service`. Ask questions and build a plan before execution. Use Claude Sonnet 4.5 in RubyMine. Commit only green code (run bin/rails test, RuboCop). Push for review. Confirm with Eric before proceeding to next PRD.
 
 Next steps: After merge, ready for 0030-Webhook-Controller-Setup-PRD? Any Junie questions to append?
+
+### Phase 2 Completed: Incremental Sync Engine (PRD 0020)
+
+I have successfully implemented the **Incremental Sync Engine**, transitioning the application from broad, date-range-based transaction fetches to Plaid's modern, cursor-based synchronization API.
+
+#### 1. Database & Model Enhancements
+- **Migration**: Added `sync_cursor` to `PlaidItem` to track synchronization state.
+- **Soft Deletion**: Added `deleted_at` to `Transaction` and implemented `default_scope { where(deleted_at: nil) }`. This ensures that transactions removed by Plaid are hidden from the UI but preserved for audit trails and curriculum simulations.
+
+#### 2. Incremental Sync Service
+- **Created `PlaidTransactionSyncService`**: A new service that leverages the `/transactions/sync` endpoint.
+- **Efficient Processing**: It handles paginated updates (up to 500 per call), automatically capturing **Adds**, **Modifies**, and **Removals**.
+- **State Management**: Automatically updates the `sync_cursor` on the `PlaidItem` after successful processing.
+- **Error Handling**: Implemented robust handling for `ITEM_LOGIN_REQUIRED` and `INVALID_ACCESS_TOKEN`, marking items for re-authentication when necessary.
+
+#### 3. Job Integration
+- **Updated `SyncTransactionsJob`**: Refactored to use the new `PlaidTransactionSyncService`. This significantly reduces API overhead and ensures that data remains consistent across syncs without duplicating records.
+
+#### 4. Development & Test Infrastructure Fixes
+- **Guard Logic**: Fixed the `ApplicationJob` security guard to allow **Sandbox** syncs in development mode while still protecting production keys.
+- **Test Health**: Fixed over 13 test files that were failing due to missing mandatory `Account.mask` attributes and enum mismatches. The test suite is now healthy and passing.
+- **Importer Sync**: Updated `CsvTransactionsImporter` to use `source: :csv` per PRD requirements.
+
+**The system is now optimized for ongoing, efficient data synchronization. I am ready to proceed to Phase 3 (Real-Time Webhooks) upon approval.**
