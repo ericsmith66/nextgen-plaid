@@ -1,18 +1,35 @@
 ### 0110-SAP-Core-Service-Setup-PRD
 
 #### Overview
-This PRD defines the core setup of the SAP (Senior Architect and Product Manager) agent as a Rails service to route AI queries for epic/PRD generation and workflow automation, integrating with the standalone SmartProxy for Grok API proxying. This advances the project's vision of efficient, local-first financial data syncing for HNW families by automating manual copy-paste loops in development workflows, enabling Junie to implement features like Plaid investments/transactions/liabilities more reliably.
+This PRD defines the core setup of the SAP (Senior Architect and Product Manager) agent as a Rails service using a **Unified Command Pattern**. It routes AI queries for generation, QA, and debugging, integrating with the standalone SmartProxy. This merges requirements for QA loops and debugging assistance into a single core service architecture, streamlining AI-assisted development for HNW financial data syncing.
+
+#### Unified Command Pattern
+SAP shall implement a base `SapAgent::Command` class with specialized subclasses:
+- `SapAgent::GenerateCommand`: For PRD/Epic generation (incorporating RAG from 0120).
+- `SapAgent::QaCommand`: For handling Junie's questions and review loops.
+- `SapAgent::DebugCommand`: For log analysis and fix proposals.
 
 #### Log Requirements
-Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards, ensuring all SAP query routings, Grok integrations, and errors are logged with timestamps, anonymized details, and traces in agent_logs/sap.log.
+Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards. All commands must log their lifecycle (start, proxy call, parsing, completion) to `agent_logs/sap.log`.
+
+#### Definition of Done (DoD)
+- **Unified Logic**: All AI interactions must inherit from `SapAgent::Command`.
+- **Testing**: 
+  - RSpec coverage for all command subclasses.
+  - VCR/WebMock for proxy interaction tests.
+- **Error Handling**: Standardized error response format across all commands.
+- **Logging**: Detailed command execution logs with timing and status.
 
 #### Requirements
 **Functional Requirements:**
-- Create a new Rails service class (app/services/sap_agent.rb) that serves as the entrypoint for AI tasks, accepting inputs like query strings (e.g., "Generate PRD for webhook setup") and routing them as JSON payloads to the SmartProxy endpoint (POST to ENV['SMART_PROXY_URL'] + '/proxy/generate').
-- Handle query routing: Format incoming queries into Grok-compatible payloads (e.g., { "query": input, "model": "grok-4", "tools": ["web_search"] if needed for live search }), send via HTTP (using Faraday or Net::HTTP), and parse the returned JSON response for further processing.
-- Integrate with Grok tools: If the response includes tool calls (e.g., for web_search or x_keyword_search), handle them by re-routing sub-calls through the proxy if necessary, merging results back into the final output (e.g., append search snippets to PRD content).
-- Support basic input validation: Ensure queries are non-empty and anonymized (e.g., strip any potential PII); return structured errors (e.g., { "error": "Invalid query" }) if invalid.
-- Enqueue async if needed: Use Solid Queue to wrap long-running Grok calls as jobs (e.g., SapProcessJob.perform_later(query)) for non-blocking operation.
+- Create `app/services/sap_agent/command.rb` (Base) and subclasses for `Generate`, `Qa`, and `Debug`.
+- Entrypoint: `SapAgent.process(query_type, payload)` which dispatches to the appropriate command.
+- Routing: Format JSON payloads for SmartProxy (POST to `ENV['SMART_PROXY_URL']`).
+- QA Loop Handling: Parse Junie's questions/reviews and route for resolution.
+- Debugging Assistance: Pull recent log snippets (e.g., from `log/*.log`), format for AI analysis, and return fix proposals.
+- Integrate with Grok tools: Handle tool calls (web_search, etc.) via proxy-side or SAP-side resolution.
+- Support basic input validation and anonymization.
+- Enqueue async: Use Solid Queue (`SapProcessJob`) to wrap command execution.
 
 **Non-Functional Requirements:**
 - Performance: <1s latency for routing (excluding proxy/API time); scale to 5 concurrent queries via queueing.

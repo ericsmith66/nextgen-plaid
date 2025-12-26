@@ -1,17 +1,31 @@
 ### 0120-RAG-Context-Integration-SAP-PRD
 
 #### Overview
-This PRD defines the integration of a simple RAG (Retrieval-Augmented Generation) mechanism into the SAP agent service to prefix queries with relevant context (daily JSON snapshots + static docs) before routing to Grok via SmartProxy, ensuring accurate, project-aligned AI outputs like PRDs/epics. This supports the project's vision of reliable workflow automation for HNW financial data syncing by providing context-aware generations without complex vector DBs, reducing hallucinations in tasks like feature planning.
+This PRD defines the integration of a simple RAG (Retrieval-Augmented Generation) mechanism into the SAP agent. It includes the creation of a `Snapshot` model for daily data state and a `Context Map` for intelligent document selection, ensuring accurate, project-aligned AI outputs without vector DB bloat.
+
+#### Context Map
+Create `knowledge_base/static_docs/context_map.md` to map query types to relevant documentation.
+- Example: `generate_prd` -> `PRODUCT_REQUIREMENTS.md`, `0_AI_THINKING_CONTEXT.md`.
+- SAP reads this map to select which documents to concatenate.
 
 #### Log Requirements
-Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards, ensuring all RAG context fetches, concatenations, and prefixing operations are logged with timestamps, anonymized snippets, and error traces in agent_logs/sap.log.
+Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md` for logging standards. Log all context selection and concatenation steps in `agent_logs/sap.log`.
+
+#### Definition of Done (DoD)
+- **Model Implementation**: `Snapshot` model created with migration (belongs_to User, jsonb data).
+- **RAG Logic**: SAP selects context based on `Context Map`.
+- **Anonymization**: Snapshots are verified to be anonymized before being sent to the proxy.
+- **Testing**: RSpec for `Snapshot` model and `ContextMap` query logic.
 
 #### Requirements
 **Functional Requirements:**
-- Extend sap_agent.rb to fetch and concatenate RAG context before routing: Pull daily user-specific JSON blobs from FinancialSnapshotJob (e.g., totals, allocations, tasks via a service call or DB query on Snapshot model if exists), plus static docs (e.g., read 0_AI_THINKING_CONTEXT.md and PRODUCT_REQUIREMENTS.md from repo root or knowledge_base/).
-- Prefix queries: Concatenate context as a prompt header (e.g., "Context: [JSON blob + static doc chunks]. Query: [user input]") with a max token limit (e.g., 4K characters; truncate oldest if exceeded); ensure anonymization (e.g., mask real financial values in snapshots).
-- Handle context failures: Fallback to minimal MCP summary if fetch fails (e.g., file not found); log warnings but proceed with query.
-- Support dynamic context: Allow optional per-query context overrides (e.g., via method arg for specific docs); integrate with tools (e.g., append search results from web_search if tool call resolved).
+- **Snapshot Model**: `rails generate model Snapshot user:references data:jsonb`.
+- **Context Map**: Create and maintain `knowledge_base/static_docs/context_map.md`.
+- **Lightweight RAG**: SAP reads `Context Map`, selects relevant static docs, and fetches the latest `Snapshot` for the user.
+- Prefix queries: Concatenate selected context as a prompt header. Max 4K characters; truncate oldest if exceeded.
+- Handle context failures: Fallback to minimal prefix if `Snapshot` or docs are missing.
+- Anonymization: Mask PII and real financial values (e.g., account numbers, exact balances) in snapshots.
+- Dynamic Context: Support overrides via query parameters.
 
 **Non-Functional Requirements:**
 - Performance: <200ms for context fetch/concat (file reads/DB queries); keep total prompt under 8K chars to avoid API limits.
