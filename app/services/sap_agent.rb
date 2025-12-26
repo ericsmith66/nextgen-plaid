@@ -1,5 +1,20 @@
-class SapAgent
-  def decompose(task_id, user_id, query)
+module SapAgent
+  COMMAND_MAPPING = {
+    'generate' => SapAgent::GenerateCommand,
+    'qa' => SapAgent::QaCommand,
+    'debug' => SapAgent::DebugCommand
+  }.freeze
+
+  def self.process(query_type, payload)
+    command_class = COMMAND_MAPPING[query_type.to_s]
+    raise "Unknown query type: #{query_type}" unless command_class
+
+    command_class.new(payload).execute
+  end
+
+  # This needs to be a class method or we need a way to call it.
+  # For backward compatibility, maybe we keep it as a module method.
+  def self.decompose(task_id, user_id, query)
     AgentLog.create!(
       task_id: task_id,
       user_id: user_id,
@@ -8,15 +23,8 @@ class SapAgent
       details: "Starting decomposition for query: #{query}"
     )
 
-    prompt = <<~PROMPT
-      You are the SAP Agent (Senior Architect and Product Manager).
-      Decompose the following human query into a structured Markdown PRD for a Rails 8 developer.
-      Query: #{query}
-      
-      Your output must be ONLY the Markdown PRD.
-    PROMPT
-
-    prd_content = AiFinancialAdvisor.ask(prompt)
+    result = process('generate', { query: query })
+    prd_content = result[:response]
 
     AgentLog.create!(
       task_id: task_id,
