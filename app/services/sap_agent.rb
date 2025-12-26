@@ -16,7 +16,7 @@ class SapAgent
       Your output must be ONLY the Markdown PRD.
     PROMPT
 
-    prd_content = AiFinancialAdvisor.ask(prompt, model: 'llama3.1:70b')
+    prd_content = AiFinancialAdvisor.ask(prompt)
 
     AgentLog.create!(
       task_id: task_id,
