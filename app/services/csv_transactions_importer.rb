@@ -192,7 +192,7 @@ class CsvTransactionsImporter
       cost_usd: cost_usd,
       income_usd: income_usd,
       tran_code: tran_code,
-      source: Transaction.sources[:manual],
+      source: "csv",
       import_timestamp: @now,
       source_institution: "jpmc",
       dedupe_fingerprint: dedupe_fingerprint,

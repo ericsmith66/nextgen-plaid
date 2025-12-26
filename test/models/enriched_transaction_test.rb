@@ -4,7 +4,7 @@ class EnrichedTransactionTest < ActiveSupport::TestCase
   setup do
     user = User.create!(email: "test@example.com", password: "password123")
     item = PlaidItem.create!(user: user, item_id: "test_item", institution_name: "Test Bank", access_token: "test_token")
-    @account = Account.create!(plaid_item: item, account_id: "test_acct_123", name: "Test Account", type: "depository")
+    @account = Account.create!(plaid_item: item, account_id: "test_acct_123", name: "Test Account", type: "depository", mask: "0000")
     @transaction = Transaction.create!(
       account: @account,
       transaction_id: "test_txn_123",

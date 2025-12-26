@@ -133,6 +133,20 @@ ENCRYPTION_KEY=64_char_hex_string_here   # ← generate with `openssl rand -hex 
 OWNER_EMAIL=your.owner@example.com       # optional; defaults to ericsmith66@me.com
 
 
+### 6. Webhook Setup (Optional but Recommended)
+To enable real-time updates, you must expose your local server to the internet so Plaid can send webhooks.
+
+**Development (ngrok)**:
+1.  Install ngrok: `brew install ngrok`
+2.  Start ngrok: `ngrok http 3000`
+3.  Copy the Forwarding URL (e.g., `https://random-id.ngrok-free.app`).
+4.  In the Plaid Dashboard, set the Webhook URL for your Item to: `https://your-ngrok-url.app/plaid/webhook`.
+
+**Production (Cloudflare Tunnel)**:
+1.  Set up a Cloudflare Tunnel pointing to your server.
+2.  Set `PLAID_REDIRECT_URI` to `https://api.higroundsolutions.com/plaid_oauth/callback`.
+3.  Plaid will automatically send webhooks to `https://api.higroundsolutions.com/plaid/webhook` if configured during Item creation.
+
 ### `TODO.md` (copy-paste)
 
 ```markdown

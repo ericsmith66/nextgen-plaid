@@ -12,7 +12,8 @@ class Account < ApplicationRecord
 
   validates :account_id, presence: true
   validates :mask, presence: true
-  validates :account_id, uniqueness: { scope: [ :plaid_item_id, :source ] }
+  # PRD 5: Uniqueness handled by DB unique index [plaid_item_id, account_id]
+  # validates :account_id, uniqueness: { scope: [ :plaid_item_id, :source ] }
 
   # PRD 9: Check if any sector exceeds 30% concentration (diversification risk)
   def diversification_risk?

@@ -11,15 +11,18 @@ class Transaction < ApplicationRecord
   # string-backed enum
   # values: "plaid", "manual" (default)
   attribute :source, :string
-  enum :source, { plaid: "plaid", manual: "manual" }
+  enum :source, { plaid: "plaid", manual: "manual", csv: "csv" }
+
+  default_scope { where(deleted_at: nil) }
 
   # CSV imports often do not have a Plaid transaction_id
   # Require transaction_id only for Plaid-sourced rows
   validates :transaction_id, presence: true, if: -> { source == "plaid" }
-  validates :transaction_id, uniqueness: { scope: :account_id }, allow_nil: true
+  # PRD 5: Uniqueness handled by DB unique index [account_id, transaction_id]
+  # validates :transaction_id, uniqueness: { scope: :account_id }, allow_nil: true
 
   # Deduplication for CSV/manual sources (fingerprint computed in importer)
-  validates :dedupe_fingerprint, uniqueness: { scope: :account_id }, allow_nil: true
+  # validates :dedupe_fingerprint, uniqueness: { scope: :account_id }, allow_nil: true
 
   # Basic data integrity for imported transactions
   validates :date, presence: true, if: -> { source == "manual" }
