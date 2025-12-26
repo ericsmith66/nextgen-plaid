@@ -8,7 +8,7 @@ Junie read <project root>/knowledge_base/prds/prds-junie-log/junie-log-requireme
 
 #### Requirements
 **Functional:**
-- Create rake task lib/tasks/plaid.rake: Define plaid:force_full_sync[item_id,product] (product: 'transactions', 'holdings', 'liabilities'); fetch PlaidItem by id, call /transactions/refresh or equivalent (for transactions/holdings; re-sync full for liabilities); then enqueue standard sync service.
+- Create rake task lib/tasks/plaid.rake: Define `plaid:force_full_sync[item_id,product]` (product: 'transactions', 'holdings', 'liabilities') and `plaid:backfill_history[item_id]` (triggers /transactions/refresh for 730-day history). Fetch PlaidItem by id, call /transactions/refresh or equivalent (for transactions/holdings; re-sync full for liabilities); then enqueue standard sync service.
 - UI addition (optional, admin-only): In Mission Control dashboard (app/views/mission_control/index.html.erb or ViewComponent), add button per PlaidItem/product; POST to new controller action (e.g., PlaidRefreshesController#create) to trigger rake equivalent async via job.
 - Safeguards: Rate limit (e.g., max 1/item/day, check last_force_at on PlaidItem); notify on success/failure (e.g., flash or email).
 - Extend PlaidItem: Migration for last_force_at (datetime).
@@ -16,7 +16,7 @@ Junie read <project root>/knowledge_base/prds/prds-junie-log/junie-log-requireme
 **Non-Functional:**
 - Performance: Task completes <10s per item; UI responsive <1s.
 - Security: Devise admin auth for UI/rake; RLS on PlaidItem access.
-- Rails Guidance: rails g task plaid force_full_sync; for UI, use Tailwind/DaisyUI button (e.g., btn-primary); jobify if UI-triggered (ForcePlaidSyncJob.perform_later).
+- Rails Guidance: rails g task plaid force_full_sync; for UI, use Tailwind/DaisyUI button (e.g., btn-primary); use Solid Queue for jobs (ForcePlaidSyncJob.perform_later).
 
 #### Architectural Context
 Aligns with Rails MVC: New rake/task integrates with existing services (PlaidTransactionSyncService, etc.); optional controller for UI (app/controllers/plaid_refreshes_controller.rb, route post '/plaid_items/:id/refresh'). Update PlaidItem model. Enhances data for FinancialSnapshotJob JSON blobs + static docs (0_AI_THINKING_CONTEXT.md, PRODUCT_REQUIREMENTS.md) in local Ollama prompts. Supports all institutions; no cloud dependency.

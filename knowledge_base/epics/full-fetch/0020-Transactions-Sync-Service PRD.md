@@ -9,7 +9,7 @@ Junie read <project root>/knowledge_base/prds/prds-junie-log/junie-log-requireme
 #### Requirements
 **Functional:**
 - Create app/services/plaid_transaction_sync_service.rb: Initialize with PlaidItem; call client.transactions_sync with access_token and stored cursor (or nil for initial); parse response (added/modified/removed transactions) and upsert to Transaction model using transaction_id uniqueness.
-- Model updates: Add migration for PlaidItem.sync_cursor (string, nullable); handle removals by soft-delete (add deleted_at datetime to Transaction if not present) or mark as removed.
+- Model updates: Add migration for PlaidItem.sync_cursor (string, nullable); handle removals by soft-deletion (add `deleted_at` datetime to Transaction and implement `default_scope { where(deleted_at: nil) }`).
 - Logic: For initial call (no cursor), fetch full history; subsequent use 90-day default via cursor; return new cursor for storage post-sync.
 - Error handling: Rescue Plaid::ApiError (e.g., ITEM_LOGIN_REQUIRED → enqueue re-auth notification); retry on transient errors (3x with backoff).
 
