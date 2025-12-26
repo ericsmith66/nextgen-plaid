@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_26_163255) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_26_173539) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -175,6 +175,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_26_163255) do
     t.string "plaid_env"
     t.string "sync_cursor"
     t.datetime "last_webhook_at"
+    t.datetime "last_force_at"
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"
