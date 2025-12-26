@@ -51,14 +51,25 @@
                   <td role="cell" class="px-4 py-3 text-sm">
                     <div class="flex flex-col gap-4">
                       <!-- Standard Action -->
-                      <%= button_to "Remove Item", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "btn btn-error btn-xs w-full" %>
-                      
-                      <% if item.status == 'needs_reauth' %>
-                        <button type="button" onclick="relinkLiabilities(<%= item.id %>)" class="btn btn-info btn-xs w-full">
-                          Grant Liab Access
-                        </button>
-                      <% end %>
+                      <div class="flex gap-1">
+                        <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "btn btn-error btn-xs flex-1" %>
+                        <% if item.status == 'needs_reauth' %>
+                          <button type="button" onclick="relinkLiabilities(<%= item.id %>)" class="btn btn-info btn-xs flex-1">
+                            Re-auth Liab
+                          </button>
+                        <% end %>
+                      </div>
 
+                      <!-- PRD 0050: Force Refresh Buttons -->
+                      <div class="border-t border-base-300 pt-2 space-y-2">
+                        <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Force Refresh</div>
+                        <div class="flex flex-wrap gap-1">
+                          <%= button_to "Txns", plaid_item_refresh_path(item, product: 'transactions'), method: :post, class: "btn btn-primary btn-xs", title: "Force /transactions/refresh" %>
+                          <%= button_to "Holdings", plaid_item_refresh_path(item, product: 'holdings'), method: :post, class: "btn btn-primary btn-xs", title: "Force /investments/refresh" %>
+                          <%= button_to "Liab", plaid_item_refresh_path(item, product: 'liabilities'), method: :post, class: "btn btn-primary btn-xs", title: "Force full liabilities sync" %>
+                        </div>
+                      </div>
+                      
                       <!-- Webhook Testing Tools (Visible in all envs for now) -->
                       <div class="border-t border-base-300 pt-2 space-y-2">
                         <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Sandbox Webhooks</div>

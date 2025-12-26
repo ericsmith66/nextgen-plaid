@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  post "/plaid_items/:id/refresh", to: "plaid_refreshes#create", as: :plaid_item_refresh
   namespace :agents do
     get "monitor", to: "monitor#index"
   end
