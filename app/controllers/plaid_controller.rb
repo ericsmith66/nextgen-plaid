@@ -9,11 +9,14 @@ class PlaidController < ApplicationController
         products: ["investments", "transactions", "liabilities"],
         country_codes: ["US"],
         language: "en",
-        redirect_uri: ENV["PLAID_REDIRECT_URI"]
+        redirect_uri: ENV["PLAID_REDIRECT_URI"],
+        transactions: Plaid::LinkTokenTransactions.new(days_requested: 730)
       )
 
       client = Rails.application.config.x.plaid_client
       response = client.link_token_create(request)
+      
+      Rails.logger.info "Link token created for user_id: #{current_user.id} with days_requested: 730"
       render json: { link_token: response.link_token }
     rescue Plaid::ApiError => e
       Rails.logger.error "Plaid Link Token Error: #{e.message} | Body: #{e.response_body}"

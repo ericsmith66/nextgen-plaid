@@ -10,7 +10,12 @@
 
   <!-- Plaid Items -->
   <div>
-    <h3 class="text-2xl font-bold text-primary-400 mb-4">Plaid Items (<%= @plaid_items.count %>)</h3>
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-2xl font-bold text-primary-400">Plaid Items (<%= @plaid_items.count %>)</h3>
+      <div class="text-xs text-slate-500 font-mono">
+        RAILS_ENV: <%= Rails.env %> | PLAID_ENV: <%= ENV["PLAID_ENV"] %>
+      </div>
+    </div>
     <% if @plaid_items.any? %>
       <div class="rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
@@ -22,6 +27,7 @@
                 <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Accounts</th>
                 <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Holdings</th>
                 <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Last Synced</th>
+                <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Last Webhook</th>
                 <th scope="col" role="columnheader" aria-sort="none" class="px-4 py-3 text-left text-sm font-semibold">Actions</th>
               </tr>
             </thead>
@@ -39,13 +45,30 @@
                   <td role="cell" class="px-4 py-3 text-sm text-gray-300">
                     <%= item.holdings_synced_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
                   </td>
-                  <td role="cell" class="px-4 py-3 text-sm space-x-2">
-                    <%= button_to "Remove", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded transition focus-visible:ring focus-visible:ring-primary" %>
-                    <% if item.status == 'needs_reauth' %>
-                      <button type="button" onclick="relinkLiabilities(<%= item.id %>)" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded transition focus-visible:ring focus-visible:ring-primary">
-                        Grant Liabilities Access
-                      </button>
-                    <% end %>
+                  <td role="cell" class="px-4 py-3 text-sm text-gray-300">
+                    <%= item.last_webhook_at&.strftime("%Y-%m-%d %H:%M") || "Never" %>
+                  </td>
+                  <td role="cell" class="px-4 py-3 text-sm">
+                    <div class="flex flex-col gap-4">
+                      <!-- Standard Action -->
+                      <%= button_to "Remove Item", mission_control_remove_item_path(item), method: :post, data: { confirm: "Remove this item and all associated data?" }, class: "btn btn-error btn-xs w-full" %>
+                      
+                      <% if item.status == 'needs_reauth' %>
+                        <button type="button" onclick="relinkLiabilities(<%= item.id %>)" class="btn btn-info btn-xs w-full">
+                          Grant Liab Access
+                        </button>
+                      <% end %>
+
+                      <!-- Webhook Testing Tools (Visible in all envs for now) -->
+                      <div class="border-t border-base-300 pt-2 space-y-2">
+                        <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Sandbox Webhooks</div>
+                        <div class="flex flex-wrap gap-1">
+                          <%= button_to "Fire Sync", mission_control_fire_webhook_path(item), params: { webhook_code: 'SYNC_UPDATES_AVAILABLE', webhook_type: 'TRANSACTIONS' }, method: :post, class: "btn btn-warning btn-xs", title: "Triggers SYNC_UPDATES_AVAILABLE" %>
+                          <%= button_to "Fire Defs", mission_control_fire_webhook_path(item), params: { webhook_code: 'DEFAULT_UPDATE', webhook_type: 'HOLDINGS' }, method: :post, class: "btn btn-warning btn-xs", title: "Triggers DEFAULT_UPDATE" %>
+                          <%= button_to "Set URL", mission_control_update_webhook_url_path(item), method: :post, class: "btn btn-ghost btn-xs border-base-300", title: "Sets Plaid Webhook URL" %>
+                        </div>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               <% end %>
@@ -148,7 +171,28 @@
 
   <!-- Sync Logs (PRD UI-3) -->
   <div>
-    <h3 class="text-2xl font-bold text-primary-400 mb-4">Sync Logs (<%= @sync_logs.total_count %>)</h3>
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-2xl font-bold text-primary-400">Sync Logs (<%= @sync_logs.total_count %>)</h3>
+      <% if @webhook_logs.any? %>
+        <div class="dropdown dropdown-end">
+          <label tabindex="0" class="btn btn-ghost btn-xs text-slate-500 underline">Recent Webhooks</label>
+          <div tabindex="0" class="dropdown-content z-[1] menu p-4 shadow bg-base-300 rounded-box w-96 border border-base-100">
+            <h4 class="font-bold mb-2 text-sm">Last 10 Webhooks</h4>
+            <ul class="space-y-2 text-[11px]">
+              <% @webhook_logs.each do |w| %>
+                <li class="border-b border-base-100 pb-1 list-none">
+                  <div class="flex justify-between">
+                    <span class="font-mono text-primary-300"><%= w.event_type %></span>
+                    <span class="<%= w.status == 'success' ? 'text-green-400' : 'text-red-400' %> uppercase font-bold"><%= w.status %></span>
+                  </div>
+                  <div class="text-slate-400"><%= w.created_at.strftime("%H:%M:%S") %> | <%= w.plaid_item&.institution_name %></div>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      <% end %>
+    </div>
 
     <!-- Filters -->
     <div class="mb-6 bg-slate-800 p-4 rounded-lg border border-slate-700">

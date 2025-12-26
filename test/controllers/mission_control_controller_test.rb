@@ -53,11 +53,13 @@ class MissionControlControllerTest < ActionDispatch::IntegrationTest
     item = PlaidItem.create!(user: @owner, item_id: "it_nuke", institution_name: "Bank", access_token: "tok", status: "good")
     acc  = item.accounts.create!(account_id: "acc_nuke", mask: "0000")
     acc.holdings.create!(security_id: "sec_nuke")
+    WebhookLog.create!(plaid_item: item, event_type: "TRANSACTIONS:INITIAL_UPDATE", status: "processed")
 
     assert_difference [
       'PlaidItem.count',
       'Account.count',
-      'Holding.count'
+      'Holding.count',
+      'WebhookLog.count'
     ], -1 do
       post mission_control_nuke_path
       assert_redirected_to mission_control_path

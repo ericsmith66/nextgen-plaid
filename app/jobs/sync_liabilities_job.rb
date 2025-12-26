@@ -27,7 +27,7 @@ class SyncLiabilitiesJob < ApplicationJob
     return unless item
 
     # PRD PROD-TEST-01: Guard production API calls
-    return if !production_plaid? && skip_non_prod!(item, "liabilities")
+    return if should_skip_sync? && skip_non_prod!(item, "liabilities")
 
     # PRD 6.6: Skip syncing items with failed status
     if item.status == 'failed'

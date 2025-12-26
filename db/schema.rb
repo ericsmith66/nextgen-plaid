@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_26_163255) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -173,6 +173,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
     t.integer "reauth_attempts", default: 0
     t.string "institution_id"
     t.string "plaid_env"
+    t.string "sync_cursor"
+    t.datetime "last_webhook_at"
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_and_item", unique: true
     t.index ["user_id", "item_id"], name: "index_plaid_items_on_user_id_and_item_id", unique: true
     t.index ["user_id"], name: "index_plaid_items_on_user_id"
@@ -187,6 +189,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
     t.string "stream_type"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "category"
+    t.string "merchant_name"
+    t.decimal "last_amount", precision: 14, scale: 4
+    t.date "last_date"
+    t.string "status"
     t.index ["plaid_item_id", "stream_id"], name: "index_recurring_transactions_on_plaid_item_id_and_stream_id", unique: true
     t.index ["plaid_item_id"], name: "index_recurring_transactions_on_plaid_item_id"
   end
@@ -264,12 +271,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
     t.bigint "merchant_id"
     t.bigint "personal_finance_category_id"
     t.bigint "transaction_code_id"
+    t.datetime "deleted_at"
     t.index ["account_id", "dedupe_fingerprint"], name: "index_txn_on_account_and_fingerprint", unique: true, where: "(dedupe_fingerprint IS NOT NULL)"
     t.index ["account_id", "dedupe_key"], name: "index_transactions_on_account_and_dedupe", unique: true
     t.index ["account_id", "transaction_id"], name: "index_transactions_on_account_id_and_transaction_id", unique: true
     t.index ["account_id", "transaction_id"], name: "index_txn_on_account_and_transaction_id", unique: true, where: "(transaction_id IS NOT NULL)"
     t.index ["account_id"], name: "index_transactions_on_account_id"
     t.index ["counterparties"], name: "index_transactions_on_counterparties_gin", using: :gin
+    t.index ["deleted_at"], name: "index_transactions_on_deleted_at"
     t.index ["location"], name: "index_transactions_on_location_gin", opclass: :jsonb_path_ops, using: :gin
     t.index ["merchant_id"], name: "index_transactions_on_merchant_id"
     t.index ["personal_finance_category_id"], name: "index_transactions_on_personal_finance_category_id"
@@ -291,6 +300,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  create_table "webhook_logs", force: :cascade do |t|
+    t.jsonb "payload"
+    t.string "event_type"
+    t.string "status"
+    t.bigint "plaid_item_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["plaid_item_id"], name: "index_webhook_logs_on_plaid_item_id"
+  end
+
   add_foreign_key "agent_logs", "users"
   add_foreign_key "enriched_transactions", "transactions"
   add_foreign_key "fixed_incomes", "holdings"
@@ -303,4 +322,5 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_24_195748) do
   add_foreign_key "transactions", "merchants"
   add_foreign_key "transactions", "personal_finance_categories"
   add_foreign_key "transactions", "transaction_codes"
+  add_foreign_key "webhook_logs", "plaid_items"
 end
