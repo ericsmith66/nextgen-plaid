@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_26_173539) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_26_175458) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -35,6 +35,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_26_173539) do
     t.integer "source", default: 0
     t.datetime "import_timestamp"
     t.string "source_institution"
+    t.jsonb "liability_details"
     t.index ["is_overdue"], name: "index_accounts_on_is_overdue"
     t.index ["plaid_item_id", "account_id"], name: "index_accounts_on_item_and_account", unique: true
     t.index ["plaid_item_id"], name: "index_accounts_on_plaid_item_id"
