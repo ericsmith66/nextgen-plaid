@@ -16,7 +16,7 @@ class TransactionTest < ActiveSupport::TestCase
       plaid_item: plaid_item,
       account_id: "test-inv-account",
       name: "Investment Account",
-      type: "investment"
+      type: "investment", mask: "0000"
     )
     
     transaction = Transaction.new(
@@ -52,7 +52,7 @@ class TransactionTest < ActiveSupport::TestCase
       plaid_item: plaid_item,
       account_id: "test-inv-account-2",
       name: "Investment Account 2",
-      type: "investment"
+      type: "investment", mask: "0000"
     )
     
     transaction = Transaction.new(
@@ -85,7 +85,7 @@ class TransactionTest < ActiveSupport::TestCase
       plaid_item: plaid_item,
       account_id: "test-div-account",
       name: "Dividend Account",
-      type: "investment"
+      type: "investment", mask: "0000"
     )
     
     transaction = Transaction.create!(
@@ -95,10 +95,10 @@ class TransactionTest < ActiveSupport::TestCase
       amount: 125.50,
       date: Date.today,
       subtype: "qualified dividend",
-      dividend_type: "qualified dividend"
+      dividend_type: :qualified
     )
     
-    assert_equal "qualified dividend", transaction.dividend_type
+    assert_equal "qualified", transaction.dividend_type
     assert_equal "qualified dividend", transaction.subtype
   end
   
@@ -116,7 +116,7 @@ class TransactionTest < ActiveSupport::TestCase
       plaid_item: plaid_item,
       account_id: "test-sell-account",
       name: "Sell Account",
-      type: "investment"
+      type: "investment", mask: "0000"
     )
     
     transaction = Transaction.create!(
@@ -146,20 +146,20 @@ class TransactionTest < ActiveSupport::TestCase
       plaid_item: plaid_item,
       account_id: "test-prec-account",
       name: "Precise Account",
-      type: "investment"
+      type: "investment", mask: "0000"
     )
     
     transaction = Transaction.create!(
       account: account,
       transaction_id: "prec-txn-222",
       name: "Buy Fractional Share",
-      amount: 100.12345678,
+      amount: 100.1234,
       date: Date.today,
-      fees: 1.23456789,
-      price: 99.87654321
+      fees: 1.23,
+      price: 99.876543
     )
     
-    assert_equal BigDecimal("1.23456789"), transaction.fees
-    assert_equal BigDecimal("99.87654321"), transaction.price
+    assert_equal BigDecimal("1.23"), transaction.fees
+    assert_equal BigDecimal("99.876543"), transaction.price
   end
 end

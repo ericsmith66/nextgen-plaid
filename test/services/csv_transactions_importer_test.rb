@@ -46,8 +46,8 @@ class CsvTransactionsImporterTest < ActiveSupport::TestCase
     CsvTransactionsImporter.call(file_path: @csv_path.to_s, user_id: @user.id)
     assert_equal before, Transaction.count, "re-import should not create duplicates"
 
-    # dedupe_key present
-    assert t1.dedupe_key.present?
+    # dedupe_fingerprint present
+    assert t1.dedupe_fingerprint.present?
 
     # Result summary contains counts
     assert result.total_rows > 0

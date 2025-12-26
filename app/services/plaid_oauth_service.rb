@@ -12,7 +12,8 @@ class PlaidOauthService
       products: %w[investments transactions liabilities],
       country_codes: ["US"],
       language: "en",
-      redirect_uri: ENV["PLAID_REDIRECT_URI"]
+      redirect_uri: ENV["PLAID_REDIRECT_URI"],
+      transactions: Plaid::LinkTokenTransactions.new(days_requested: 730)
     )
 
     response = @plaid_client.link_token_create(request)
