@@ -62,6 +62,7 @@ class PlaidWebhookController < ApplicationController
     when "LIABILITIES"
       case code
       when "DEFAULT_UPDATE"
+        # PRD 0060: Enqueue liabilities sync on DEFAULT_UPDATE for liabilities accounts
         SyncLiabilitiesJob.perform_later(item.id)
       end
     when "ITEM"

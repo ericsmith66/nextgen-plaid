@@ -15,7 +15,7 @@ class PlaidLiabilitiesServiceTest < ActiveSupport::TestCase
     @service = PlaidLiabilitiesService.new(@plaid_item)
   end
 
-  test "fetch_and_sync_liabilities updates account with credit card data" do
+  test "fetch_and_sync_liabilities updates account with credit card data and full details" do
     # Mock Plaid response
     mock_response = mock_liabilities_response_with_credit_card
 
@@ -29,6 +29,10 @@ class PlaidLiabilitiesServiceTest < ActiveSupport::TestCase
         assert_equal Date.parse("2025-01-15"), @account.next_payment_due_date
         assert_equal false, @account.is_overdue
         assert_equal true, @account.debt_risk_flag, "debt_risk_flag should be true for APR 19.99% > 5%"
+        
+        # PRD 0060: Verify liability_details storage
+        assert @account.liability_details.present?
+        assert_equal 19.99, @account.liability_details["credit"]["aprs"].first["apr_percentage"]
       end
     end
   end

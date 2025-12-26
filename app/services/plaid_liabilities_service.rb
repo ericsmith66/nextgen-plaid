@@ -60,8 +60,51 @@ class PlaidLiabilitiesService
       end
     end
 
+    # PRD 0060: Store full liability details in JSONB
+    store_liability_details(account, response)
+
     # Compute debt_risk_flag after updating liability fields
     compute_debt_risk_flag(account)
+  end
+
+  def store_liability_details(account, response)
+    details = {}
+    
+    if response.liabilities.credit
+      cc = response.liabilities.credit.find { |l| l.account_id == account.account_id }
+      if cc
+        details[:credit] = cc.respond_to?(:to_hash) ? cc.to_hash : format_openstruct(cc)
+      end
+    end
+
+    if response.liabilities.student
+      sl = response.liabilities.student.find { |l| l.account_id == account.account_id }
+      if sl
+        details[:student] = sl.respond_to?(:to_hash) ? sl.to_hash : format_openstruct(sl)
+      end
+    end
+
+    if response.liabilities.mortgage
+      m = response.liabilities.mortgage.find { |l| l.account_id == account.account_id }
+      if m
+        details[:mortgage] = m.respond_to?(:to_hash) ? m.to_hash : format_openstruct(m)
+      end
+    end
+
+    account.update!(liability_details: details) if details.any?
+  end
+
+  def format_openstruct(os)
+    hash = os.marshal_dump
+    hash.transform_values do |v|
+      if v.is_a?(OpenStruct)
+        format_openstruct(v)
+      elsif v.is_a?(Array)
+        v.map { |i| i.is_a?(OpenStruct) ? format_openstruct(i) : i }
+      else
+        v
+      end
+    end
   end
 
   def update_account_from_credit_card(account, credit_card)
