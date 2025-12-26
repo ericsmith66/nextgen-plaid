@@ -18,10 +18,11 @@ class Transaction < ApplicationRecord
   # CSV imports often do not have a Plaid transaction_id
   # Require transaction_id only for Plaid-sourced rows
   validates :transaction_id, presence: true, if: -> { source == "plaid" }
-  validates :transaction_id, uniqueness: { scope: :account_id }, allow_nil: true
+  # PRD 5: Uniqueness handled by DB unique index [account_id, transaction_id]
+  # validates :transaction_id, uniqueness: { scope: :account_id }, allow_nil: true
 
   # Deduplication for CSV/manual sources (fingerprint computed in importer)
-  validates :dedupe_fingerprint, uniqueness: { scope: :account_id }, allow_nil: true
+  # validates :dedupe_fingerprint, uniqueness: { scope: :account_id }, allow_nil: true
 
   # Basic data integrity for imported transactions
   validates :date, presence: true, if: -> { source == "manual" }
