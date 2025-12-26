@@ -1,7 +1,7 @@
 ### PRD: 0040-Daily-Sync-Fallback-Job-PRD
 
 #### Overview
-Implement a daily fallback sync job using Sidekiq cron (via whenever gem) to check PlaidItem.last_webhook_at and trigger 90-day transaction incrementals or full holdings/liabilities refreshes if no webhook received in the last 24 hours, ensuring data freshness without relying solely on webhooks for curriculum reliability.
+Implement a daily fallback sync job using Solid Queue recurring jobs to check PlaidItem.last_webhook_at and trigger 90-day transaction incrementals or full holdings/liabilities refreshes if no webhook received in the last 24 hours, ensuring data freshness without relying solely on webhooks for curriculum reliability.
 
 #### Log Requirements
 Junie read <project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md
@@ -10,13 +10,13 @@ Junie read <project root>/knowledge_base/prds/prds-junie-log/junie-log-requireme
 **Functional:**
 - Add migration for PlaidItem.last_webhook_at (datetime, nullable) if not present from previous PRDs.
 - Create app/jobs/daily_plaid_sync_job.rb: Loop over PlaidItems; if last_webhook_at < 24.hours.ago or nil, enqueue product-specific syncs (e.g., PlaidTransactionSyncService for transactions with 90-day cursor, full /holdings/get and /liabilities/get for others).
-- Schedule via whenever: Add config/schedule.rb entry for daily run (e.g., every :day, at: '2:00 am'); integrate with Sidekiq/Solid Queue for async execution.
+- Schedule via Solid Queue recurring: Add `config/recurring.yml` entry for daily run at 2:00 AM (e.g., `daily_plaid_sync_job: { class: "DailyPlaidSyncJob", schedule: "at 2am every day" }`).
 - Handle errors: Retry failed syncs (3x); log skips if ITEM_LOGIN_REQUIRED (enqueue re-auth flow).
 
 **Non-Functional:**
 - Performance: Process 10 Items <30s; throttle API calls (e.g., sleep 1s between).
 - Security: Respect RLS in queries (e.g., PlaidItem.joins(:user).where(users: { family_id: current_family.id }) if multi-family); no unencrypted data.
-- Rails Guidance: Use whenever gem (add to Gemfile); rails g job daily_plaid_sync; test cron syntax with whenever --update-crontab in dev.
+- Rails Guidance: Use Solid Queue recurring (config/recurring.yml); rails g job daily_plaid_sync; test in dev.
 
 #### Architectural Context
 Aligns with Rails MVC: Job calls existing services (PlaidTransactionSyncService, holdings/liabilities equivalents); update PlaidItem model. Enhances daily FinancialSnapshotJob by ensuring fresh data for JSON blobs + static docs (0_AI_THINKING_CONTEXT.md, PRODUCT_REQUIREMENTS.md) in AI prompts via local Ollama. Supports all institutions; no schema breaks.

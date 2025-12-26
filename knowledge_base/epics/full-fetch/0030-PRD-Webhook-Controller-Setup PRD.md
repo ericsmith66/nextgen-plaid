@@ -10,12 +10,12 @@ Junie read <project root>/knowledge_base/prds/prds-junie-log/junie-log-requireme
 **Functional:**
 - Add app/controllers/plaid_webhook_controller.rb: POST route /plaid/webhook; parse JSON payload using plaid-ruby (e.g., verify with webhook_code and item_id); handle key events: TRANSACTION (SYNC_UPDATES_AVAILABLE → enqueue transaction sync), HOLDINGS:DEFAULT_UPDATE/INVESTMENTS_TRANSACTIONS:DEFAULT_UPDATE → enqueue holdings refresh, DEFAULT_UPDATE (with account_ids) → enqueue liabilities refresh.
 - Verification: Implement HMAC signature check using PLAID_WEBHOOK_VERIFICATION_KEY or plaid-ruby helpers; IP whitelisting optional via ENV.
-- Enqueuing: Use Solid Queue/Sidekiq to jobify syncs (e.g., SyncTransactionsJob.perform_later(plaid_item_id)); update PlaidItem.last_webhook_at on success.
+- Enqueuing: Use Solid Queue to jobify syncs (e.g., SyncTransactionsJob.perform_later(plaid_item_id)); update PlaidItem.last_webhook_at on success.
 - Error handling: Return 200 OK always (Plaid requirement); log invalid signatures/payloads to DLQ (e.g., new WebhookLog model with JSONB payload); rescue unknown events gracefully.
 
 **Non-Functional:**
 - Performance: Handle webhook in <200ms; no heavy processing in controller—defer to jobs.
-- Security: Skip CSRF for webhook route (protect_from_forgery except: :create); RLS not needed (no DB reads beyond find_by_item_id); encrypt sensitive payload fields if stored.
+- Security: Skip CSRF for webhook route (protect_from_forgery except: :create); RLS not needed (no DB reads beyond find_by_item_id); encrypt sensitive payload fields if stored. Use Plaid's HMAC verification; ensure compatibility with ngrok/Cloudflare Tunnel.
 - Rails Guidance: Route as post 'plaid/webhook', to: 'plaid_webhook#create'; use ApplicationController subclass; migration for WebhookLog if DLQ needed (rails g model WebhookLog payload:jsonb event_type:string status:string).
 
 #### Architectural Context
