@@ -37,3 +37,34 @@ Aligns with Rails MVC: Job calls existing services (PlaidTransactionSyncService,
 Junie, pull from main, create branch `feature/full-fetch-0040-daily-sync-fallback-job`. Ask questions and build a plan before execution. Use Claude Sonnet 4.5 in RubyMine. Commit only green code (run bin/rails test, RuboCop). Push for review. Confirm with Eric before proceeding to next PRD.
 
 Next steps: After merge, ready for 0050-Force-Full-Update-Feature-PRD? Any Junie questions to append?
+
+#### Testing Instructions
+
+**1. Automated Unit Tests**
+Run the dedicated test suite for the fallback job to verify logic for fresh vs. stale items:
+```bash
+bin/rails test test/jobs/daily_plaid_sync_job_test.rb
+```
+
+**2. Manual Verification (Rails Console)**
+You can simulate the job's behavior or trigger it manually in development:
+```ruby
+# 1. Enter console
+bin/rails c
+
+# 2. Check which items are currently "stale" (no webhook in > 24h)
+PlaidItem.where("last_webhook_at < ? OR last_webhook_at IS NULL", 24.hours.ago).count
+
+# 3. Run the job immediately to see enqueuing logic
+DailyPlaidSyncJob.perform_now
+```
+
+**3. Scheduling Verification**
+Verify that the job is registered in the recurring task configuration:
+- Open `config/recurring.yml`
+- Ensure the `daily_plaid_sync_fallback` entry exists with `class: DailyPlaidSyncJob` and a valid schedule (e.g., `at 2am every day`).
+
+**4. Logs & Monitoring**
+- Check `log/development.log` after running the job.
+- Look for: `DailyPlaidSyncJob: Triggering fallback sync for Item ID: [X] (Last webhook: [Date])`
+- Verify that `SyncHoldingsJob`, `SyncTransactionsJob`, and `SyncLiabilitiesJob` are enqueued in the logs.
