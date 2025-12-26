@@ -45,6 +45,14 @@ class SyncLiabilitiesJob < ApplicationJob
     SyncLog.create!(plaid_item: item, job_type: "liabilities", status: "started", job_id: self.job_id)
 
     begin
+      # PRD 0030 Bugfix: Ensure accounts exist before syncing liabilities.
+      # After a 'nuke', accounts are gone. Webhooks might trigger this job before SyncHoldingsJob runs.
+      if item.accounts.empty?
+        Rails.logger.info "SyncLiabilitiesJob: No accounts found for Item #{item.id}, performing holdings/accounts sync first"
+        SyncHoldingsJob.perform_now(item.id)
+        item.reload
+      end
+
       # PRD 12: Use PlaidLiabilitiesService to fetch and sync liability data to Account model
       service = PlaidLiabilitiesService.new(item)
       service.fetch_and_sync_liabilities

@@ -57,7 +57,9 @@ class PlaidTransactionSyncService
       account = @item.accounts.find_by(account_id: txn.account_id)
       next unless account
 
-      transaction = account.transactions.find_or_initialize_by(transaction_id: txn.transaction_id)
+      # PRD 0020: Use create_or_find_by to handle race conditions during concurrent syncs.
+      # We include source: "plaid" to satisfy the DB default and avoid 'manual' validation triggers.
+      transaction = account.transactions.create_or_find_by!(transaction_id: txn.transaction_id, source: "plaid")
       update_transaction_fields(transaction, txn)
       transaction.save!
     end

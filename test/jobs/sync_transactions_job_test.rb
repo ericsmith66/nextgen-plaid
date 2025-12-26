@@ -390,6 +390,9 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
     user = User.create!(email: "recurring@example.com", password: "Password!123")
     item = PlaidItem.create!(user: user, item_id: "it_recurring", institution_name: "Bank", access_token: "tok_rec", status: "good")
     
+    # Seed an account so we don't trigger SyncHoldingsJob
+    Account.create!(plaid_item: item, account_id: "acc_rec", name: "Checking", mask: "0000", type: "depository")
+
     stream = OpenStruct.new(
       stream_id: "stream_1",
       category: ["Food and Drink", "Coffee Shop"],

@@ -45,6 +45,15 @@ class SyncTransactionsJob < ApplicationJob
     SyncLog.create!(plaid_item: item, job_type: "transactions", status: "started", job_id: self.job_id)
 
     begin
+      # PRD 0030 Bugfix: Ensure accounts exist before syncing transactions.
+      # After a 'nuke', accounts are gone. Webhooks might trigger this job before SyncHoldingsJob runs.
+      if item.accounts.empty?
+        Rails.logger.info "SyncTransactionsJob: No accounts found for Item #{item.id}, performing holdings/accounts sync first"
+        # We use perform_now to ensure accounts are created before we continue to transactions
+        SyncHoldingsJob.perform_now(item.id)
+        item.reload
+      end
+
       # PRD 0020: Use PlaidTransactionSyncService for cursor-based incremental sync
       sync_service = PlaidTransactionSyncService.new(item)
       sync_result = sync_service.sync
@@ -147,7 +156,10 @@ class SyncTransactionsJob < ApplicationJob
       account = item.accounts.find_by(account_id: txn.account_id)
       next unless account
 
-      transaction = account.transactions.find_or_initialize_by(transaction_id: txn.investment_transaction_id)
+      # PRD 11: Use create_or_find_by to handle race conditions during concurrent syncs.
+      # We include source: "plaid" to satisfy the DB default and avoid 'manual' validation triggers.
+      transaction = account.transactions.create_or_find_by!(transaction_id: txn.investment_transaction_id, source: "plaid")
+      
       transaction.assign_attributes(
         name: txn.name,
         amount: txn.amount,

@@ -90,9 +90,18 @@ class SyncHoldingsJob < ApplicationJob
           iso_currency_code: plaid_account.balances.iso_currency_code
         )
       else
-        # Create new account if no match found
-        account = item.accounts.create!(
-          account_id: plaid_account.account_id,
+        # Create new account if no match found. Use create_or_find_by to handle race conditions.
+        account = item.accounts.create_or_find_by!(account_id: plaid_account.account_id) do |acc|
+          acc.persistent_account_id = persistent_id
+          acc.name = plaid_account.name
+          acc.mask = plaid_account.mask
+          acc.type = plaid_account.type
+          acc.subtype = plaid_account.subtype
+          acc.current_balance = plaid_account.balances.current
+          acc.iso_currency_code = plaid_account.balances.iso_currency_code
+        end
+        # Ensure it's updated if it was found instead of created
+        account.update!(
           persistent_account_id: persistent_id,
           name: plaid_account.name,
           mask: plaid_account.mask,
@@ -108,26 +117,26 @@ class SyncHoldingsJob < ApplicationJob
         security = response.securities.find { |s| s.security_id == holding.security_id }
         next unless security
 
-        # PRD 8: Use find_or_initialize_by to support both create and update
-        pos = account.holdings.find_or_initialize_by(security_id: security.security_id)
+        # PRD 8: Use create_or_find_by to handle race conditions
+        pos = account.holdings.create_or_find_by!(security_id: security.security_id)
         
         # Map basic fields
-        pos.symbol        = security.ticker_symbol
-        pos.name          = security.name
-        pos.quantity      = holding.quantity
-        pos.cost_basis    = holding.cost_basis
-        pos.market_value  = holding.institution_value || holding.market_value
-        
-        # PRD 8: Map extended fields from Plaid (handle nil gracefully)
-        pos.vested_value             = holding.vested_value
-        pos.institution_price        = holding.institution_price
-        pos.institution_price_as_of  = holding.institution_price_as_of
-        
-        # PRD 9: Map securities metadata from Plaid (nullable, may require license)
-        pos.isin     = security.isin
-        pos.cusip    = security.cusip
-        pos.sector   = security.sector || "Unknown"
-        pos.industry = security.industry
+        pos.assign_attributes(
+          symbol: security.ticker_symbol,
+          name: security.name,
+          quantity: holding.quantity,
+          cost_basis: holding.cost_basis,
+          market_value: holding.institution_value || holding.market_value,
+          vested_value: holding.vested_value,
+          institution_price: holding.institution_price,
+          institution_price_as_of: holding.institution_price_as_of,
+          isin: security.isin,
+          cusip: security.cusip,
+          sector: security.sector || "Unknown",
+          industry: security.industry,
+          type: security.type,
+          subtype: security.respond_to?(:subtype) ? security.subtype : nil
+        )
         
         # PRD 8: Compute high_cost_flag (>50% gain threshold)
         if pos.cost_basis.present? && pos.cost_basis > 0 && pos.market_value.present?
@@ -137,39 +146,23 @@ class SyncHoldingsJob < ApplicationJob
           pos.high_cost_flag = false
         end
         
-        # PRD 8: Log when vested_value is missing (expected for some institutions)
-        if holding.vested_value.nil? && pos.quantity.to_f > 0
-          Rails.logger.warn "SyncHoldingsJob: vested_value nil for holding #{security.security_id} (#{security.ticker_symbol}) in account #{plaid_account.account_id}"
-        end
-        
-        # PRD 9: Log when securities metadata is missing (may require Plaid license or manual enrichment)
-        if security.sector.nil? || security.isin.nil?
-          Rails.logger.info "SyncHoldingsJob: Securities metadata incomplete for #{security.security_id} (#{security.ticker_symbol}): sector=#{security.sector.inspect}, isin=#{security.isin.inspect}"
-        end
-        
-        # PRD 10: Map type/subtype from security (subtype may not be available on all Security objects)
-        pos.type = security.type
-        pos.subtype = security.respond_to?(:subtype) ? security.subtype : nil
-        
         pos.save!
         
         # PRD 10: Handle FixedIncome details if present
         if security.respond_to?(:fixed_income) && security.fixed_income.present?
           fi = security.fixed_income
           
-          fixed_income_record = pos.fixed_income || pos.build_fixed_income
-          fixed_income_record.yield_percentage = fi.yield_percentage
-          fixed_income_record.yield_type = fi.yield_type || "unknown"
-          fixed_income_record.maturity_date = fi.maturity_date
-          fixed_income_record.issue_date = fi.issue_date
-          fixed_income_record.face_value = fi.face_value
+          fixed_income_record = pos.fixed_income || pos.create_fixed_income!(yield_type: "unknown") rescue pos.fixed_income
+          fixed_income_record.assign_attributes(
+            yield_percentage: fi.yield_percentage,
+            yield_type: fi.yield_type || "unknown",
+            maturity_date: fi.maturity_date,
+            issue_date: fi.issue_date,
+            face_value: fi.face_value
+          )
           
           # PRD 10: Set income_risk_flag if yield < 2%
-          if fi.yield_percentage.present? && fi.yield_percentage.to_f < 2.0
-            fixed_income_record.income_risk_flag = true
-          else
-            fixed_income_record.income_risk_flag = false
-          end
+          fixed_income_record.income_risk_flag = (fi.yield_percentage.present? && fi.yield_percentage.to_f < 2.0)
           
           fixed_income_record.save!
           
@@ -183,11 +176,13 @@ class SyncHoldingsJob < ApplicationJob
         if security.respond_to?(:option_contract) && security.option_contract.present?
           oc = security.option_contract
           
-          option_record = pos.option_contract || pos.build_option_contract
-          option_record.contract_type = oc.contract_type
-          option_record.expiration_date = oc.expiration_date
-          option_record.strike_price = oc.strike_price
-          option_record.underlying_ticker = oc.underlying_ticker
+          option_record = pos.option_contract || pos.create_option_contract! rescue pos.option_contract
+          option_record.assign_attributes(
+            contract_type: oc.contract_type,
+            expiration_date: oc.expiration_date,
+            strike_price: oc.strike_price,
+            underlying_ticker: oc.underlying_ticker
+          )
           
           option_record.save!
         end
