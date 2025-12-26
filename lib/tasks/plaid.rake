@@ -82,4 +82,49 @@ namespace :plaid do
       puts "Error: #{e.message}"
     end
   end
+
+  desc "Force a full sync for a specific product"
+  # Usage: bin/rails plaid:force_full_sync[item_id,product]
+  # Products: transactions, holdings, liabilities
+  task :force_full_sync, [:id, :product] => :environment do |_, args|
+    item_id = args[:id]
+    product = args[:product]
+
+    if item_id.blank? || product.blank?
+      puts "Error: item_id and product are required."
+      puts "Usage: bin/rails plaid:force_full_sync[id,product]"
+      exit 1
+    end
+
+    # PRD 0050: Logic handled by ForcePlaidSyncJob
+    # Note: Rake tasks usually don't enforce rate limits unless asked, 
+    # but the job does. We'll call the job perform_now for synchronous feedback.
+    begin
+      ForcePlaidSyncJob.perform_now(item_id, product)
+      puts "Force sync initiated for item_id:#{item_id}, product:#{product}"
+    rescue => e
+      puts "Error: #{e.message}"
+    end
+  end
+
+  desc "Backfill 730-day transaction history"
+  # Usage: bin/rails plaid:backfill_history[item_id]
+  task :backfill_history, [:id] => :environment do |_, args|
+    item_id = args[:id]
+
+    if item_id.blank?
+      puts "Error: item_id is required."
+      puts "Usage: bin/rails plaid:backfill_history[id]"
+      exit 1
+    end
+
+    # PRD 0050: backfill_history triggers /transactions/refresh for 730-day history
+    # This is equivalent to force_full_sync[id, transactions]
+    begin
+      ForcePlaidSyncJob.perform_now(item_id, "transactions")
+      puts "History backfill initiated for item_id:#{item_id}"
+    rescue => e
+      puts "Error: #{e.message}"
+    end
+  end
 end
