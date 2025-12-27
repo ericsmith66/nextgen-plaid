@@ -18,7 +18,7 @@ module SapAgent
 
       # Inject context into system prompt
       full_system_prompt = system_prompt.gsub('[CONTEXT_BACKLOG]', backlog_content || "[]")
-      full_system_prompt = "Vision SSOT:\n#{mcp_content}\n\n#{full_system_prompt}" if mcp_content
+      full_system_prompt = full_system_prompt.gsub('[VISION_SSOT]', mcp_content || "No vision context.")
 
       "#{full_system_prompt}\n\nUser Request: #{payload[:query]}"
     end
@@ -27,6 +27,14 @@ module SapAgent
       log_lifecycle('START')
       validate!
       
+      # Optional: Perform research if needed
+      if payload[:research]
+        log_lifecycle('RESEARCH_START')
+        research_results = SapAgent::SmartProxyClient.research(payload[:query], request_id: @request_id)
+        @payload[:research_results] = research_results
+        log_lifecycle('RESEARCH_COMPLETED', "Confidence: #{research_results[:confidence]}")
+      end
+
       attempts = 0
       max_attempts = 3 # 1 original + 2 retries
       last_error = nil

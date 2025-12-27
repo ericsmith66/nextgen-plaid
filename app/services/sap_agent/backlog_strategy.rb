@@ -32,8 +32,17 @@ module SapAgent
     def self.store!(data)
       File.open(BACKLOG_PATH, File::RDWR | File::CREAT) do |f|
         f.flock(File::LOCK_EX)
-        current_backlog = f.read.present? ? JSON.parse(f.read) : []
-        current_backlog << data
+        raw_content = f.read
+        current_backlog = raw_content.present? ? JSON.parse(raw_content) : []
+        
+        # Merge or add
+        existing_index = current_backlog.find_index { |item| item['id'] == data['id'] }
+        if existing_index
+          current_backlog[existing_index] = data
+        else
+          current_backlog << data
+        end
+
         f.rewind
         f.write(JSON.pretty_generate(current_backlog))
         f.flush
