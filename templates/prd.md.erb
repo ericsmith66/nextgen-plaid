@@ -1,0 +1,35 @@
+## <%= id %>-<%= slug %>-PRD.md
+
+#### Overview
+<%= overview %>
+
+#### Log Requirements
+Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-requirement.md`. <%= log_details %>
+
+#### Requirements
+**Functional Requirements:**
+<%= functional_requirements %>
+
+**Non-Functional Requirements:**
+<%= non_functional_requirements %>
+
+#### Architectural Context
+<%= architectural_context %>
+
+#### Acceptance Criteria
+- <%= ac1 %>
+- <%= ac2 %>
+- <%= ac3 %>
+- <%= ac4 %>
+- <%= ac5 %>
+- <%= ac6 %>
+- <%= ac7 %>
+- <%= ac8 %>
+
+#### Test Cases
+- <%= test1 %>
+- <%= test2 %>
+- <%= test3 %>
+
+#### Workflow
+Junie: Use <%= llm %> (default). Pull from master (`git pull origin main`), create branch (`git checkout -b feature/<%= id %>-<%= slug %>`). Ask questions and build a plan before coding (e.g., "<%= example_question1 %>? <%= example_question2 %>?"). Implement in atomic commits; run tests locally; commit only if green. PR to main with description linking to this PRD.

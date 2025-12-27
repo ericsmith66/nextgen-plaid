@@ -5,11 +5,15 @@ class SapAgentTest < ActiveSupport::TestCase
     @payload = { query: "Test PRD query" }
   end
 
-  test "SapAgent.process dispatches to GenerateCommand" do
-    # Mocking AiFinancialAdvisor to avoid actual network calls during unit tests
-    AiFinancialAdvisor.stub :ask, "Mocked PRD response" do
-      result = SapAgent.process('generate', @payload)
-      assert_equal "Mocked PRD response", result[:response]
+  test "SapAgent.process incorporates RAG context" do
+    user = User.first || User.create!(email: "sap_test_integration@example.com", password: "password")
+    Snapshot.create!(user: user, data: { status: "active" })
+    
+    AiFinancialAdvisor.stub :ask, ->(prompt) { prompt } do
+      result = SapAgent.process('generate', @payload.merge(user_id: user.id))
+      assert_match /\[CONTEXT START\]/, result[:response]
+      assert_match /USER DATA SNAPSHOT/, result[:response]
+      assert_match /"status":"active"/, result[:response]
     end
   end
 

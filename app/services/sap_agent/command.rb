@@ -34,8 +34,13 @@ module SapAgent
 
     def call_proxy
       log_lifecycle('PROXY_CALL')
-      # We use AiFinancialAdvisor which already routes to the SmartProxy
-      AiFinancialAdvisor.ask(prompt)
+      # Incorporate RAG context
+      user_id = payload[:user_id] || payload["user_id"]
+      query_type = self.class.name.split('::').last.gsub('Command', '').downcase
+      rag_prefix = SapAgent::RagProvider.build_prefix(query_type, user_id)
+      
+      full_prompt = "#{rag_prefix}\n\n#{prompt}"
+      AiFinancialAdvisor.ask(full_prompt)
     end
 
     def prompt
