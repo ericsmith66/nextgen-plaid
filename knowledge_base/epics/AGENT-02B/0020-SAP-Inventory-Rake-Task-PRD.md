@@ -8,16 +8,17 @@ Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-require
 
 #### Requirements
 **Functional Requirements:**
-- **Rake Task Creation**: Add lib/tasks/sap_inventory.rake with #perform to scan knowledge_base/epics/ and knowledge_base/prds/ for .md files, extract metadata (e.g., title from first # header, status from AC bullets, dependencies from table refs using regex).
-- **Inventory Update**: Generate/update knowledge_base/inventory.json as array of objects (e.g., { "id": "0010", "title": "RAG Framework", "status": "Todo", "dependencies": ["Epic 1"] }); compare mod dates to avoid unnecessary rewrites.
-- **Trigger Integration**: Run on demand (rake sap:inventory); auto-trigger post-merge via webhook extension (defer to 0040); tie to existing recurring.yml for daily runs.
-- **Error Handling**: On scan failures (e.g., invalid MD), skip file and log warning; if no files, create empty array JSON.
+- **Rake Task Creation**: Add lib/tasks/sap_inventory.rake with #perform to scan knowledge_base/epics/ and knowledge_base/prds/ for .md files.
+- **Metadata Extraction**: Use a lightweight frontmatter parser (regex for YAML block `---` at top of MD). Extract title, priority, status, and dependencies. Fallback to regex (e.g., `# (.*)` for title) if no frontmatter found.
+- **Inventory Update**: Generate/update knowledge_base/inventory.json as array of objects (e.g., { "id": "0010", "title": "RAG Framework", "status": "Todo", "priority": "High", "dependencies": ["Epic 1"] }); compare mod dates to avoid unnecessary rewrites.
+- **Trigger Integration**: Run on demand (rake sap:inventory); auto-trigger post-merge via webhook extension (0040); tie to `recurring.yml`.
+- **Error Handling**: Skip invalid MD files and log warning. Handle large dirs (max 100 files). Fallback for missing git.
 
 **Non-Functional Requirements:**
 - Performance: Scan <100ms for 50 files; JSON write <50ms.
 - Security: Read-only scan; slugify keys for safety.
-- Compatibility: Rails 7+; use Dir.glob/File.read—no new gems.
-- Privacy: No content extraction beyond metadata; align with local execution.
+- Compatibility: Rails 7+; no new gems.
+- Privacy: Metadata only; no sensitive content extraction.
 
 #### Architectural Context
 Integrate with Epic 1's SapAgent by loading inventory.json in #rag_context for history section. Use Rails conventions: Rake for task, no controllers/jobs here. Parse MD with simple regex (e.g., /# (.*)/ for title); use code_execution in tests for complex parsing. Defer full semantic search—focus on file-based inventory. Challenge: Handle large dirs (limit to 100 files max); browse_page repo if needed for verification in tests.

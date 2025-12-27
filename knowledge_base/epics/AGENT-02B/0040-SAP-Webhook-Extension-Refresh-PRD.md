@@ -9,13 +9,14 @@ Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-require
 #### Requirements
 **Functional Requirements:**
 - **Webhook Extension**: Add handling in PlaidWebhookController for GitHub post-merge payloads (e.g., if event == 'push' and branch == 'main' and files.include?('knowledge_base/'), enqueue rake sap:inventory).
-- **Trigger Logic**: Use Sidekiq to run rake; update backlog via SapAgent #update_backlog after inventory refresh.
+- **Signature Validation**: Use `GITHUB_WEBHOOK_SECRET` from `.env` to verify GitHub payload signatures. Return 401/422 on failure.
+- **Trigger Logic**: Use Solid Queue to run rake; update backlog via SapAgent #update_backlog after inventory refresh.
 - **Event Parsing**: Parse payload for changed files (regex /knowledge_base/), ignore non-relevant pushes.
-- **Error Handling**: On invalid payload, return 422 and log; failed rake logs error without crash.
+- **Error Handling**: Log failures without crashing. Return appropriate HTTP status codes.
 
 **Non-Functional Requirements:**
 - Performance: Handling <100ms; rake trigger async.
-- Security: Verify GitHub signature (existing secret); RLS on controller if needed.
+- Security: Verify GitHub signature (mandatory). RLS on controller.
 - Compatibility: Rails 7+; use ActionController for extension.
 - Privacy: No data exposure in webhooks.
 

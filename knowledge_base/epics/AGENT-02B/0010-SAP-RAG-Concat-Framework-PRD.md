@@ -9,15 +9,16 @@ Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-require
 #### Requirements
 **Functional Requirements:**
 - **JSON Blob Generation**: Extend FinancialSnapshotJob to create daily sanitized JSON (e.g., { "history": [array of merged PRDs with titles/IDs extracted from git log regex like /Merged PRD (\d+)/], "vision": [array of key excerpts from MCP/static_docs, e.g., "estate-tax sunset" paragraphs], "backlog": [array of objects from TODO.md parsed as table with Priority/ID/Title/Description/Status/Dependencies], "code_state": [object with minified db/schema.rb, rails routes output, Gemfile.lock summary] }).
-- **Concat for RAG**: Add #rag_context method in SapAgent (app/services/sap_agent.rb) to load latest snapshot JSON from knowledge_base/snapshots/ and concat as string prefix to system prompt (e.g., "Project Context: #{json_string}"); auto-summarize sections if total >4K chars (e.g., reduce history to top 10 items).
-- **Trigger Integration**: Schedule as Sidekiq job via existing recurring.yml (daily at 3am); add rake sap:generate_snapshot for manual/on-demand runs.
-- **Error Handling**: On parse failures (e.g., invalid git log), log error and use fallback empty sections; on oversized blobs, summarize and log "Truncated [section] to fit token limit".
+- **Concat for RAG**: Add #rag_context method in SapAgent (app/services/sap_agent.rb) to load latest snapshot JSON from knowledge_base/snapshots/ and concat as string prefix to system prompt (e.g., "Project Context: #{json_string}"); auto-summarize sections if total >4K chars.
+- **Summarization Strategy**: Use deterministic summarization: first N lines + tail for history; keyword extraction for vision; regex-based minification for `schema.rb` (table/column names/types only, omit indices/FKs). Escalate to LLM (Ollama) via toggle if deterministic is insufficient.
+- **Trigger & Retention**: Schedule via `recurring.yml` (daily 3am). Retain last 7 daily snapshots; archive/delete older via rake (weekly) and log deletions.
+- **UI Extension**: Add optional `/admin/rag_inspector` in Mission Control (Streamlit-like simplicity) to view latest snapshot/inventory/backlog JSON.
+- **Error Handling**: Fallback to `inventory.json` if git is unavailable. Log "Truncated [section]" on oversized blobs.
 
 **Non-Functional Requirements:**
-- Performance: Blob generation <200ms on average repo size; concat <50ms; handle up to 10KB raw data.
-- Security: Sanitize JSON outputs (escape special chars); read-only access to knowledge_base/ and git repo.
-- Compatibility: Rails 7+; use built-in JSON/File/Git system calls—no new gems.
-- Privacy: Exclude any sensitive data (e.g., no access_tokens in code_state); align with local-only execution.
+- Performance: Blob generation <200ms; concat <50ms.
+- Security: Sanitize JSON; verify `GITHUB_WEBHOOK_SECRET` signature for automation triggers (see 0040).
+- Privacy: No sensitive data (tokens/PII); align with local-only.
 
 #### Architectural Context
 Build on Epic 1's SapAgent service by injecting RAG concat into prompt building (e.g., in ArtifactCommand#prompt or Router). Store blobs in knowledge_base/snapshots/ as dated files (e.g., 2025-12-27-project-snapshot.json) for audit. Use Rails MVC: Job for generation logic, no new models/migrations. Parse git log via system("git log --grep='Merged PRD'"); use code_execution if needed for complex parsing in tests. Defer advanced RAG—focus on simple concat prefix. Challenge: Limit summaries to essential (e.g., vision to 5 key sentences); browse_page repo if git local unavailable in tests.

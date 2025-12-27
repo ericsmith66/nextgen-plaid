@@ -8,16 +8,18 @@ Junie: Read `<project root>/knowledge_base/prds/prds-junie-log/junie-log-require
 
 #### Requirements
 **Functional Requirements:**
-- **Backlog Methods**: Add #generate_backlog, #update_backlog, #prune_backlog to SapAgent; parse TODO.md into table array (objects with Priority/ID/Title/Description/Status/Dependencies/Effort/Deadline); auto-detect status (e.g., "Completed" if git log matches /Merged PRD ID/).
-- **Update/Prune Logic**: Update statuses from git; add Effort (1-5 based on complexity keywords) and Deadline (e.g., parse "Dec 30" or default +30 days); prune Low/stale (>30 days no activity) per YAGNI, log rationale.
-- **Integration**: Call in PRD generation (Epic 1 prompt) to output updated table; save as backlog.json in knowledge_base/.
-- **Error Handling**: On parse failures, log and use fallback empty table; prevent prune of High items.
+- **Backlog SSOT & Sync**: Add #generate_backlog, #update_backlog, #prune_backlog, #archive_backlog, and #sync_backlog to SapAgent. `backlog.json` is the SSOT. `TODO.md` is a human-readable view generated from JSON. Implement bidirectional sync (prioritizing JSON for AI).
+- **Prune & Archive**: Move pruned items (Low/stale >30 days) to `knowledge_base/backlog_archive.json` instead of deletion. Add restore method. Log rationale.
+- **Auto-Status Detection**: Use git log regex on PRD IDs (e.g., "Merged PRD 0010") to detect completion.
+- **Effort & Deadline**: Effort 1-5 based on complexity keywords. Deadline default +30 days or parsed from query.
+- **Integration**: Injects updated backlog table into PRD/Epic generation prompts. Save state in `backlog.json`.
+- **Error Handling**: No prune on High-priority items. Fallback to empty table on parse errors.
 
 **Non-Functional Requirements:**
 - Performance: Operations <100ms for 20 items.
-- Security: Read-only for TODO.md/git.
-- Compatibility: Rails 7+; use regex/system calls.
-- Privacy: No sensitive data in table.
+- Security: Read-only for git; atomic writes for `backlog.json`.
+- Compatibility: Rails 7+; no new gems.
+- Privacy: No sensitive data in backlog.
 
 #### Architectural Context
 Build on SapAgent from Epic 1; integrate with RAG concat (include backlog table in JSON blob). Use Rails: Service methods, no new files beyond backlog.json. Parse git via system("git log"); use code_execution in tests for regex. Challenge: Accurate Effort estimation (keyword-based, e.g., "complex" =5); limit table to 50 items.
