@@ -2,7 +2,8 @@ module SapAgent
   COMMAND_MAPPING = {
     'generate' => SapAgent::GenerateCommand,
     'qa' => SapAgent::QaCommand,
-    'debug' => SapAgent::DebugCommand
+    'debug' => SapAgent::DebugCommand,
+    'health' => SapAgent::HealthCommand
   }.freeze
 
   def self.process(query_type, payload)

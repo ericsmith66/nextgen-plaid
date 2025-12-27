@@ -23,9 +23,12 @@ class AiFinancialAdvisor
     if response.code == '200'
       body = JSON.parse(response.body)
       # xAI returns content in choices[0].message.content
+      # Ollama returns content in message.content
       # If it was proxied and already parsed by Sinatra, it might be a Hash or a String
       parsed_body = body.is_a?(String) ? JSON.parse(body) : body
-      parsed_body.dig('choices', 0, 'message', 'content') || parsed_body['response']
+      parsed_body.dig('choices', 0, 'message', 'content') || 
+        parsed_body.dig('message', 'content') || 
+        parsed_body['response']
     else
       Rails.logger.error("SmartProxy Error: #{response.code} - #{response.body}")
       "ERROR: SmartProxy returned #{response.code}"

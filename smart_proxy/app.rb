@@ -4,6 +4,7 @@ require 'logger'
 require 'dotenv'
 Dotenv.load(File.expand_path('../.env', __dir__))
 require_relative 'lib/grok_client'
+require_relative 'lib/ollama_client'
 require_relative 'lib/tool_client'
 require_relative 'lib/anonymizer'
 require 'securerandom'
@@ -101,8 +102,13 @@ class SmartProxyApp < Sinatra::Base
       payload: anonymized_payload
     })
 
-    client = GrokClient.new(api_key: ENV['GROK_API_KEY'])
-    response = client.chat_completions(anonymized_payload)
+    if anonymized_payload['model'] == 'ollama'
+      client = OllamaClient.new
+      response = client.chat(anonymized_payload)
+    else
+      client = GrokClient.new(api_key: ENV['GROK_API_KEY'])
+      response = client.chat_completions(anonymized_payload)
+    end
 
     $logger.info({
       event: 'response_received',
