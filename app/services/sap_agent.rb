@@ -23,7 +23,7 @@ module SapAgent
       details: "Starting decomposition for query: #{query}"
     )
 
-    result = process('generate', { query: query })
+    result = process('generate', { query: query, user_id: user_id })
     prd_content = result[:response]
 
     AgentLog.create!(
