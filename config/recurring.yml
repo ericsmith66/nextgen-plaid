@@ -19,3 +19,6 @@ production:
   daily_auto_sync:
     class: SyncAllItemsJob
     schedule: at 3am every day
+  rotate_agent_logs:
+    command: "rake logs:rotate"
+    schedule: at 3am every day
