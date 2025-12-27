@@ -4,13 +4,14 @@ module SapAgent
       raise "Output missing 'Overview'" unless response.include?('#### Overview')
       raise "Output missing 'Acceptance Criteria'" unless response.include?('#### Acceptance Criteria')
       
-      ac_count = response.scan(/^\s*-\s+/).count
-      # Note: This regex might be too broad if other sections use bullets. 
-      # Let's try to be more specific to AC section if possible.
+      # Flexible bullet detection for AC section
       ac_section = response.match(/#### Acceptance Criteria(.*?)(####|\z)/m)&.[](1)
       if ac_section
-        ac_bullets = ac_section.scan(/^\s*-\s+/).count
+        # Match -, *, or 1. style bullets
+        ac_bullets = ac_section.scan(/^\s*[-*]|\d+\.\s+/).count
         raise "Acceptance Criteria must be between 5 and 8 bullets (found #{ac_bullets})" unless ac_bullets.between?(5, 8)
+      else
+        raise "Could not find Acceptance Criteria section for validation"
       end
 
       raise "Output missing 'Architectural Context'" unless response.include?('#### Architectural Context')

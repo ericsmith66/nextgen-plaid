@@ -18,7 +18,7 @@ module SapAgent
 
       # Inject context into system prompt
       full_system_prompt = system_prompt.gsub('[CONTEXT_BACKLOG]', backlog_content || "[]")
-      full_system_prompt = "Vision SSOT:\n#{mcp_content}\n\n#{full_system_prompt}" if mcp_content
+      full_system_prompt = full_system_prompt.gsub('[VISION_SSOT]', mcp_content || "No vision context.")
 
       "#{full_system_prompt}\n\nUser Request: #{payload[:query]}"
     end
