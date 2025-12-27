@@ -1,14 +1,22 @@
 module SapAgent
-  class GenerateCommand < Command
-    def prompt
-      query = payload[:query] || payload["query"]
-      <<~PROMPT
-        You are the SAP Agent (Senior Architect and Product Manager).
-        Generate a detailed Markdown PRD/Epic for the following request:
-        #{query}
-        
-        Focus on technical architecture, data models, and functional requirements.
-      PROMPT
+  class GenerateCommand < ArtifactCommand
+    def validate!
+      # Ensure strategy is set if not provided in payload
+      payload[:strategy] ||= infer_strategy(payload[:query])
+      super
+    end
+
+    private
+
+    def infer_strategy(query)
+      case query.downcase
+      when /backlog/
+        :backlog
+      when /epic/
+        :epic
+      else
+        :prd
+      end
     end
   end
 end
