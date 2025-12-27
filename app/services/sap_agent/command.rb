@@ -4,6 +4,7 @@ module SapAgent
 
     def initialize(payload)
       @payload = payload
+      @request_id = payload[:request_id] || SecureRandom.uuid
       @logger = Logger.new(Rails.root.join('agent_logs/sap.log'))
       @logger.formatter = proc do |severity, datetime, progname, msg|
         "[#{datetime}] #{severity}: #{msg}\n"
@@ -40,7 +41,12 @@ module SapAgent
       rag_prefix = SapAgent::RagProvider.build_prefix(query_type, user_id)
       
       full_prompt = "#{rag_prefix}\n\n#{prompt}"
-      AiFinancialAdvisor.ask(full_prompt)
+      
+      # Route between Grok and Ollama
+      model = SapAgent::Router.route(payload)
+
+      # Pass request_id to AI call
+      AiFinancialAdvisor.ask(full_prompt, model: model, request_id: @request_id)
     end
 
     def prompt

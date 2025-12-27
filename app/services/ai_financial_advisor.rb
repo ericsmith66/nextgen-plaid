@@ -1,5 +1,5 @@
 class AiFinancialAdvisor
-  def self.ask(prompt, model: 'grok-4')
+  def self.ask(prompt, model: 'grok-4', request_id: nil)
     smart_proxy_url = ENV['SMART_PROXY_URL'] || "http://localhost:#{ENV['SMART_PROXY_PORT'] || 4567}/proxy/generate"
     uri = URI(smart_proxy_url)
     http = Net::HTTP.new(uri.host, uri.port)
@@ -9,6 +9,7 @@ class AiFinancialAdvisor
 
     request = Net::HTTP::Post.new(uri, 'Content-Type' => 'application/json')
     request['Authorization'] = "Bearer #{auth_token}" if auth_token
+    request['X-Request-ID'] = request_id if request_id
     request.body = {
       model: model,
       messages: [
@@ -22,9 +23,12 @@ class AiFinancialAdvisor
     if response.code == '200'
       body = JSON.parse(response.body)
       # xAI returns content in choices[0].message.content
+      # Ollama returns content in message.content
       # If it was proxied and already parsed by Sinatra, it might be a Hash or a String
       parsed_body = body.is_a?(String) ? JSON.parse(body) : body
-      parsed_body.dig('choices', 0, 'message', 'content') || parsed_body['response']
+      parsed_body.dig('choices', 0, 'message', 'content') || 
+        parsed_body.dig('message', 'content') || 
+        parsed_body['response']
     else
       Rails.logger.error("SmartProxy Error: #{response.code} - #{response.body}")
       "ERROR: SmartProxy returned #{response.code}"
