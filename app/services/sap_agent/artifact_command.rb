@@ -20,6 +20,12 @@ module SapAgent
       full_system_prompt = system_prompt.gsub('[CONTEXT_BACKLOG]', backlog_content || "[]")
       full_system_prompt = full_system_prompt.gsub('[VISION_SSOT]', mcp_content || "No vision context.")
 
+      # Check if VISION_SSOT was actually in the system prompt. If not, append it if we want it there.
+      # Based on the test failing, it seems the system prompt might not have [VISION_SSOT] placeholder.
+      unless system_prompt.include?('[VISION_SSOT]')
+        full_system_prompt += "\n\nVision context:\n#{mcp_content}" if mcp_content
+      end
+
       "#{full_system_prompt}\n\nUser Request: #{payload[:query]}"
     end
 
