@@ -1,6 +1,7 @@
 require "json"
 require "open3"
 require "tempfile"
+require "securerandom"
 
 module SapAgent
   COMMAND_MAPPING = {
@@ -61,6 +62,68 @@ module SapAgent
       log_review_event("code_review.complete", score: score, elapsed_ms: elapsed, model_used: model_used)
 
       output
+    end
+
+    def iterate_prompt(task:, branch: nil, correlation_id: SecureRandom.uuid, resume_token: nil, human_feedback: nil, pause: false)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.task_id = task
+      self.branch = branch
+      self.correlation_id = correlation_id
+      self.model_used = SapAgent::Config::MODEL_DEFAULT
+
+      context = [ "Task: #{task}" ]
+      context << "Human feedback: #{human_feedback}" if human_feedback.present?
+
+      if pause
+        token = resume_token.presence || SecureRandom.uuid
+        log_iterate_event("iterate.paused", resume_token: token)
+        return { status: "paused", resume_token: token, context: context.join("\n") }
+      end
+
+      iterations = []
+      retry_count = 0
+      current_resume_token = resume_token
+
+      SapAgent::Config::ITERATION_CAP.times do |idx|
+        iteration_number = idx + 1
+        current_model = self.model_used
+        output = generate_iteration_output(context.join("\n"), iteration_number, current_model)
+        iterations << { iteration: iteration_number, output: output, model_used: current_model }
+
+        token_count = estimate_tokens(context.join("\n") + output.to_s)
+        if token_count > SapAgent::Config::TOKEN_BUDGET
+          log_iterate_event("iterate.abort", reason: "token_budget_exceeded", token_count: token_count, iteration: iteration_number)
+          return { status: "aborted", reason: "token_budget_exceeded", token_count: token_count, iterations: iterations, partial_output: output }
+        end
+
+        score = score_output(output, context.join("\n"))
+        log_iterate_event("iterate.phase", iteration: iteration_number, score: score, token_count: token_count, model_used: current_model)
+
+        context << "Iteration #{iteration_number} output: #{output}"
+
+        if score >= SapAgent::Config::SCORE_STOP_THRESHOLD
+          elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          log_iterate_event("iterate.complete", iteration: iteration_number, score: score, elapsed_ms: elapsed, model_used: current_model)
+          return { status: "completed", iterations: iterations, final_output: output, score: score, model_used: current_model, resume_token: current_resume_token }
+        end
+
+        if score < SapAgent::Config::SCORE_ESCALATE_THRESHOLD || token_count > 500
+          self.model_used = ENV["ESCALATE_LLM"].presence || SapAgent::Config::MODEL_ESCALATE
+        end
+
+        if retry_count < SapAgent::Config::BACKOFF_MS.size
+          sleep(SapAgent::Config::BACKOFF_MS[retry_count] / 1000.0)
+          retry_count += 1
+        else
+          log_iterate_event("iterate.abort", reason: "iteration_cap", iteration: iteration_number)
+          return { status: "aborted", reason: "iteration_cap", iterations: iterations, final_output: output, score: score, model_used: current_model, resume_token: current_resume_token }
+        end
+      end
+
+      { status: "aborted", reason: "iteration_cap", iterations: iterations, model_used: self.model_used, resume_token: current_resume_token }
+    rescue StandardError => e
+      log_iterate_event("iterate.error", error: e.message)
+      { status: "error", error: e.message, iterations: iterations }
     end
     def sync_backlog
       backlog_path = Rails.root.join("knowledge_base/backlog.json")
@@ -250,12 +313,37 @@ module SapAgent
       logger.info(payload.to_json)
     end
 
+    def log_iterate_event(event, data = {})
+      payload = {
+        timestamp: Time.now.utc.iso8601,
+        task_id: task_id,
+        branch: branch,
+        uuid: SecureRandom.uuid,
+        correlation_id: correlation_id,
+        model_used: model_used,
+        elapsed_ms: data.delete(:elapsed_ms),
+        score: data.delete(:score)
+      }.merge(data).merge(event: event).compact
+
+      logger.info(payload.to_json)
+    end
+
     def estimate_tokens(text)
       (text.to_s.length / 4.0).ceil
     end
 
     def logger
       @logger ||= Logger.new(Rails.root.join("agent_logs/sap.log"))
+    end
+
+    def score_output(output, context)
+      # Default heuristic score; tests will stub this method for deterministic behavior.
+      length_score = [ (output.to_s.length + context.to_s.length) / 10, 100 ].min
+      [ length_score, SapAgent::Config::SCORE_STOP_THRESHOLD ].min
+    end
+
+    def generate_iteration_output(context, iteration_number, model)
+      "Iteration #{iteration_number} response using #{model}: #{context[0..50]}"
     end
   end
 end
