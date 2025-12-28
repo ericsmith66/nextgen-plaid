@@ -190,6 +190,16 @@ module SapAgent
       end
     end
 
+    def poll_task_state(task_id)
+      state_path = Rails.root.join("tmp", "sap_iter_state_#{task_id}.json")
+      return { status: "pending", message: "No state found" } unless File.exist?(state_path)
+
+      JSON.parse(File.read(state_path)).with_indifferent_access
+    rescue StandardError => e
+      log_iterate_event("iterate.error", error: e.message, task_id: task_id)
+      { status: "error", message: e.message }
+    end
+
     def decompose(task_id, user_id, query)
       AgentLog.create!(
         task_id: task_id,
