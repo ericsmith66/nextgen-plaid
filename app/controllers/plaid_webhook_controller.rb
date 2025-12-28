@@ -3,6 +3,12 @@ class PlaidWebhookController < ApplicationController
   
   # PRD 0030: Webhook Controller Setup
   def create
+    # Identify if it's a GitHub webhook
+    if request.headers['X-GitHub-Event'].present?
+      handle_github_webhook
+      return
+    end
+
     payload = JSON.parse(request.body.read)
     webhook_type = payload["webhook_type"]
     webhook_code = payload["webhook_code"]
@@ -93,5 +99,36 @@ class PlaidWebhookController < ApplicationController
       status: "failed",
       error_message: error_message
     )
+  end
+
+  def handle_github_webhook
+    payload_body = request.body.read
+    verify_github_signature(payload_body)
+    
+    payload = JSON.parse(payload_body)
+    event = request.headers['X-GitHub-Event']
+    
+    if event == 'push' && payload['ref'] == 'refs/heads/main'
+      files = (payload['commits'] || []).map { |c| c['added'] + c['modified'] }.flatten
+      if files.any? { |f| f.start_with?('knowledge_base/') }
+        Rails.logger.info("GitHub push to main detected with knowledge_base changes. Triggering refresh.")
+        SapRefreshJob.perform_later
+      end
+    end
+    
+    render json: { status: "processed" }, status: :ok
+  rescue => e
+    Rails.logger.error "GitHub Webhook Error: #{e.message}"
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  def verify_github_signature(payload_body)
+    secret = ENV['GITHUB_WEBHOOK_SECRET']
+    return unless secret.present?
+
+    signature = 'sha256=' + OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new('sha256'), secret, payload_body)
+    unless Rack::Utils.secure_compare(signature, request.headers['X-Hub-Signature-256'] || "")
+      halt 401, "Signatures didn't match!"
+    end
   end
 end

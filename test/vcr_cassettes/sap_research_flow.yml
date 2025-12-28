@@ -1,0 +1,41 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: http://localhost:4567/proxy/tools
+    body:
+      encoding: UTF-8
+      string: '{"query":"Research Plaid","num_results":5}'
+    headers:
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+      User-Agent:
+      - Ruby
+      Host:
+      - localhost:4567
+      Authorization:
+      - Bearer your_secure_proxy_token_here
+      X-Request-Id:
+      - '098f9575-3732-41ba-9fbf-43bcac6f542f'
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '452'
+    body:
+      encoding: UTF-8
+      string: '{"confidence":0.0,"web_results":{"error":"{\"error\":{\"code\":404,\"message\":\"The
+        requested resource was not found. Please check the URL and try again. Documentation
+        is available at https://docs.x.ai/\"}}"},"x_results":{"error":"{\"error\":{\"code\":404,\"message\":\"The
+        requested resource was not found. Please check the URL and try again. Documentation
+        is available at https://docs.x.ai/\"}}"},"session_id":"098f9575-3732-41ba-9fbf-43bcac6f542f"}'
+  recorded_at: Sat, 27 Dec 2025 21:42:49 GMT
+recorded_with: VCR 6.3.1

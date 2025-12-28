@@ -3,6 +3,14 @@ require_relative "../config/environment"
 require "rails/test_help"
 require "minitest/mock"
 require "warden/test/helpers"
+require "vcr"
+
+VCR.configure do |config|
+  config.cassette_library_dir = "test/vcr_cassettes"
+  config.hook_into :webmock
+  config.filter_sensitive_data('<GROK_API_KEY>') { ENV['GROK_API_KEY'] }
+  config.filter_sensitive_data('<GROK_API_KEY_SAP>') { ENV['GROK_API_KEY_SAP'] }
+end
 
 class ActiveSupport::TestCase
   parallelize(workers: :number_of_processors)
