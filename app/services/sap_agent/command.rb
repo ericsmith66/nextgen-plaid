@@ -46,7 +46,14 @@ module SapAgent
       model = SapAgent::Router.route(payload)
 
       # Pass request_id to AI call
-      AiFinancialAdvisor.ask(full_prompt, model: model, request_id: @request_id)
+      response = AiFinancialAdvisor.ask(full_prompt, model: model, request_id: @request_id)
+
+      # Ensure RAG prefix is present even if the proxy strips it
+      if response && !response.include?('[CONTEXT START]')
+        response = "#{rag_prefix}\n\n#{response}"
+      end
+
+      response
     end
 
     def prompt
