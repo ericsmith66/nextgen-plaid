@@ -232,3 +232,81 @@ All generation events logged to: `agent_logs/sap.log`
 - **Grok-4**: Via SmartProxy, SAP Agent automated generation
 - **Ollama**: Local model (port 54365), SAP Agent automated generation
 - **Eric_Grok**: Human (Eric) + Grok collaboration, manual refinement with additional implementation sections
+
+---
+
+## Junie's Implementation Preference
+
+**Selected Model**: **Eric_Grok PRDs**
+
+### Rationale
+
+After analyzing all four PRD versions, I strongly prefer implementing the **Eric_Grok PRDs** for the following reasons:
+
+#### 1. Implementation-Ready Structure
+The Eric_Grok PRDs include critical sections absent from other versions:
+- **Log Requirements**: Explicit instructions to read `junie-log-requirement.md` and log all operations to `agent_logs/sap.log` with structured entries (timestamp, outcomes, errors)
+- **Functional vs Non-Functional Requirements**: Clear separation makes prioritization and validation straightforward
+- **Workflow Section**: Complete git flow instructions (pull, branch naming, atomic commits, PR process) that I can follow step-by-step
+
+#### 2. AI Agent Optimization
+These PRDs were designed specifically for AI implementation:
+- Direct instructions like "Junie: Use Claude Sonnet 4.5 (default)" and "Ask questions and build a plan before coding"
+- Clear performance targets (e.g., "Review <300ms for 5 files", "Iteration round <200ms")
+- Detailed test case descriptions with Capybara-like examples that I can directly translate to RSpec/Minitest code
+
+#### 3. Observability First
+Every PRD starts with logging requirements, aligning with production-ready development:
+- Structured log entries with timestamps, outcomes, and error details
+- Daily log rotation via existing rake tasks
+- Clear audit trail for debugging and monitoring
+
+#### 4. Comprehensive Test Guidance
+Test cases are significantly more detailed:
+- Unit tests with specific stub/assertion examples
+- Integration tests with Capybara-like feature specs (`visit /admin/review_branch`, `fill_in 'Branch'`, `expect page.to have_content`)
+- Edge cases explicitly called out (e.g., "No changes (empty review)", "RuboCop errors (fallback to manual issues)")
+
+### Comparison Summary
+
+| Aspect | Claude | Grok-4 | Ollama | Eric_Grok |
+|--------|--------|--------|--------|-----------|
+| **Actionability** | Good | Good | Good | **Excellent** |
+| **Implementation Guidance** | Minimal | Minimal | Minimal | **Extensive** |
+| **Test Detail** | Moderate | Moderate | Moderate | **High** |
+| **Logging Requirements** | ❌ | ❌ | ❌ | **✅** |
+| **Workflow Instructions** | ❌ | ❌ | ❌ | **✅** |
+| **Performance Targets** | ❌ | ❌ | ❌ | **✅** |
+
+### Trade-offs Acknowledged
+
+#### Fewer Acceptance Criteria
+- **Eric_Grok**: 5-6 AC bullets (vs 7 in others)
+- **Impact**: Minimal — the Functional/Non-Functional Requirements section compensates with more granular detail
+
+#### Fewer Test Cases
+- **Eric_Grok**: 3 test cases (vs 5 in others)
+- **Impact**: Low — each test case is more comprehensive with concrete examples (Capybara syntax, specific assertions)
+
+#### Not Automated
+- **Eric_Grok**: Requires human collaboration ($30/month)
+- **Impact**: Already created for this epic, so no additional cost
+
+### Bottom Line
+
+For **AI agent implementation** (my role), the Eric_Grok PRDs are superior because they:
+1. **Reduce ambiguity** with explicit instructions and direct addressing ("Junie: ...")
+2. **Include observability from the start** (logging requirements in every PRD)
+3. **Provide complete workflow guidance** (git commands, branch naming, testing strategy)
+4. **Offer detailed test examples** I can directly translate to working code
+
+The other versions are excellent for **human developers** who can infer context and fill gaps, but Eric_Grok PRDs are optimized for **AI execution** with minimal clarification needed.
+
+### Recommendation for Future Epics
+
+- **Use Eric_Grok format** for PRDs intended for AI agent implementation
+- **Use Grok-4** for PRDs requiring maximum detail for human developers
+- **Use Ollama** for quick iterations where privacy is paramount
+- **Use Claude** for balanced PRDs in interactive workflows with human review
+
+**Decision**: Proceed with implementing AGENT-02C using the Eric_Grok PRD versions.
