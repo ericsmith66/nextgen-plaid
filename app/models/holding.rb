@@ -11,8 +11,7 @@ class Holding < ApplicationRecord
   enum :source, { plaid: 0, csv: 1 }
 
   validates :security_id, presence: true
-  # PRD 8: Uniqueness handled by DB unique index [account_id, security_id, source]
-  # validates :security_id, uniqueness: { scope: [ :account_id, :source ] }
+  validates :security_id, uniqueness: { scope: [ :account_id, :source ] }
   
   # CSV-2: Validations for CSV imports
   validates :symbol, presence: true, if: :csv?

@@ -11,11 +11,11 @@ module SapAgent
       
       full_context = <<~CONTEXT
         [CONTEXT START]
-        --- STATIC DOCUMENTS ---
-        #{docs_content}
-        
         --- USER DATA SNAPSHOT ---
         #{snapshot_content}
+        
+        --- STATIC DOCUMENTS ---
+        #{docs_content}
         [CONTEXT END]
       CONTEXT
       

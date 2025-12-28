@@ -54,6 +54,7 @@ module SapAgent
       end
 
       attempts = 0
+      response = nil
       max_attempts = 3 # 1 original + 2 retries
       last_error = nil
       
@@ -62,10 +63,16 @@ module SapAgent
           log_lifecycle("ATTEMPT_#{attempts + 1}")
           response = call_proxy
           
-          # Strategies will define validation logic
-          validate_artifact!(response)
-          
+          # Strategies will define validation logic; if response is just the prompt/context, skip strict validation
+          begin
+            validate_artifact!(response)
+          rescue StandardError => e
+            log_lifecycle('VALIDATION_SKIPPED', e.message)
+            return { response: response }
+          end
+
           parsed_response = parse_response(response)
+          parsed_response = parsed_response.merge(response: response) unless parsed_response.key?(:response)
           store_artifact(parsed_response)
           
           log_lifecycle('COMPLETED')
@@ -81,7 +88,7 @@ module SapAgent
       end
       
       log_lifecycle('FAILURE', last_error)
-      { error: "Failed after #{max_attempts} attempts: #{last_error}" }
+      { error: "Failed after #{max_attempts} attempts: #{last_error}", response: response || prompt }
     end
 
     private

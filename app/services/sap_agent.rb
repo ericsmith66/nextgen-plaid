@@ -18,7 +18,14 @@ module SapAgent
       command_class = COMMAND_MAPPING[query_type.to_s]
       raise "Unknown query type: #{query_type}" unless command_class
 
-      command_class.new(payload).execute
+      result = command_class.new(payload).execute
+
+      if result.is_a?(Hash) && result[:response].present? && !result[:response].include?("[CONTEXT START]")
+        prefix = SapAgent::RagProvider.build_prefix(query_type, payload[:user_id] || payload["user_id"])
+        result = result.merge(response: "#{prefix}\n\n#{result[:response]}")
+      end
+
+      result
     end
 
     def code_review(branch: nil, files: nil, task_id: nil, correlation_id: SecureRandom.uuid)
