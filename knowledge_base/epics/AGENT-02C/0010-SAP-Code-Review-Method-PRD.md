@@ -32,8 +32,8 @@ Integrate into SapAgent from AGENT-02A/B; call in router for post-PR reviews. Us
 - Uses Ollama default; escalates to Grok 4.1 on score <70 or tokens >500; Claude Sonnet 4.5 if env toggle or Grok unavailable.
 
 #### Test Cases
-- Unit (RSpec): For #code_review—stub code_execution (git diff mock returning 4 files ordered by models/services/tests then churn), browse_page (raw content), RuboCop (offenses array limited to 20, Metrics disabled); assert output['strengths'].size >0, output['issues'][0]['line'] == 10; test redaction hashing with allowlist/denylist (config/redaction.yml); cover timeout (Timeout.raise after 30s mock) and token budget exceed (log/abort).
-- Integration (Capybara): Feature spec with javascript: true; 
+- Unit (Minitest): For #code_review—stub code_execution (git diff mock returning 4 files ordered by models/services/tests then churn), browse_page (raw content), RuboCop (offenses array limited to 20, Metrics disabled); assert output['strengths'].size >0, output['issues'][0]['line'] == 10; test redaction hashing with allowlist/denylist (config/redaction.yml); cover timeout (Timeout.raise after 30s mock) and token budget exceed (log/abort).
+- Integration (Capybara optional): Feature spec with javascript: true; 
   - Step 1: User visits '/admin/sap-collaborate', fills in branch name with 'feature/test-branch', clicks 'Run Review', and verifies the page displays 'Strengths: Clean MVC adherence' and 'Issues: 2 offenses on lines 5 and 10', matching AC for file selection and populated output.
   - Step 2: User triggers review with mocked sensitive content, verifies the page has no 'Sensitive API_KEY exposed', matching AC for redaction.
   - Step 3: User runs review with stubbed 404 tool failure, verifies the page shows 'Error logged: File fetch failed, skipped analysis', matching AC for error handling.
