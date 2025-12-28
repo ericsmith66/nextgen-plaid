@@ -1,0 +1,25 @@
+inherit_gem:
+  rubocop-rails-omakase: rubocop.yml
+
+AllCops:
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  Exclude:
+    - 'db/schema.rb'
+    - 'node_modules/**/*'
+    - 'vendor/**/*'
+
+Layout:
+  Enabled: true
+
+Metrics:
+  Enabled: false
+
+Style:
+  Enabled: true
+
+Lint:
+  Enabled: true
+
+Security:
+  Enabled: true

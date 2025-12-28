@@ -1,0 +1,7 @@
+allowlist:
+  - SAFE_TOKEN
+
+denylist:
+  - API_KEY
+  - SECRET_KEY
+  - PASSWORD
