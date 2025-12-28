@@ -1,2 +1,3 @@
 System Prompt
 [CONTEXT_BACKLOG]
+[VISION_SSOT]
