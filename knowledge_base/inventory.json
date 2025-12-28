@@ -1,0 +1,296 @@
+[
+  {
+    "title": "0000-Overview 1 SAP Core & Tools (AGENT-02A)",
+    "id": "0000",
+    "path": "knowledge_base/epics/AGENT-02A/0000-Overview 1 SAP Core & Tools (AGENT-02A).md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "0010-Backlog-PRD",
+    "id": "0010",
+    "path": "knowledge_base/epics/AGENT-02A/0010-Backlog-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "0012-Epics-PRD",
+    "id": "0012",
+    "path": "knowledge_base/epics/AGENT-02A/0012-Epics-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "0015-PRDs-PRD",
+    "id": "0015",
+    "path": "knowledge_base/epics/AGENT-02A/0015-PRDs-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "0020-SAP-Enhanced-Prompt-Externalization-PRD",
+    "id": "0020",
+    "path": "knowledge_base/epics/AGENT-02A/0020-SAP-Enhanced-Prompt-Externalization-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "0030-SAP-SmartProxy-Tool-Integration-PRD",
+    "id": "0030",
+    "path": "knowledge_base/epics/AGENT-02A/0030-SAP-SmartProxy-Tool-Integration-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "040-SAP-Grok-Ollama-Routing-Escalation-PRD",
+    "id": "040",
+    "path": "knowledge_base/epics/AGENT-02A/040-SAP-Grok-Ollama-Routing-Escalation-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "Feedback",
+    "id": "unknown",
+    "path": "knowledge_base/epics/AGENT-02A/Feedback.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "0010-SAP-RAG-Concat-Framework-PRD",
+    "id": "0010",
+    "path": "knowledge_base/epics/AGENT-02B/0010-SAP-RAG-Concat-Framework-PRD.md",
+    "last_modified": "2025-12-27 16:13:41 -0600"
+  },
+  {
+    "title": "0020-SAP-Inventory-Rake-Task-PRD",
+    "id": "0020",
+    "path": "knowledge_base/epics/AGENT-02B/0020-SAP-Inventory-Rake-Task-PRD.md",
+    "last_modified": "2025-12-27 16:13:46 -0600"
+  },
+  {
+    "title": "0030-SAP-Backlog-Management-Methods-PRD",
+    "id": "0030",
+    "path": "knowledge_base/epics/AGENT-02B/0030-SAP-Backlog-Management-Methods-PRD.md",
+    "last_modified": "2025-12-27 16:13:53 -0600"
+  },
+  {
+    "title": "0040-SAP-Webhook-Extension-Refresh-PRD",
+    "id": "0040",
+    "path": "knowledge_base/epics/AGENT-02B/0040-SAP-Webhook-Extension-Refresh-PRD.md",
+    "last_modified": "2025-12-27 16:13:58 -0600"
+  },
+  {
+    "title": "feedback",
+    "id": "unknown",
+    "path": "knowledge_base/epics/AGENT-02B/feedback.md",
+    "last_modified": "2025-12-27 16:10:41 -0600"
+  },
+  {
+    "title": "Implementation Plan: AGENT-02B (RAG & Backlog Management)",
+    "id": "unknown",
+    "path": "knowledge_base/epics/AGENT-02B/implementation_plan.md",
+    "last_modified": "2025-12-27 16:14:04 -0600"
+  },
+  {
+    "title": "001-Investment-Enrichment-PRD",
+    "id": "001",
+    "path": "knowledge_base/epics/Investment-Enrichment/001-Investment-Enrichment-PRD.md",
+    "last_modified": "2025-12-27 15:47:24 -0600"
+  },
+  {
+    "title": "0011-Local-Transaction-Enrichment-PRD",
+    "id": "0011",
+    "path": "knowledge_base/epics/Local-Transaction-Enrichment/0011-Local-Transaction-Enrichment-PRD.md",
+    "last_modified": "2025-12-27 15:48:44 -0600"
+  },
+  {
+    "title": "0000-SAP Agent Overview",
+    "id": "0000",
+    "path": "knowledge_base/epics/SAP Agent/0000-SAP Agent Overview.md",
+    "last_modified": "2025-12-26 13:24:51 -0600"
+  },
+  {
+    "title": "0001-SAP-Agent-Review-Feedback",
+    "id": "0001",
+    "path": "knowledge_base/epics/SAP Agent/0001-SAP-Agent-Review-Feedback.md",
+    "last_modified": "2025-12-26 13:08:33 -0600"
+  },
+  {
+    "title": "0100-SmartProxy-Sinatra-Server-PRD",
+    "id": "0100",
+    "path": "knowledge_base/epics/SAP Agent/0100-SmartProxy-Sinatra-Server-PRD.md",
+    "last_modified": "2025-12-26 13:25:06 -0600"
+  },
+  {
+    "title": "0110-SAP-Core-Service-Setup-PRD",
+    "id": "0110",
+    "path": "knowledge_base/epics/SAP Agent/0110-SAP-Core-Service-Setup-PRD.md",
+    "last_modified": "2025-12-26 13:25:14 -0600"
+  },
+  {
+    "title": "0120-RAG-Context-Integration-SAP-PRD",
+    "id": "0120",
+    "path": "knowledge_base/epics/SAP Agent/0120-RAG-Context-Integration-SAP-PRD.md",
+    "last_modified": "2025-12-26 13:25:22 -0600"
+  },
+  {
+    "title": "0130-PRD-Epic-Storage-Notification-PRD",
+    "id": "0130",
+    "path": "knowledge_base/epics/SAP Agent/0130-PRD-Epic-Storage-Notification-PRD.md",
+    "last_modified": "2025-12-26 13:25:32 -0600"
+  },
+  {
+    "title": "PRD AGENT-01.01",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-01.01.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD AGENT-01.5",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-01.5.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD AGENT-01",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-01.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD AGENT-02",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-02.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD AGENT-03",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-03.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD AGENT-04",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-04.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD AGENT-05",
+    "id": "unknown",
+    "path": "knowledge_base/epics/agents/PRD AGENT-05.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "0000-Full Fetch Overview",
+    "id": "0000",
+    "path": "knowledge_base/epics/full-fetch/0000-Full Fetch Overview.md",
+    "last_modified": "2025-12-26 04:52:59 -0600"
+  },
+  {
+    "title": "0010-Link-Token-Update PRD",
+    "id": "0010",
+    "path": "knowledge_base/epics/full-fetch/0010-Link-Token-Update PRD.md",
+    "last_modified": "2025-12-26 09:32:39 -0600"
+  },
+  {
+    "title": "0020-Transactions-Sync-Service PRD",
+    "id": "0020",
+    "path": "knowledge_base/epics/full-fetch/0020-Transactions-Sync-Service PRD.md",
+    "last_modified": "2025-12-26 09:32:39 -0600"
+  },
+  {
+    "title": "Usage: bin/rails plaid:update_webhook[database_id, webhook_url]",
+    "id": "0030",
+    "path": "knowledge_base/epics/full-fetch/0030-PRD-Webhook-Controller-Setup PRD.md",
+    "last_modified": "2025-12-26 09:51:07 -0600"
+  },
+  {
+    "title": "1. Enter console",
+    "id": "0040",
+    "path": "knowledge_base/epics/full-fetch/0040-Daily-Sync-Fallback-Job PRD.md",
+    "last_modified": "2025-12-26 13:28:26 -0600"
+  },
+  {
+    "title": "Unit tests for the job logic and rate limiting",
+    "id": "0050",
+    "path": "knowledge_base/epics/full-fetch/0050-Force-Full-Update-Feature-PRD.md",
+    "last_modified": "2025-12-26 13:28:26 -0600"
+  },
+  {
+    "title": "0060-Extend-Holdings-Liabilities-PRD",
+    "id": "0060",
+    "path": "knowledge_base/epics/full-fetch/0060-Extend-Holdings-Liabilities-PRD.md",
+    "last_modified": "2025-12-26 05:09:39 -0600"
+  },
+  {
+    "title": "0000-generated-prd-PRD",
+    "id": "0000",
+    "path": "knowledge_base/epics/generated-prd/0000-generated-prd-PRD.md",
+    "last_modified": "2025-12-27 15:25:01 -0600"
+  },
+  {
+    "title": "PRD: CSV-2 - Holdings CSV Import Service and Model Extensions",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD CSV-02.md",
+    "last_modified": "2025-12-18 17:40:48 -0600"
+  },
+  {
+    "title": "PRD: CSV-3 - Extend Account Model and Import ACCOUNTS CSV",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD CSV-03.md",
+    "last_modified": "2025-12-16 11:33:02 -0600"
+  },
+  {
+    "title": "PRD: CSV-5 - Transaction CSV Import Service and Model Extensions",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD CSV-05.md",
+    "last_modified": "2025-12-18 17:40:48 -0600"
+  },
+  {
+    "title": "PRD CSV-06",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD CSV-06.md",
+    "last_modified": "2025-12-18 17:40:48 -0600"
+  },
+  {
+    "title": "PRD: PROD-TEST 1 - Plaid Production Environment Switch and Database Initialization/Seeding",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD PROD-TEST-01.md",
+    "last_modified": "2025-12-25 06:17:00 -0600"
+  },
+  {
+    "title": "PRD UI-7",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD UI-7.md",
+    "last_modified": "2025-12-25 05:38:28 -0600"
+  },
+  {
+    "title": "PRD-Backlog",
+    "id": "unknown",
+    "path": "knowledge_base/prds/PRD-Backlog.md",
+    "last_modified": "2025-12-18 17:40:48 -0600"
+  },
+  {
+    "title": "Junie Task Log — CSV-02 Holdings Import Service",
+    "id": "2025",
+    "path": "knowledge_base/prds/prds-junie-log/2025-12-16__csv-02-holdings-import.md",
+    "last_modified": "2025-12-18 17:40:48 -0600"
+  },
+  {
+    "title": "Junie Task Log — CSV-5: Transaction CSV Import",
+    "id": "2025",
+    "path": "knowledge_base/prds/prds-junie-log/2025-12-18__csv-5-transactions-import.md",
+    "last_modified": "2025-12-18 17:40:48 -0600"
+  },
+  {
+    "title": "2025-12-26: PRD 0040 - Daily Sync Fallback Job",
+    "id": "2025",
+    "path": "knowledge_base/prds/prds-junie-log/2025-12-26__prd-0040-daily-sync-fallback.md",
+    "last_modified": "2025-12-26 13:28:26 -0600"
+  },
+  {
+    "title": "Junie Log: PRD 0050 - Force Full Update Feature",
+    "id": "2025",
+    "path": "knowledge_base/prds/prds-junie-log/2025-12-26__prd-0050-force-full-update.md",
+    "last_modified": "2025-12-26 13:28:26 -0600"
+  },
+  {
+    "title": "PRD — Junie Task Log Requirements",
+    "id": "unknown",
+    "path": "knowledge_base/prds/prds-junie-log/junie-log-requirement.md",
+    "last_modified": "2025-12-16 12:04:32 -0600"
+  }
+]

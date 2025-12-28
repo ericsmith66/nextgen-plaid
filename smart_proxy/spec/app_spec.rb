@@ -33,6 +33,43 @@ RSpec.describe SmartProxyApp do
     context 'when authorized' do
       let(:headers) { { 'HTTP_AUTHORIZATION' => "Bearer #{auth_token}", 'HTTP_HOST' => 'localhost' } }
 
+      it 'prioritizes GROK_API_KEY_SAP' do
+        allow(ENV).to receive(:[]).with('GROK_API_KEY_SAP').and_return('sap_key')
+        
+        stub_request(:post, "https://api.x.ai/v1/chat/completions")
+          .with(headers: { 'Authorization' => 'Bearer sap_key' })
+          .to_return(status: 200, body: {}.to_json)
+
+        post '/proxy/generate', payload.to_json, headers
+        expect(last_response).to be_ok
+      end
+
+      it 'uses session id from headers' do
+        request_id = 'test-request-id'
+        headers_with_id = headers.merge('HTTP_X_REQUEST_ID' => request_id)
+        
+        stub_request(:post, "https://api.x.ai/v1/chat/completions")
+          .to_return(status: 200, body: {}.to_json)
+
+        post '/proxy/generate', payload.to_json, headers_with_id
+        expect(last_response).to be_ok
+      end
+
+      it 'isolates concurrent requests (conceptual test)' do
+        stub_request(:post, "https://api.x.ai/v1/search/web").to_return(status: 200, body: {}.to_json)
+        stub_request(:post, "https://api.x.ai/v1/search/x").to_return(status: 200, body: {}.to_json)
+
+        tool_payload = { 'query' => 'test' }
+        post '/proxy/tools', tool_payload.to_json, headers
+        id1 = JSON.parse(last_response.body)['session_id']
+        
+        post '/proxy/tools', tool_payload.to_json, headers
+        id2 = JSON.parse(last_response.body)['session_id']
+        
+        expect(id1).not_to eq(id2)
+        expect(id1).not_to be_nil
+      end
+
       it 'forwards the request to Grok' do
         stub_request(:post, "https://api.x.ai/v1/chat/completions")
           .to_return(status: 200, body: { 'choices' => [{ 'message' => { 'content' => 'Hi' } }] }.to_json, headers: { 'Content-Type' => 'application/json' })

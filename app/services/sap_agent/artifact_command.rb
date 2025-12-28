@@ -12,21 +12,33 @@ module SapAgent
     end
 
     def prompt
-      system_prompt = File.read(PROMPT_PATH)
-      mcp_content = File.read(MCP_PATH) if File.exist?(MCP_PATH)
-      backlog_content = File.read(BACKLOG_PATH) if File.exist?(BACKLOG_PATH)
+      system_prompt_template = File.read(PROMPT_PATH)
+      mcp_content = File.exist?(MCP_PATH) ? File.read(MCP_PATH) : "No vision context."
+      backlog_content = File.exist?(BACKLOG_PATH) ? File.read(BACKLOG_PATH) : "[]"
+      rag_context = fetch_rag_context
 
-      # Inject context into system prompt
-      full_system_prompt = system_prompt.gsub('[CONTEXT_BACKLOG]', backlog_content || "[]")
-      full_system_prompt = full_system_prompt.gsub('[VISION_SSOT]', mcp_content || "No vision context.")
+      # Use ERB for dynamic substitutions in the system prompt
+      # We define the context variables that ERB will use
+      context = {
+        backlog: backlog_content,
+        vision: mcp_content,
+        project_context: rag_context
+      }
 
-      # Check if VISION_SSOT was actually in the system prompt. If not, append it if we want it there.
-      # Based on the test failing, it seems the system prompt might not have [VISION_SSOT] placeholder.
-      unless system_prompt.include?('[VISION_SSOT]')
-        full_system_prompt += "\n\nVision context:\n#{mcp_content}" if mcp_content
+      # Replace placeholders [CONTEXT_BACKLOG] and [VISION_SSOT] for backward compatibility
+      # while supporting ERB <%= vision %> and <%= backlog %>
+      rendered_system_prompt = system_prompt_template
+                               .gsub('[CONTEXT_BACKLOG]', context[:backlog])
+                               .gsub('[VISION_SSOT]', context[:vision])
+                               .gsub('[PROJECT_CONTEXT]', context[:project_context].to_json)
+
+      # Also support ERB rendering if <%= is present
+      if rendered_system_prompt.include?('<%=')
+        template = ERB.new(rendered_system_prompt)
+        rendered_system_prompt = template.result_with_hash(context)
       end
 
-      "#{full_system_prompt}\n\nUser Request: #{payload[:query]}"
+      "#{rendered_system_prompt}\n\nUser Request: #{payload[:query]}"
     end
 
     def execute
@@ -70,6 +82,18 @@ module SapAgent
       
       log_lifecycle('FAILURE', last_error)
       { error: "Failed after #{max_attempts} attempts: #{last_error}" }
+    end
+
+    private
+
+    def fetch_rag_context
+      snapshot_path = Dir.glob(Rails.root.join('knowledge_base/snapshots/*-project-snapshot.json')).max
+      return {} unless snapshot_path && File.exist?(snapshot_path)
+
+      JSON.parse(File.read(snapshot_path))
+    rescue => e
+      Rails.logger.warn("RAG context fetch failed: #{e.message}")
+      {}
     end
 
     protected

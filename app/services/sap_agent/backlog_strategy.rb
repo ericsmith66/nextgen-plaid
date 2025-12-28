@@ -35,6 +35,9 @@ module SapAgent
         raw_content = f.read
         current_backlog = raw_content.present? ? JSON.parse(raw_content) : []
         
+        # Add timestamp
+        data['updated_at'] ||= Time.current
+        
         # Merge or add
         existing_index = current_backlog.find_index { |item| item['id'] == data['id'] }
         if existing_index
@@ -61,7 +64,10 @@ module SapAgent
       backlog = JSON.parse(content)
       return "0010" if backlog.empty?
       
-      last_id = backlog.map { |item| item['id'].to_i }.max
+      # We need to consider AGENT-02B PRD numbering might be different but let's stick to incremental
+      # If we have AGENT-01XX in PRDs, we might want to skip those
+      ids = backlog.map { |item| item['id'].to_s.match(/^\d+$/) ? item['id'].to_i : nil }.compact
+      last_id = ids.max || 9
       (last_id + 1).to_s.rjust(4, '0')
     end
   end

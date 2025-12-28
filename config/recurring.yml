@@ -22,3 +22,9 @@ production:
   rotate_agent_logs:
     command: "rake logs:rotate"
     schedule: at 3am every day
+  daily_sap_rag_snapshot:
+    command: "rake sap:rag:snapshot"
+    schedule: at 3am every day
+  weekly_sap_rag_cleanup:
+    command: "rake sap:rag:cleanup"
+    schedule: at 4am every Sunday

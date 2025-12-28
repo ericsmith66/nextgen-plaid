@@ -54,7 +54,7 @@ class SmartProxyApp < Sinatra::Base
       query: query
     })
 
-    client = ToolClient.new(api_key: ENV['GROK_API_KEY'], session_id: @session_id)
+    client = ToolClient.new(api_key: ENV['GROK_API_KEY_SAP'] || ENV['GROK_API_KEY'], session_id: @session_id)
     
     web_resp = client.web_search(query, num_results: num_results)
     x_resp = client.x_keyword_search(query, limit: num_results)
@@ -106,7 +106,7 @@ class SmartProxyApp < Sinatra::Base
       client = OllamaClient.new
       response = client.chat(anonymized_payload)
     else
-      client = GrokClient.new(api_key: ENV['GROK_API_KEY'])
+      client = GrokClient.new(api_key: ENV['GROK_API_KEY_SAP'] || ENV['GROK_API_KEY'])
       response = client.chat_completions(anonymized_payload)
     end
 

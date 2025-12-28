@@ -13,9 +13,18 @@ class SapAgentRagProviderTest < ActiveSupport::TestCase
   end
 
   test "build_prefix selects correct docs based on query type" do
-    prefix = SapAgent::RagProvider.build_prefix('generate')
-    assert_match(/File: PRODUCT_REQUIREMENTS.md/, prefix)
-    assert_match(/File: 0_AI_THINKING_CONTEXT.md/, prefix)
+    # Create mock docs for testing
+    File.write(Rails.root.join('PRODUCT_REQUIREMENTS.md'), "Product Requirements")
+    File.write(Rails.root.join('0_AI_THINKING_CONTEXT.md'), "AI Thinking Context")
+    
+    begin
+      prefix = SapAgent::RagProvider.build_prefix('generate')
+      assert_match(/File: PRODUCT_REQUIREMENTS.md/, prefix)
+      assert_match(/File: 0_AI_THINKING_CONTEXT.md/, prefix)
+    ensure
+      File.delete(Rails.root.join('PRODUCT_REQUIREMENTS.md'))
+      File.delete(Rails.root.join('0_AI_THINKING_CONTEXT.md'))
+    end
   end
 
   test "build_prefix includes and anonymizes user snapshot" do

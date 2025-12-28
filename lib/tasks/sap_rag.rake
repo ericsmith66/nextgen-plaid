@@ -1,5 +1,15 @@
 namespace :sap do
   namespace :rag do
+    desc "Generate a project state snapshot for RAG context"
+    task :snapshot => :environment do
+      FinancialSnapshotJob.perform_now
+    end
+
+    desc "Cleanup old snapshots"
+    task :cleanup => :environment do
+      FinancialSnapshotJob.new.send(:cleanup_old_snapshots)
+    end
+
     desc "Inspect the RAG context for a specific query type and user"
     task :inspect, [:query_type, :user_id] => :environment do |t, args|
       query_type = args[:query_type] || 'generate'
