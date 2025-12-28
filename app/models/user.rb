@@ -11,6 +11,10 @@ class User < ApplicationRecord
     roles&.include?("admin")
   end
 
+  def owner?
+    email == (ENV["OWNER_EMAIL"].presence || "ericsmith66@me.com")
+  end
+
   def parent?
     roles&.include?("parent")
   end

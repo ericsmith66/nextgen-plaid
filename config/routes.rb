@@ -48,5 +48,6 @@ Rails.application.routes.draw do
   namespace :admin do
     resources :users
     resources :accounts
+    get "rag_inspector", to: "rag_inspector#index"
   end
 end

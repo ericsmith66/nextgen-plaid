@@ -1,0 +1,130 @@
+<%= render(LayoutComponent.new(title: "RAG Inspector", current_user: current_user)) do %>
+  <div class="space-y-8">
+    <div class="flex justify-between items-center">
+      <h2 class="text-3xl font-bold text-primary-400">RAG Inspector</h2>
+      <div class="flex gap-4">
+        <%= link_to "Mission Control", mission_control_path, class: "btn btn-outline btn-sm" %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Latest Snapshot -->
+      <div class="card bg-base-200 border border-base-300 shadow-xl">
+        <div class="card-body">
+          <h3 class="card-title text-primary-400 flex justify-between">
+            Latest Snapshot
+            <% if @latest_snapshot %>
+              <span class="text-xs font-mono text-slate-500"><%= @latest_snapshot[:name] %></span>
+            <% end %>
+          </h3>
+          <% if @latest_snapshot %>
+            <div class="bg-base-300 p-4 rounded-lg overflow-auto max-h-[500px]">
+              <pre class="text-xs text-green-400"><code><%= JSON.pretty_generate(@latest_snapshot[:data]) %></code></pre>
+            </div>
+          <% else %>
+            <p class="text-slate-500 italic">No snapshots found.</p>
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Inventory -->
+      <div class="card bg-base-200 border border-base-300 shadow-xl">
+        <div class="card-body">
+          <h3 class="card-title text-primary-400">Knowledge Base Inventory (<%= @inventory.size %> files)</h3>
+          <div class="overflow-x-auto">
+            <table class="table table-compact w-full">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Last Modified</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @inventory.each do |item| %>
+                  <tr class="hover:bg-base-300">
+                    <td class="text-xs"><%= item['title'] %></td>
+                    <td class="text-xs font-mono"><%= item['id'] %></td>
+                    <td>
+                      <span class="badge badge-sm <%= item['status'] == 'Completed' ? 'badge-success' : 'badge-ghost' %>">
+                        <%= item['status'] %>
+                      </span>
+                    </td>
+                    <td class="text-xs"><%= Time.parse(item['last_modified']).strftime("%Y-%m-%d %H:%M") rescue item['last_modified'] %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Backlog -->
+      <div class="card bg-base-200 border border-base-300 shadow-xl">
+        <div class="card-body">
+          <h3 class="card-title text-primary-400 text-2xl">Active Backlog (<%= @backlog.size %> items)</h3>
+          <div class="overflow-x-auto">
+            <table class="table table-compact w-full">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Title</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @backlog.each do |item| %>
+                  <tr class="hover:bg-base-300">
+                    <td class="text-xs font-mono"><%= item['id'] %></td>
+                    <td class="text-xs"><%= item['title'] %></td>
+                    <td>
+                      <span class="badge badge-sm <%= item['priority'] == 'High' ? 'badge-error' : (item['priority'] == 'Medium' ? 'badge-warning' : 'badge-info') %>">
+                        <%= item['priority'] %>
+                      </span>
+                    </td>
+                    <td>
+                      <span class="badge badge-sm <%= item['status'] == 'Completed' ? 'badge-success' : 'badge-outline' %>">
+                        <%= item['status'] %>
+                      </span>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Snapshot History -->
+      <div class="card bg-base-200 border border-base-300 shadow-xl">
+        <div class="card-body">
+          <h3 class="card-title text-primary-400">Snapshot History</h3>
+          <div class="overflow-x-auto">
+            <table class="table table-compact w-full">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Size</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @snapshots.each do |snap| %>
+                  <tr class="hover:bg-base-300">
+                    <td class="text-xs font-mono"><%= snap[:name] %></td>
+                    <td class="text-xs"><%= number_to_human_size(snap[:size]) %></td>
+                    <td class="text-xs"><%= snap[:mtime].strftime("%Y-%m-%d %H:%M") %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

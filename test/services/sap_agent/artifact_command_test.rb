@@ -11,7 +11,7 @@ class ArtifactCommandTest < ActiveSupport::TestCase
     
     # Ensure sap_system.md exists
     FileUtils.mkdir_p(Rails.root.join('config/agent_prompts'))
-    File.write(Rails.root.join('config/agent_prompts/sap_system.md'), "System Prompt\n[CONTEXT_BACKLOG]")
+    File.write(Rails.root.join('config/agent_prompts/sap_system.md'), "System Prompt\n[CONTEXT_BACKLOG]\n[VISION_SSOT]\n[PROJECT_CONTEXT]")
   end
 
   test "ArtifactCommand prompt includes MCP and system prompt" do
@@ -20,6 +20,19 @@ class ArtifactCommandTest < ActiveSupport::TestCase
     assert_match /Vision: Private Financial Data Sync/, prompt
     assert_match /System Prompt/, prompt
     assert_match /User Request: Create PRD for transaction sync/, prompt
+  end
+
+  test "ArtifactCommand prompt includes Project Context" do
+    # Create a snapshot for the test
+    FileUtils.mkdir_p(Rails.root.join('knowledge_base/snapshots'))
+    snapshot_data = { history: [], code_state: { schema: "Test Schema" } }
+    File.write(Rails.root.join('knowledge_base/snapshots/2025-12-27-project-snapshot.json'), snapshot_data.to_json)
+
+    command = SapAgent::ArtifactCommand.new(@payload.merge(strategy: :prd))
+    prompt = command.prompt
+    assert_match /Test Schema/, prompt
+  ensure
+    File.delete(Rails.root.join('knowledge_base/snapshots/2025-12-27-project-snapshot.json')) if File.exist?(Rails.root.join('knowledge_base/snapshots/2025-12-27-project-snapshot.json'))
   end
 
   test "GenerateCommand infers prd strategy" do
@@ -85,5 +98,16 @@ class ArtifactCommandTest < ActiveSupport::TestCase
     assert_equal "0011", id
   ensure
     File.delete(backlog_path) if File.exist?(backlog_path)
+  end
+
+  test "SapAgent.decompose routes through ArtifactCommand" do
+    user = User.first || User.create!(email: "sap_test_decompose@example.com", password: "password")
+    
+    # Stub the process method to verify it's called correctly
+    SapAgent.stub :process, ->(type, payload) { { response: "#### Overview\nGenerated PRD content", status: :success } } do
+      assert_nothing_raised do
+        SapAgent.decompose("task_123", user.id, "Create PRD for transaction sync")
+      end
+    end
   end
 end
