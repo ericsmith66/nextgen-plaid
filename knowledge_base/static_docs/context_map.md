@@ -4,7 +4,7 @@ This file maps SAP query types to relevant documentation files for RAG context s
 
 | Query Type | Relevant Documents |
 |------------|-------------------|
-| generate   | PRODUCT_REQUIREMENTS.md, 0_AI_THINKING_CONTEXT.md |
-| qa         | 0_AI_THINKING_CONTEXT.md, README.md |
-| debug      | 0_AI_THINKING_CONTEXT.md, log/smart_proxy.log |
-| default    | 0_AI_THINKING_CONTEXT.md |
+| generate   | PRODUCT_REQUIREMENTS.md, MCP.md, 0_AI_THINKING_CONTEXT.md |
+| qa         | MCP.md, 0_AI_THINKING_CONTEXT.md, README.md |
+| debug      | 0_AI_THINKING_CONTEXT.md, MCP.md, log/smart_proxy.log |
+| default    | MCP.md, 0_AI_THINKING_CONTEXT.md |
