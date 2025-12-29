@@ -14,6 +14,10 @@ module SapAgent
     ADAPTIVE_ESCALATION_ORDER = %w[grok-4.1 claude-sonnet-4.5 ollama].freeze
     ADAPTIVE_MAX_ESCALATIONS = 1
 
+    PRUNE_TARGET_TOKENS = 4000
+    PRUNE_MIN_KEEP_TOKENS = 2000
+    PRUNE_BACKOFF_MS = [ 150, 300 ].freeze
+
     MODEL_DEFAULT = "ollama".freeze
     MODEL_ESCALATE = "grok-4.1".freeze
     MODEL_FALLBACK = "claude-sonnet-4.5".freeze
