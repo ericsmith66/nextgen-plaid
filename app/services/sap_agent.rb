@@ -209,6 +209,60 @@ module SapAgent
       log_iterate_event("adaptive.error", error: e.message)
       { status: "error", reason: e.message, iterations: iterations }
     end
+
+    def conductor(task:, branch: nil, correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, refiner_iterations: 3, max_jobs: 5)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.task_id = task
+      self.branch = branch
+      self.correlation_id = correlation_id
+      self.model_used = SapAgent::Config::MODEL_DEFAULT
+
+      requested_jobs = 2 + refiner_iterations # outliner + reviewer + refiners
+      if requested_jobs > max_jobs
+        log_conductor_event("conductor.aborted", reason: "max_jobs_exceeded", requested_jobs: requested_jobs, max_jobs: max_jobs, idempotency_uuid: idempotency_uuid)
+        return { status: "aborted", reason: "max_jobs_exceeded", requested_jobs: requested_jobs, max_jobs: max_jobs }
+      end
+
+      state = {
+        task: task,
+        idempotency_uuid: idempotency_uuid,
+        correlation_id: correlation_id,
+        escalation_used: false,
+        iterations: [],
+        steps: []
+      }
+
+      failure_streak = 0
+      queue_job_id = -> { SecureRandom.uuid }
+
+      outliner_result = run_sub_agent(:outliner, state, queue_job_id.call, iteration: 1)
+      failure_streak = update_failure_streak(outliner_result, failure_streak)
+      state = outliner_result[:state]
+      return circuit_breaker_fallback(state) if circuit_breaker_tripped?(failure_streak)
+
+      refiner_iterations.times do |idx|
+        sub_result = run_sub_agent(:refiner, state, queue_job_id.call, iteration: idx + 1)
+        failure_streak = update_failure_streak(sub_result, failure_streak)
+        state = sub_result[:state]
+        return circuit_breaker_fallback(state) if circuit_breaker_tripped?(failure_streak)
+      end
+
+      reviewer_result = run_sub_agent(:reviewer, state, queue_job_id.call, iteration: refiner_iterations + 1)
+      failure_streak = update_failure_streak(reviewer_result, failure_streak)
+      state = reviewer_result[:state]
+
+      if circuit_breaker_tripped?(failure_streak)
+        return circuit_breaker_fallback(state)
+      end
+
+      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      log_conductor_event("conductor.complete", idempotency_uuid: idempotency_uuid, elapsed_ms: elapsed, queue_job_id: reviewer_result[:queue_job_id])
+
+      { status: "completed", state: state, elapsed_ms: elapsed }
+    rescue StandardError => e
+      log_conductor_event("conductor.error", reason: e.message, idempotency_uuid: idempotency_uuid)
+      { status: "error", reason: e.message }
+    end
     def queue_handshake(artifact:, task_summary:, task_id:, branch: "main", correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, artifact_path: nil)
       started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       self.task_id = task_id
@@ -574,6 +628,21 @@ module SapAgent
       logger.info(payload.to_json)
     end
 
+    def log_conductor_event(event, data = {})
+      payload = {
+        timestamp: Time.now.utc.iso8601,
+        task_id: task_id,
+        branch: branch,
+        uuid: SecureRandom.uuid,
+        correlation_id: correlation_id,
+        model_used: model_used,
+        elapsed_ms: data.delete(:elapsed_ms),
+        score: data.delete(:score)
+      }.merge(data).merge(event: event).compact
+
+      logger.info(payload.to_json)
+    end
+
     def estimate_tokens(text)
       (text.to_s.length / 4.0).ceil
     end
@@ -601,6 +670,80 @@ module SapAgent
       # Default heuristic score; tests will stub this method for deterministic behavior.
       length_score = [ (output.to_s.length + context.to_s.length) / 10, 100 ].min
       [ length_score, SapAgent::Config::SCORE_STOP_THRESHOLD ].min
+    end
+
+    def run_sub_agent(sub_agent, state, queue_job_id, iteration: nil)
+      payload = state.merge(queue_job_id: queue_job_id, sub_agent: sub_agent, iteration: iteration)
+      log_conductor_event("conductor.route", payload)
+
+      result = nil
+      SapAgent::TimeoutWrapper.with_timeout(1) do
+        result =
+          case sub_agent
+          when :outliner then sub_agent_outliner(state)
+          when :refiner then sub_agent_refiner(state, iteration)
+          when :reviewer then sub_agent_reviewer(state)
+          else
+            { status: "error", state: state, reason: "unknown_sub_agent" }
+          end
+      end
+
+      result ||= { status: "error", state: state, reason: "no_result" }
+      new_state = safe_state_roundtrip(result[:state] || state)
+      log_conductor_event("conductor.state_saved", sub_agent: sub_agent, queue_job_id: queue_job_id, iteration: iteration)
+
+      result.merge(state: new_state, queue_job_id: queue_job_id)
+    rescue StandardError => e
+      log_conductor_event("conductor.error", sub_agent: sub_agent, queue_job_id: queue_job_id, reason: e.message)
+      { status: "error", reason: e.message, state: state, queue_job_id: queue_job_id }
+    end
+
+    def sub_agent_outliner(state)
+      steps = [ "Gather requirements", "Design", "Implement", "Test" ]
+      new_state = state.dup
+      new_state[:steps] = (state[:steps] || []) + [ "outliner" ]
+      new_state[:outline] = steps
+      { status: "ok", state: new_state }
+    end
+
+    def sub_agent_refiner(state, iteration)
+      new_state = state.dup
+      refinements = new_state[:refinements] || []
+      refinements << "refinement-#{iteration}"
+      new_state[:refinements] = refinements
+      new_state[:steps] = (state[:steps] || []) + [ "refiner-#{iteration}" ]
+      new_state[:iterations] = (state[:iterations] || []) + [ { iteration: iteration, output: "refined step #{iteration}" } ]
+      { status: "ok", state: new_state }
+    end
+
+    def sub_agent_reviewer(state)
+      new_state = state.dup
+      new_state[:steps] = (state[:steps] || []) + [ "reviewer" ]
+      new_state[:score] = 85
+      { status: "ok", state: new_state }
+    end
+
+    def safe_state_roundtrip(state)
+      parsed = JSON.parse(state.to_json)
+      parsed.is_a?(Hash) ? parsed.with_indifferent_access : state
+    rescue JSON::ParserError
+      log_conductor_event("conductor.error", reason: "state_validation_failed")
+      state
+    end
+
+    def update_failure_streak(result, current_streak)
+      return 0 if result[:status] == "ok"
+
+      current_streak + 1
+    end
+
+    def circuit_breaker_tripped?(failure_streak)
+      failure_streak >= 3
+    end
+
+    def circuit_breaker_fallback(state)
+      log_conductor_event("conductor.circuit_breaker", reason: "failure_streak", state: state)
+      { status: "fallback", reason: "circuit_breaker", state: state }
     end
 
     def generate_iteration_output(context, iteration_number, model)
