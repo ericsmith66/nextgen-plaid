@@ -133,6 +133,82 @@ module SapAgent
       log_iterate_event("iterate.error", error: e.message)
       { status: "error", error: e.message, iterations: iterations }
     end
+
+    def adaptive_iterate(task:, branch: nil, correlation_id: SecureRandom.uuid, human_feedback: nil, start_model: nil)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.task_id = task
+      self.branch = branch
+      self.correlation_id = correlation_id
+      self.model_used = start_model.presence || ENV["ESCALATE_LLM"].presence || SapAgent::Config::MODEL_DEFAULT
+
+      context = [ "Task: #{task}" ]
+      context << "Human feedback: #{human_feedback}" if human_feedback.present?
+
+      iterations = []
+      retry_count = 0
+      escalation_used = 0
+      cumulative_tokens = 0
+      previous_model = self.model_used
+
+      SapAgent::Config::ADAPTIVE_ITERATION_CAP.times do |idx|
+        iteration_number = idx + 1
+        current_model = self.model_used
+
+        output = generate_iteration_output(context.join("\n"), iteration_number, current_model)
+        iterations << { iteration: iteration_number, output: output, model_used: current_model }
+
+        token_count = estimate_tokens(context.join("\n") + output.to_s)
+        cumulative_tokens += token_count
+
+        log_iterate_event("adaptive.iteration", iteration: iteration_number, token_count: token_count, cumulative_tokens: cumulative_tokens, model_used: current_model)
+
+        if cumulative_tokens > SapAgent::Config::ADAPTIVE_TOKEN_BUDGET
+          log_iterate_event("adaptive.abort", reason: "token_budget_exceeded", token_count: cumulative_tokens, iteration: iteration_number)
+          return { status: "aborted", reason: "token_budget_exceeded", token_count: cumulative_tokens, iterations: iterations, partial_output: output }
+        end
+
+        score = score_output(output, context.join("\n"))
+        normalized_score = normalize_score(score, current_model, previous_model)
+
+        log_iterate_event("adaptive.scored", iteration: iteration_number, score: normalized_score, token_count: cumulative_tokens, model_used: current_model)
+
+        context << "Iteration #{iteration_number} output: #{output}"
+
+        if normalized_score >= SapAgent::Config::SCORE_STOP_THRESHOLD
+          elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          log_iterate_event("adaptive.complete", iteration: iteration_number, score: normalized_score, elapsed_ms: elapsed, model_used: current_model)
+          return { status: "completed", iterations: iterations, final_output: output, score: normalized_score, model_used: current_model }
+        end
+
+        escalation_triggered = normalized_score < SapAgent::Config::SCORE_ESCALATE_THRESHOLD || cumulative_tokens > SapAgent::Config::ADAPTIVE_TOKEN_BUDGET
+
+        if escalation_triggered && escalation_used < SapAgent::Config::ADAPTIVE_MAX_ESCALATIONS
+          next_model = next_escalation_model(current_model)
+          if next_model
+            escalation_used += 1
+            log_iterate_event("adaptive.escalate", iteration: iteration_number, from: current_model, to: next_model, escalation_used: escalation_used)
+            previous_model = current_model
+            self.model_used = next_model
+            retry_count = 0
+            next
+          end
+        end
+
+        if retry_count < SapAgent::Config::ADAPTIVE_RETRY_LIMIT
+          backoff_ms = SapAgent::Config::BACKOFF_MS[retry_count] || SapAgent::Config::BACKOFF_MS.last
+          SapAgent::TimeoutWrapper.with_timeout((backoff_ms / 1000.0) + 0.1) { sleep(backoff_ms / 1000.0) }
+          retry_count += 1
+          previous_model = current_model
+          next
+        end
+      end
+
+      log_iterate_event("adaptive.abort", reason: "iteration_cap", iteration: SapAgent::Config::ADAPTIVE_ITERATION_CAP)
+      { status: "aborted", reason: "iteration_cap", iterations: iterations, final_output: iterations.last&.dig(:output), model_used: self.model_used }
+    rescue StandardError => e
+      log_iterate_event("adaptive.error", error: e.message)
+      { status: "error", reason: e.message, iterations: iterations }
+    end
     def queue_handshake(artifact:, task_summary:, task_id:, branch: "main", correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, artifact_path: nil)
       started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       self.task_id = task_id
@@ -500,6 +576,21 @@ module SapAgent
 
     def estimate_tokens(text)
       (text.to_s.length / 4.0).ceil
+    end
+
+    def normalize_score(score, current_model, previous_model)
+      return score if current_model == previous_model
+
+      adjusted = score * 0.95
+      [ [ adjusted, 0 ].max, 100 ].min
+    end
+
+    def next_escalation_model(current_model)
+      order = SapAgent::Config::ADAPTIVE_ESCALATION_ORDER
+      index = order.index(current_model)
+      return order.first unless index
+
+      order[index + 1] || order.first
     end
 
     def logger
