@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>NextGen Plaid — Admin</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+  <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+  <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+</head>
+
+<body data-theme="business" class="min-h-screen bg-base-200">
+  <%= render NavigationComponent.new(current_user: current_user) %>
+
+  <% flash.each do |type, msg| %>
+    <div class="alert <%= type == 'notice' ? 'alert-success' : 'alert-error' %> rounded-none">
+      <%= msg %>
+    </div>
+  <% end %>
+
+  <main class="container mx-auto p-6 space-y-6">
+    <%= yield %>
+  </main>
+</body>
+</html>

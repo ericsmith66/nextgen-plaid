@@ -1,0 +1,109 @@
+<div class="space-y-6">
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body space-y-4">
+      <div class="flex flex-col gap-2">
+        <h1 class="card-title">SAP Oversight</h1>
+        <p class="text-sm text-base-content/70">Admin-only workspace to start Adaptive Iterate or Conductor runs. Enter a task, confirm IDs, and launch. Raw JSON is tucked behind a toggle.</p>
+      </div>
+
+      <%= form_with url: admin_sap_collaborate_start_iterate_path, method: :post, local: true, html: { class: "space-y-4" } do |f| %>
+        <div class="form-control">
+          <label class="label" for="task">
+            <span class="label-text">Task<span class="text-error">*</span></span>
+          </label>
+          <%= f.text_area :task, value: sap_params[:task], required: true, class: "textarea textarea-bordered", placeholder: "Describe the task (e.g., Generate PRD for webhook ingestion)" %>
+          <label class="label">
+            <span class="label-text-alt text-error">Task is required.</span>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="form-control">
+            <label class="label" for="branch">
+              <span class="label-text">Branch (optional)</span>
+            </label>
+            <%= f.text_field :branch, value: sap_params[:branch], class: "input input-bordered", placeholder: "feature/agent-03" %>
+            <label class="label">
+              <span class="label-text-alt">Optional: note the git branch for this run.</span>
+            </label>
+          </div>
+
+          <div class="form-control">
+            <label class="label" for="flow">
+              <span class="label-text">Flow</span>
+            </label>
+            <select class="select select-bordered" id="flow" disabled>
+              <option>Adaptive Iterate</option>
+              <option>Conductor</option>
+            </select>
+            <label class="label">
+              <span class="label-text-alt">Choose via the buttons below.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="form-control">
+            <label class="label" for="correlation_id">
+              <span class="label-text">Correlation ID (auto-generated)</span>
+            </label>
+            <%= f.text_field :correlation_id, value: @correlation_id, class: "input input-bordered" %>
+            <label class="label">
+              <span class="label-text-alt">Used to track logs and live updates.</span>
+            </label>
+          </div>
+
+          <div class="form-control">
+            <label class="label" for="idempotency_uuid">
+              <span class="label-text">Idempotency UUID (auto-generated)</span>
+            </label>
+            <%= f.text_field :idempotency_uuid, value: @idempotency_uuid, class: "input input-bordered" %>
+            <label class="label">
+              <span class="label-text-alt">Keeps repeated submissions aligned.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary" type="submit">Start Adaptive Iterate</button>
+          <button class="btn btn-secondary" type="submit" formaction="<%= admin_sap_collaborate_start_conductor_path %>">Start Conductor</button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-lg">
+    <div class="card-body space-y-3">
+      <h2 class="card-title">Status & Output</h2>
+      <p class="text-sm text-base-content/70">Correlation ID: <span class="font-mono"><%= @correlation_id %></span></p>
+      <p class="text-sm text-base-content/70">Idempotency UUID: <span class="font-mono"><%= @idempotency_uuid %></span></p>
+
+      <% if @humanized_response.present? %>
+        <div class="alert alert-success">
+          <span><%= @humanized_response %></span>
+        </div>
+      <% elsif @sap_response.present? %>
+        <div class="alert alert-info">
+          <span>Response ready. Open raw JSON below.</span>
+        </div>
+      <% else %>
+        <div class="alert">
+          <span>No run started yet. Submit a task to see results.</span>
+        </div>
+      <% end %>
+
+      <% if @sap_response.present? %>
+        <details class="collapse collapse-arrow bg-base-200">
+          <summary class="collapse-title text-md font-medium">Show raw JSON</summary>
+          <div class="collapse-content">
+            <pre class="whitespace-pre-wrap text-xs"><%= JSON.pretty_generate(@sap_response) rescue @sap_response.to_json %></pre>
+          </div>
+        </details>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="alert alert-info shadow-lg">
+    <span>Real-time updates, pause/resume, and audit history will be added in PRDs 0041C–0041E. Access is owner/admin only.</span>
+  </div>
+</div>
