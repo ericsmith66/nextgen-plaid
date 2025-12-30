@@ -8,9 +8,10 @@ class ApplicationJob < ActiveJob::Base
   private
 
   def should_skip_sync?
-    # Only skip if we are trying to use PRODUCTION Plaid in a NON-PRODUCTION Rails environment.
-    # We WANT to allow 'sandbox' or 'development' Plaid environments in any Rails environment.
-    ENV["PLAID_ENV"] == "production" && !Rails.env.production?
+   # Only skip if we are trying to use PRODUCTION Plaid in a NON-PRODUCTION Rails environment.
+   # We WANT to allow 'sandbox' or 'development' Plaid environments in any Rails environment.
+   ENV["PLAID_ENV"] == "production" && !Rails.env.production?
+   false
   end
 
   def skip_non_prod!(item, job_type)
