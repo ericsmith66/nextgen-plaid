@@ -83,6 +83,137 @@ class SyncTransactionsJobTest < ActiveJob::TestCase
     assert_nil transaction.dividend_type
   end
 
+  test "creates enriched transaction when enrichment enabled" do
+    original_flag = ENV["PLAID_ENRICH_ENABLED"]
+    ENV["PLAID_ENRICH_ENABLED"] = "true"
+
+    user = User.create!(email: "enrich@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_enrich", institution_name: "Bank", access_token: "tok_enrich", status: "good")
+
+    account = Account.create!(
+      plaid_item: item,
+      account_id: "acc_enrich",
+      name: "Checking",
+      type: "depository",
+      subtype: "checking",
+      mask: "9999"
+    )
+
+    pfc = OpenStruct.new(primary: "FOOD_AND_DRINK", detailed: "COFFEE", confidence_level: "HIGH")
+    counterparty = OpenStruct.new(logo_url: "https://logo.example.com", website: "https://coffee.example.com", confidence_level: "HIGH")
+
+    plaid_transaction = OpenStruct.new(
+      transaction_id: "txn_enrich_1",
+      account_id: account.account_id,
+      name: "Blue Bottle",
+      merchant_name: "Blue Bottle",
+      amount: 5.75,
+      date: Date.today,
+      category: ["Food and Drink", "Coffee Shop"],
+      pending: false,
+      payment_channel: "in_store",
+      iso_currency_code: "USD",
+      personal_finance_category: pfc,
+      counterparties: [counterparty]
+    )
+
+    fake_sync_response = OpenStruct.new(
+      added: [plaid_transaction],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync_enrich"
+    )
+
+    fake_inv_transactions_response = OpenStruct.new(
+      investment_transactions: [],
+      securities: [],
+      request_id: "req_inv_enrich"
+    )
+
+    fake_recurring_response = OpenStruct.new(
+      inflow_streams: [],
+      outflow_streams: [],
+      request_id: "req_rec_enrich"
+    )
+
+    fake_transactions_response = OpenStruct.new(transactions: [], request_id: "req_txn_enrich")
+
+    with_stubbed_plaid_client(
+      transactions_sync: fake_sync_response,
+      transactions_get: fake_transactions_response,
+      investments_transactions_get: fake_inv_transactions_response,
+      transactions_recurring_get: fake_recurring_response
+    ) do
+      SyncTransactionsJob.perform_now(item.id)
+    end
+
+    transaction = Transaction.find_by(transaction_id: "txn_enrich_1")
+    refute_nil transaction
+
+    enriched = transaction.enriched_transaction
+    refute_nil enriched
+    assert_equal "Blue Bottle", enriched.merchant_name
+    assert_equal "FOOD_AND_DRINK → COFFEE", enriched.personal_finance_category
+    assert_equal "HIGH", enriched.confidence_level
+    assert_equal "https://logo.example.com", enriched.logo_url
+    assert_equal "https://coffee.example.com", enriched.website
+  ensure
+    ENV["PLAID_ENRICH_ENABLED"] = original_flag
+  end
+
+  test "sync uses two-year lookback for investment transactions" do
+    user = User.create!(email: "lookback@example.com", password: "Password!123")
+    item = PlaidItem.create!(user: user, item_id: "it_lookback", institution_name: "Fidelity", access_token: "tok_lb", status: "good")
+
+    Account.create!(
+      plaid_item: item,
+      account_id: "acc_lb",
+      name: "Investment Account",
+      type: "investment",
+      subtype: "brokerage",
+      mask: "5555"
+    )
+
+    fake_sync_response = OpenStruct.new(
+      added: [],
+      modified: [],
+      removed: [],
+      has_more: false,
+      next_cursor: "new_cursor",
+      request_id: "req_sync"
+    )
+
+    fake_inv_transactions_response = OpenStruct.new(
+      investment_transactions: [],
+      securities: [],
+      request_id: "req_inv"
+    )
+
+    fake_recurring_response = OpenStruct.new(
+      inflow_streams: [],
+      outflow_streams: []
+    )
+
+    requests = []
+    original_client = Rails.application.config.x.plaid_client
+    mock_client = Minitest::Mock.new
+    mock_client.expect(:transactions_sync, fake_sync_response, [Object])
+    mock_client.expect(:transactions_recurring_get, fake_recurring_response, [Object])
+    mock_client.expect(:investments_transactions_get, fake_inv_transactions_response, [->(req) { requests << req; true }])
+
+    Rails.application.config.x.plaid_client = mock_client
+
+    SyncTransactionsJob.perform_now(item.id)
+
+    mock_client.verify
+    refute_empty requests
+    assert_equal (Date.current - 730.days).strftime("%Y-%m-%d"), requests.first.start_date
+  ensure
+    Rails.application.config.x.plaid_client = original_client
+  end
+
   # PRD 11: Test dividend transaction with dividend_type
   test "sync sets dividend_type for dividend transactions" do
     user = User.create!(email: "divtxn@example.com", password: "Password!123")
