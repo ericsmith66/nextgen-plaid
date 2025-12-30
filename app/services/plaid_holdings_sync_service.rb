@@ -102,7 +102,7 @@ class PlaidHoldingsSyncService
       security = plaid_securities.find { |s| s.security_id == holding.security_id }
       next unless security
 
-      pos = account.holdings.create_or_find_by!(security_id: security.security_id, source: "plaid")
+      pos = account.holdings.find_or_create_by!(security_id: security.security_id, source: :plaid)
       
       pos.assign_attributes(
         symbol: security.ticker_symbol,

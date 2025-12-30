@@ -103,23 +103,51 @@ class SyncTransactionsJob < ApplicationJob
 
   # PRD 11: Sync investment transactions for item
   def sync_investments(item)
-    request = Plaid::InvestmentsTransactionsGetRequest.new(
-      access_token: item.access_token,
-      start_date: (Date.today - 30.days).strftime('%Y-%m-%d'),
-      end_date: Date.today.strftime('%Y-%m-%d')
-    )
-    
-    response = Rails.application.config.x.plaid_client.investments_transactions_get(request)
-    
-    # Log API call
-    PlaidApiCall.log_call(
-      product: 'investments',
-      endpoint: '/investments/transactions/get',
-      request_id: response.request_id,
-      count: response.investment_transactions.size
-    )
+    start_date = if item.transactions_synced_at.present?
+      item.transactions_synced_at.to_date
+    else
+      (Date.current - 730.days)
+    end
 
-    process_investment_transactions(item, response.investment_transactions, response.securities)
+    end_date = Date.current
+    offset = 0
+    page_size = 500
+    all_transactions = []
+    securities_by_id = {}
+
+    loop do
+      request = Plaid::InvestmentsTransactionsGetRequest.new(
+        access_token: item.access_token,
+        start_date: start_date.strftime('%Y-%m-%d'),
+        end_date: end_date.strftime('%Y-%m-%d'),
+        options: Plaid::InvestmentsTransactionsGetRequestOptions.new(
+          count: page_size,
+          offset: offset
+        )
+      )
+
+      response = Rails.application.config.x.plaid_client.investments_transactions_get(request)
+
+      # Log API call per page
+      PlaidApiCall.log_call(
+        product: 'investments',
+        endpoint: '/investments/transactions/get',
+        request_id: response.request_id,
+        count: response.investment_transactions.size
+      )
+
+      all_transactions.concat(response.investment_transactions)
+      response.securities.each do |security|
+        securities_by_id[security.security_id] ||= security
+      end
+
+      batch_size = response.investment_transactions.size
+      offset += batch_size
+
+      break if batch_size < page_size
+    end
+
+    process_investment_transactions(item, all_transactions, securities_by_id.values)
   rescue Plaid::ApiError => e
     Rails.logger.error "SyncTransactionsJob: investments_transactions_get failed for Item #{item.id}: #{e.message}"
     # Non-fatal for the whole job

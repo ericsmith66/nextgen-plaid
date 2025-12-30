@@ -62,6 +62,7 @@ class PlaidTransactionSyncService
       transaction = account.transactions.create_or_find_by!(transaction_id: txn.transaction_id, source: "plaid")
       update_transaction_fields(transaction, txn)
       transaction.save!
+      upsert_enriched_transaction(transaction, txn)
     end
   end
 
@@ -88,6 +89,42 @@ class PlaidTransactionSyncService
       source: "plaid",
       deleted_at: nil # Restore if it was previously soft-deleted
     )
+  end
+
+  def upsert_enriched_transaction(transaction, plaid_txn)
+    return unless ENV.fetch("PLAID_ENRICH_ENABLED", "false").to_s == "true"
+
+    pfc = plaid_txn.respond_to?(:personal_finance_category) ? plaid_txn.personal_finance_category : nil
+    primary = pfc&.respond_to?(:primary) ? pfc.primary : pfc&.dig(:primary)
+    detailed = pfc&.respond_to?(:detailed) ? pfc.detailed : pfc&.dig(:detailed)
+    category_string = if primary.present? || detailed.present?
+      detailed.present? ? "#{primary} → #{detailed}" : primary
+    end
+
+    counterparties = plaid_txn.respond_to?(:counterparties) ? plaid_txn.counterparties : nil
+    counterparty = counterparties&.first
+    logo_url = counterparty&.respond_to?(:logo_url) ? counterparty.logo_url : counterparty&.dig(:logo_url)
+    website = counterparty&.respond_to?(:website) ? counterparty.website : counterparty&.dig(:website)
+
+    confidence = if pfc&.respond_to?(:confidence_level)
+      pfc.confidence_level
+    elsif counterparty&.respond_to?(:confidence_level)
+      counterparty.confidence_level
+    else
+      "UNKNOWN"
+    end
+
+    enriched = transaction.enriched_transaction || EnrichedTransaction.find_or_initialize_by(transaction_id: transaction.id)
+    enriched.assign_attributes(
+      merchant_name: plaid_txn.merchant_name || plaid_txn.name,
+      logo_url: logo_url,
+      website: website,
+      personal_finance_category: category_string,
+      confidence_level: confidence
+    )
+    enriched.save!
+  rescue => e
+    Rails.logger.error "PlaidTransactionSyncService: failed to upsert enriched transaction #{transaction.id}: #{e.message}"
   end
 
   def handle_plaid_error(e)
