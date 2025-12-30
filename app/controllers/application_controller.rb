@@ -1,4 +1,6 @@
 class ApplicationController < ActionController::Base
+  include Pundit::Authorization
+  rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
   protect_from_forgery with: :exception
 
   # This is the official Devise fix for Rails 7+ / 8
@@ -7,6 +9,11 @@ class ApplicationController < ActionController::Base
   before_action :set_environment_banner
 
   private
+
+  def user_not_authorized
+    flash[:alert] = "You are not authorized to perform this action."
+    redirect_to(request.referrer || authenticated_root_path)
+  end
 
   def set_environment_banner
     return unless current_user
