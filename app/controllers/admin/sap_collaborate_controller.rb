@@ -38,6 +38,15 @@ module Admin
       render_error(e)
     end
 
+    def status
+      payload = Rails.cache.read(cache_key)
+      if payload
+        render json: payload.merge(correlation_id: @correlation_id)
+      else
+        render json: { correlation_id: @correlation_id, status: "unknown" }, status: :not_found
+      end
+    end
+
     private
 
     def authorize_sap_collaborate
@@ -54,6 +63,7 @@ module Admin
     def render_response(response, notice:)
       @sap_response = response
       @humanized_response = humanize_response(response)
+      cache_and_broadcast(@sap_response, @humanized_response)
       flash.now[:notice] = "#{notice} (corr: #{@correlation_id})"
       render :index
     end
@@ -61,7 +71,10 @@ module Admin
     def humanize_response(payload)
       return if payload.blank?
 
-      SapAgent::RagProvider.summarize("Summarize in English: #{payload.to_json}") || safe_fallback_summary(payload)
+      return summarize_hash(payload) if payload.is_a?(Hash)
+      return payload if payload.is_a?(String)
+
+      safe_fallback_summary(payload)
     rescue StandardError
       nil
     end
@@ -69,6 +82,41 @@ module Admin
     def safe_fallback_summary(payload)
       text = payload.is_a?(String) ? payload : payload.to_json
       text&.truncate(280)
+    end
+
+    def summarize_hash(payload)
+      status = payload[:status] || payload["status"]
+      reason = payload[:reason] || payload["reason"]
+      iterations = payload[:iterations] || payload["iterations"]
+      iter_count = iterations.respond_to?(:size) ? iterations.size : nil
+      model = payload[:model_used] || payload["model_used"]
+
+      parts = []
+      parts << "Status: #{status}" if status
+      parts << "Reason: #{reason}" if reason
+      parts << "Iterations: #{iter_count}" if iter_count
+      parts << "Model: #{model}" if model
+      return parts.join(" | ") if parts.any?
+
+      safe_fallback_summary(payload)
+    end
+
+    def cache_and_broadcast(payload, humanized)
+      body = {
+        correlation_id: @correlation_id,
+        idempotency_uuid: @idempotency_uuid,
+        status: payload.is_a?(Hash) ? (payload[:status] || payload["status"] || "completed") : "completed",
+        payload: payload,
+        humanized: humanized,
+        updated_at: Time.current
+      }
+
+      Rails.cache.write(cache_key, body, expires_in: 1.hour)
+      SapRunChannel.broadcast_to(@correlation_id, body)
+    end
+
+    def cache_key
+      "sap_run:#{@correlation_id}"
     end
 
     def render_missing_task

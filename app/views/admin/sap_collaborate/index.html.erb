@@ -11,7 +11,7 @@
           <label class="label" for="task">
             <span class="label-text">Task<span class="text-error">*</span></span>
           </label>
-          <%= f.text_area :task, value: sap_params[:task], required: true, class: "textarea textarea-bordered", placeholder: "Describe the task (e.g., Generate PRD for webhook ingestion)" %>
+          <%= f.text_area :task, value: @task, required: true, class: "textarea textarea-bordered", placeholder: "Describe the task (e.g., Generate PRD for webhook ingestion)" %>
           <label class="label">
             <span class="label-text-alt text-error">Task is required.</span>
           </label>
@@ -22,7 +22,7 @@
             <label class="label" for="branch">
               <span class="label-text">Branch (optional)</span>
             </label>
-            <%= f.text_field :branch, value: sap_params[:branch], class: "input input-bordered", placeholder: "feature/agent-03" %>
+            <%= f.text_field :branch, value: @branch, class: "input input-bordered", placeholder: "feature/agent-03" %>
             <label class="label">
               <span class="label-text-alt">Optional: note the git branch for this run.</span>
             </label>
@@ -72,34 +72,44 @@
     </div>
   </div>
 
-  <div class="card bg-base-100 shadow-lg">
+  <div class="card bg-base-100 shadow-lg" id="sap-status-card"
+       data-correlation="<%= @correlation_id %>"
+       data-status-url="<%= admin_sap_collaborate_status_path(correlation_id: @correlation_id) %>">
     <div class="card-body space-y-3">
       <h2 class="card-title">Status & Output</h2>
       <p class="text-sm text-base-content/70">Correlation ID: <span class="font-mono"><%= @correlation_id %></span></p>
       <p class="text-sm text-base-content/70">Idempotency UUID: <span class="font-mono"><%= @idempotency_uuid %></span></p>
 
-      <% if @humanized_response.present? %>
-        <div class="alert alert-success">
-          <span><%= @humanized_response %></span>
-        </div>
-      <% elsif @sap_response.present? %>
-        <div class="alert alert-info">
-          <span>Response ready. Open raw JSON below.</span>
-        </div>
-      <% else %>
-        <div class="alert">
-          <span>No run started yet. Submit a task to see results.</span>
-        </div>
-      <% end %>
-
-      <% if @sap_response.present? %>
-        <details class="collapse collapse-arrow bg-base-200">
-          <summary class="collapse-title text-md font-medium">Show raw JSON</summary>
-          <div class="collapse-content">
-            <pre class="whitespace-pre-wrap text-xs"><%= JSON.pretty_generate(@sap_response) rescue @sap_response.to_json %></pre>
+      <div id="sap-status-alert">
+        <% if @humanized_response.present? %>
+          <div class="alert alert-success">
+            <span><%= @humanized_response %></span>
           </div>
-        </details>
-      <% end %>
+        <% elsif @sap_response.present? %>
+          <div class="alert alert-info">
+            <span>Response ready. Open raw JSON below.</span>
+          </div>
+        <% else %>
+          <div class="alert">
+            <span>No run started yet. Submit a task to see results.</span>
+          </div>
+        <% end %>
+      </div>
+
+      <div id="sap-status-raw" class="hidden">
+        <% if @sap_response.present? %>
+          <details class="collapse collapse-arrow bg-base-200">
+            <summary class="collapse-title text-md font-medium">Show raw JSON</summary>
+            <div class="collapse-content">
+              <pre class="whitespace-pre-wrap text-xs"><%= JSON.pretty_generate(@sap_response) rescue @sap_response.to_json %></pre>
+            </div>
+          </details>
+        <% end %>
+      </div>
+
+      <div id="sap-fallback" class="hidden alert alert-warning">
+        <span>Live updates unavailable; falling back to periodic refresh.</span>
+      </div>
     </div>
   </div>
 
@@ -107,3 +117,48 @@
     <span>Real-time updates, pause/resume, and audit history will be added in PRDs 0041C–0041E. Access is owner/admin only.</span>
   </div>
 </div>
+
+<script type="module">
+  const card = document.getElementById("sap-status-card");
+  if (card) {
+    const correlationId = card.dataset.correlation;
+    const statusUrl = card.dataset.statusUrl;
+    const alertBox = document.getElementById("sap-status-alert");
+    const rawBox = document.getElementById("sap-status-raw");
+    const fallback = document.getElementById("sap-fallback");
+
+    const renderPayload = (payload) => {
+      if (!payload) return;
+      const message = payload.humanized || `Status: ${payload.status}`;
+      alertBox.innerHTML = `<div class="alert alert-info"><span>${message}</span></div>`;
+      rawBox.classList.remove("hidden");
+      rawBox.innerHTML = `<details class="collapse collapse-arrow bg-base-200"><summary class="collapse-title text-md font-medium">Show raw JSON</summary><div class="collapse-content"><pre class="whitespace-pre-wrap text-xs">${JSON.stringify(payload.payload || payload, null, 2)}</pre></div></details>`;
+    };
+
+    const poll = () => {
+      fetch(statusUrl).then(r => r.ok ? r.json() : null).then(renderPayload).catch(() => {});
+    };
+
+    const startPolling = () => {
+      if (fallback) fallback.classList.remove("hidden");
+      poll();
+      setInterval(poll, 5000);
+    };
+
+    const connectCable = async () => {
+      try {
+        const { createConsumer } = await import("https://cdn.jsdelivr.net/npm/@rails/actioncable@7.1.3-2/dist/actioncable.esm.js");
+        const consumer = createConsumer();
+        consumer.subscriptions.create({ channel: "SapRunChannel", correlation_id: correlationId }, {
+          received(data) { renderPayload(data); },
+          connected() {},
+          rejected() { startPolling(); }
+        });
+      } catch (e) {
+        startPolling();
+      }
+    };
+
+    connectCable();
+  }
+</script>
