@@ -133,6 +133,136 @@ module SapAgent
       log_iterate_event("iterate.error", error: e.message)
       { status: "error", error: e.message, iterations: iterations }
     end
+
+    def adaptive_iterate(task:, branch: nil, correlation_id: SecureRandom.uuid, human_feedback: nil, start_model: nil)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.task_id = task
+      self.branch = branch
+      self.correlation_id = correlation_id
+      self.model_used = start_model.presence || ENV["ESCALATE_LLM"].presence || SapAgent::Config::MODEL_DEFAULT
+
+      context = [ "Task: #{task}" ]
+      context << "Human feedback: #{human_feedback}" if human_feedback.present?
+
+      iterations = []
+      retry_count = 0
+      escalation_used = 0
+      cumulative_tokens = 0
+      previous_model = self.model_used
+
+      SapAgent::Config::ADAPTIVE_ITERATION_CAP.times do |idx|
+        iteration_number = idx + 1
+        current_model = self.model_used
+
+        output = generate_iteration_output(context.join("\n"), iteration_number, current_model)
+        iterations << { iteration: iteration_number, output: output, model_used: current_model }
+
+        token_count = estimate_tokens(context.join("\n") + output.to_s)
+        cumulative_tokens += token_count
+
+        log_iterate_event("adaptive.iteration", iteration: iteration_number, token_count: token_count, cumulative_tokens: cumulative_tokens, model_used: current_model)
+
+        if cumulative_tokens > SapAgent::Config::ADAPTIVE_TOKEN_BUDGET
+          log_iterate_event("adaptive.abort", reason: "token_budget_exceeded", token_count: cumulative_tokens, iteration: iteration_number)
+          return { status: "aborted", reason: "token_budget_exceeded", token_count: cumulative_tokens, iterations: iterations, partial_output: output }
+        end
+
+        score = score_output(output, context.join("\n"))
+        normalized_score = normalize_score(score, current_model, previous_model)
+
+        log_iterate_event("adaptive.scored", iteration: iteration_number, score: normalized_score, token_count: cumulative_tokens, model_used: current_model)
+
+        context << "Iteration #{iteration_number} output: #{output}"
+
+        if normalized_score >= SapAgent::Config::SCORE_STOP_THRESHOLD
+          elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          log_iterate_event("adaptive.complete", iteration: iteration_number, score: normalized_score, elapsed_ms: elapsed, model_used: current_model)
+          return { status: "completed", iterations: iterations, final_output: output, score: normalized_score, model_used: current_model }
+        end
+
+        escalation_triggered = normalized_score < SapAgent::Config::SCORE_ESCALATE_THRESHOLD || cumulative_tokens > SapAgent::Config::ADAPTIVE_TOKEN_BUDGET
+
+        if escalation_triggered && escalation_used < SapAgent::Config::ADAPTIVE_MAX_ESCALATIONS
+          next_model = next_escalation_model(current_model)
+          if next_model
+            escalation_used += 1
+            log_iterate_event("adaptive.escalate", iteration: iteration_number, from: current_model, to: next_model, escalation_used: escalation_used)
+            previous_model = current_model
+            self.model_used = next_model
+            retry_count = 0
+            next
+          end
+        end
+
+        if retry_count < SapAgent::Config::ADAPTIVE_RETRY_LIMIT
+          backoff_ms = SapAgent::Config::BACKOFF_MS[retry_count] || SapAgent::Config::BACKOFF_MS.last
+          SapAgent::TimeoutWrapper.with_timeout((backoff_ms / 1000.0) + 0.1) { sleep(backoff_ms / 1000.0) }
+          retry_count += 1
+          previous_model = current_model
+          next
+        end
+      end
+
+      log_iterate_event("adaptive.abort", reason: "iteration_cap", iteration: SapAgent::Config::ADAPTIVE_ITERATION_CAP)
+      { status: "aborted", reason: "iteration_cap", iterations: iterations, final_output: iterations.last&.dig(:output), model_used: self.model_used }
+    rescue StandardError => e
+      log_iterate_event("adaptive.error", error: e.message)
+      { status: "error", reason: e.message, iterations: iterations }
+    end
+
+    def conductor(task:, branch: nil, correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, refiner_iterations: 3, max_jobs: 5)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.task_id = task
+      self.branch = branch
+      self.correlation_id = correlation_id
+      self.model_used = SapAgent::Config::MODEL_DEFAULT
+
+      requested_jobs = 2 + refiner_iterations # outliner + reviewer + refiners
+      if requested_jobs > max_jobs
+        log_conductor_event("conductor.aborted", reason: "max_jobs_exceeded", requested_jobs: requested_jobs, max_jobs: max_jobs, idempotency_uuid: idempotency_uuid)
+        return { status: "aborted", reason: "max_jobs_exceeded", requested_jobs: requested_jobs, max_jobs: max_jobs }
+      end
+
+      state = {
+        task: task,
+        idempotency_uuid: idempotency_uuid,
+        correlation_id: correlation_id,
+        escalation_used: false,
+        iterations: [],
+        steps: []
+      }
+
+      failure_streak = 0
+      queue_job_id = -> { SecureRandom.uuid }
+
+      outliner_result = run_sub_agent(:outliner, state, queue_job_id.call, iteration: 1)
+      failure_streak = update_failure_streak(outliner_result, failure_streak)
+      state = outliner_result[:state]
+      return circuit_breaker_fallback(state) if circuit_breaker_tripped?(failure_streak)
+
+      refiner_iterations.times do |idx|
+        sub_result = run_sub_agent(:refiner, state, queue_job_id.call, iteration: idx + 1)
+        failure_streak = update_failure_streak(sub_result, failure_streak)
+        state = sub_result[:state]
+        return circuit_breaker_fallback(state) if circuit_breaker_tripped?(failure_streak)
+      end
+
+      reviewer_result = run_sub_agent(:reviewer, state, queue_job_id.call, iteration: refiner_iterations + 1)
+      failure_streak = update_failure_streak(reviewer_result, failure_streak)
+      state = reviewer_result[:state]
+
+      if circuit_breaker_tripped?(failure_streak)
+        return circuit_breaker_fallback(state)
+      end
+
+      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      log_conductor_event("conductor.complete", idempotency_uuid: idempotency_uuid, elapsed_ms: elapsed, queue_job_id: reviewer_result[:queue_job_id])
+
+      { status: "completed", state: state, elapsed_ms: elapsed }
+    rescue StandardError => e
+      log_conductor_event("conductor.error", reason: e.message, idempotency_uuid: idempotency_uuid)
+      { status: "error", reason: e.message }
+    end
     def queue_handshake(artifact:, task_summary:, task_id:, branch: "main", correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, artifact_path: nil)
       started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       self.task_id = task_id
@@ -258,6 +388,33 @@ module SapAgent
         sync_backlog
         Rails.logger.info({ event: "sap.backlog.pruned", count: pruned.size }.to_json)
       end
+    end
+
+    def prune_context(context:, correlation_id: SecureRandom.uuid, min_keep: SapAgent::Config::PRUNE_MIN_KEEP_TOKENS, target_tokens: SapAgent::Config::PRUNE_TARGET_TOKENS)
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.correlation_id = correlation_id
+
+      tokens = estimate_tokens(context.to_s)
+      if tokens <= target_tokens
+        log_conductor_event("prune.skipped", reason: "under_target", token_count: tokens, correlation_id: correlation_id)
+        return { status: "skipped", context: context, token_count: tokens }
+      end
+
+      pruned = prune_by_heuristic(context)
+      pruned_tokens = estimate_tokens(pruned)
+
+      if pruned_tokens < min_keep
+        log_conductor_event("prune.warning", reason: "min_keep_floor", token_count: pruned_tokens, min_keep: min_keep, correlation_id: correlation_id)
+        return { status: "warning", context: context, token_count: tokens, warning: "min_keep_floor" }
+      end
+
+      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      log_conductor_event("prune.complete", pruned_tokens: pruned_tokens, original_tokens: tokens, correlation_id: correlation_id, elapsed_ms: elapsed)
+
+      { status: "pruned", context: minify_context(pruned), token_count: pruned_tokens, original_tokens: tokens, elapsed_ms: elapsed }
+    rescue StandardError => e
+      log_conductor_event("prune.error", reason: e.message, correlation_id: correlation_id)
+      { status: "error", context: context, token_count: tokens }
     end
 
     def poll_task_state(task_id)
@@ -498,8 +655,87 @@ module SapAgent
       logger.info(payload.to_json)
     end
 
+    def log_conductor_event(event, data = {})
+      payload = {
+        timestamp: Time.now.utc.iso8601,
+        task_id: task_id,
+        branch: branch,
+        uuid: SecureRandom.uuid,
+        correlation_id: correlation_id,
+        model_used: model_used,
+        elapsed_ms: data.delete(:elapsed_ms),
+        score: data.delete(:score)
+      }.merge(data).merge(event: event).compact
+
+      logger.info(payload.to_json)
+    end
+
     def estimate_tokens(text)
       (text.to_s.length / 4.0).ceil
+    end
+
+    def prune_by_heuristic(context)
+      items = context.is_a?(Array) ? context : context.to_s.split("\n").reject(&:blank?)
+
+      scored = items.map do |chunk|
+        relevance = ollama_relevance(chunk)
+        age_score = age_weight(chunk)
+        weight = (0.7 * relevance) + (0.3 * age_score)
+        { chunk: chunk, weight: weight }
+      end
+
+      sorted = scored.sort_by { |c| -c[:weight] }
+      kept = []
+      sorted.each do |entry|
+        kept << entry[:chunk]
+        break if estimate_tokens(kept.join("\n\n")) >= SapAgent::Config::PRUNE_MIN_KEEP_TOKENS
+      end
+
+      kept.join("\n\n")
+    end
+
+    def ollama_relevance(chunk)
+      # Stub relevance to 1.0; in production, call model. Tests will stub.
+      1.0
+    end
+
+    def age_weight(chunk)
+      # Parse timestamps; if older than 30 days, downweight to 0.
+      match = chunk.to_s.match(/(\d{4}-\d{2}-\d{2})/)
+      return 1.0 unless match
+
+      begin
+        date = Date.parse(match[1])
+        (Date.today - date) > 30 ? 0.0 : 1.0
+      rescue ArgumentError
+        1.0
+      end
+    end
+
+    def minify_context(text)
+      text.to_s.split("\n").map do |line|
+        if line.include?("|")
+          parts = line.split("|").map(&:strip)
+          parts.take(2).join(" | ")
+        else
+          line
+        end
+      end.join("\n")
+    end
+
+    def normalize_score(score, current_model, previous_model)
+      return score if current_model == previous_model
+
+      adjusted = score * 0.95
+      [ [ adjusted, 0 ].max, 100 ].min
+    end
+
+    def next_escalation_model(current_model)
+      order = SapAgent::Config::ADAPTIVE_ESCALATION_ORDER
+      index = order.index(current_model)
+      return order.first unless index
+
+      order[index + 1] || order.first
     end
 
     def logger
@@ -510,6 +746,80 @@ module SapAgent
       # Default heuristic score; tests will stub this method for deterministic behavior.
       length_score = [ (output.to_s.length + context.to_s.length) / 10, 100 ].min
       [ length_score, SapAgent::Config::SCORE_STOP_THRESHOLD ].min
+    end
+
+    def run_sub_agent(sub_agent, state, queue_job_id, iteration: nil)
+      payload = state.merge(queue_job_id: queue_job_id, sub_agent: sub_agent, iteration: iteration)
+      log_conductor_event("conductor.route", payload)
+
+      result = nil
+      SapAgent::TimeoutWrapper.with_timeout(1) do
+        result =
+          case sub_agent
+          when :outliner then sub_agent_outliner(state)
+          when :refiner then sub_agent_refiner(state, iteration)
+          when :reviewer then sub_agent_reviewer(state)
+          else
+            { status: "error", state: state, reason: "unknown_sub_agent" }
+          end
+      end
+
+      result ||= { status: "error", state: state, reason: "no_result" }
+      new_state = safe_state_roundtrip(result[:state] || state)
+      log_conductor_event("conductor.state_saved", sub_agent: sub_agent, queue_job_id: queue_job_id, iteration: iteration)
+
+      result.merge(state: new_state, queue_job_id: queue_job_id)
+    rescue StandardError => e
+      log_conductor_event("conductor.error", sub_agent: sub_agent, queue_job_id: queue_job_id, reason: e.message)
+      { status: "error", reason: e.message, state: state, queue_job_id: queue_job_id }
+    end
+
+    def sub_agent_outliner(state)
+      steps = [ "Gather requirements", "Design", "Implement", "Test" ]
+      new_state = state.dup
+      new_state[:steps] = (state[:steps] || []) + [ "outliner" ]
+      new_state[:outline] = steps
+      { status: "ok", state: new_state }
+    end
+
+    def sub_agent_refiner(state, iteration)
+      new_state = state.dup
+      refinements = new_state[:refinements] || []
+      refinements << "refinement-#{iteration}"
+      new_state[:refinements] = refinements
+      new_state[:steps] = (state[:steps] || []) + [ "refiner-#{iteration}" ]
+      new_state[:iterations] = (state[:iterations] || []) + [ { iteration: iteration, output: "refined step #{iteration}" } ]
+      { status: "ok", state: new_state }
+    end
+
+    def sub_agent_reviewer(state)
+      new_state = state.dup
+      new_state[:steps] = (state[:steps] || []) + [ "reviewer" ]
+      new_state[:score] = 85
+      { status: "ok", state: new_state }
+    end
+
+    def safe_state_roundtrip(state)
+      parsed = JSON.parse(state.to_json)
+      parsed.is_a?(Hash) ? parsed.with_indifferent_access : state
+    rescue JSON::ParserError
+      log_conductor_event("conductor.error", reason: "state_validation_failed")
+      state
+    end
+
+    def update_failure_streak(result, current_streak)
+      return 0 if result[:status] == "ok"
+
+      current_streak + 1
+    end
+
+    def circuit_breaker_tripped?(failure_streak)
+      failure_streak >= 3
+    end
+
+    def circuit_breaker_fallback(state)
+      log_conductor_event("conductor.circuit_breaker", reason: "failure_streak", state: state)
+      { status: "fallback", reason: "circuit_breaker", state: state }
     end
 
     def generate_iteration_output(context, iteration_number, model)
