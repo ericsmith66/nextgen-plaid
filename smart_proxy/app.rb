@@ -42,8 +42,8 @@ class SmartProxyApp < Sinatra::Base
   end
 
   post '/proxy/tools' do
-    request.body.rewind
-    request_payload = JSON.parse(request.body.read)
+    body_content = request.body.read
+    request_payload = JSON.parse(body_content)
     
     query = request_payload['query']
     num_results = request_payload['num_results'] || 5
@@ -90,8 +90,8 @@ class SmartProxyApp < Sinatra::Base
   end
 
   post '/proxy/generate' do
-    request.body.rewind
-    request_payload = JSON.parse(request.body.read)
+    body_content = request.body.read
+    request_payload = JSON.parse(body_content)
     
     # Anonymize request
     anonymized_payload = Anonymizer.anonymize(request_payload)

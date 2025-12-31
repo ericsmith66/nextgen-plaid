@@ -28,6 +28,19 @@ module SapAgent
       "[CONTEXT ERROR: Fallback to minimal prefix]\n"
     end
 
+    def self.summarize(text)
+      return if text.nil?
+
+      snippet = text.is_a?(String) ? text : text.to_json
+      snippet = snippet.to_s.strip
+      truncated = snippet[0...400]
+      sap_logger.info({ event: 'RAG_SUMMARY', length: truncated.length })
+      truncated
+    rescue => e
+      sap_logger.warn({ event: 'RAG_SUMMARY_FAILURE', error: e.message })
+      nil
+    end
+
     private
 
     def self.fetch_static_docs(query_type)

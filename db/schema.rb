@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_12_26_203811) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_30_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -200,6 +200,27 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_26_203811) do
     t.index ["plaid_item_id"], name: "index_recurring_transactions_on_plaid_item_id"
   end
 
+  create_table "sap_runs", force: :cascade do |t|
+    t.bigint "user_id"
+    t.text "task"
+    t.string "status", default: "pending", null: false
+    t.string "phase"
+    t.string "model_used"
+    t.string "correlation_id", null: false
+    t.string "idempotency_uuid"
+    t.jsonb "output_json"
+    t.string "artifact_path"
+    t.string "resume_token"
+    t.text "error_message"
+    t.datetime "started_at"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["correlation_id"], name: "index_sap_runs_on_correlation_id", unique: true
+    t.index ["started_at"], name: "index_sap_runs_on_started_at"
+    t.index ["user_id"], name: "index_sap_runs_on_user_id"
+  end
+
   create_table "snapshots", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.jsonb "data"
@@ -327,6 +348,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_12_26_203811) do
   add_foreign_key "option_contracts", "holdings"
   add_foreign_key "plaid_items", "users"
   add_foreign_key "recurring_transactions", "plaid_items"
+  add_foreign_key "sap_runs", "users"
   add_foreign_key "snapshots", "users"
   add_foreign_key "sync_logs", "plaid_items"
   add_foreign_key "transactions", "accounts"
