@@ -823,7 +823,23 @@ module SapAgent
     end
 
     def generate_iteration_output(context, iteration_number, model)
-      "Iteration #{iteration_number} response using #{model}: #{context[0..50]}"
+      prompt = build_iteration_prompt(context, iteration_number)
+      response = AiFinancialAdvisor.ask(prompt, model: model, request_id: correlation_id)
+      response || "No response from #{model}"
+    end
+
+    def build_iteration_prompt(context, iteration_number)
+      <<~PROMPT
+        You are the SAP (Senior Architect and Product Manager) Agent.
+
+        Iteration: #{iteration_number}
+
+        Context:
+        #{context}
+
+        Please provide a detailed, actionable response to continue this task.
+        Focus on clarity, completeness, and practical implementation details.
+      PROMPT
     end
   end
 end
