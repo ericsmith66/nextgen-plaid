@@ -23,8 +23,8 @@ SapAgent basics (iterate_prompt with resume_token); SmartProxy ports (3001 dev/3
 - **Feel**: Fluid—streaming feels "live typing"; quick feedback (spinner &lt;2s, poll 3s); intuitive (gear hides complexity); resilient (fallbacks with messages like "Polling updates...").
 
 ### Navigation to the Page
-- **Path**: /admin/sap-collaborate (admin/owner-gated via Devise/Pundit).
-- **How**: From main nav (NavigationComponent): Add link &lt;a href="/admin/sap-collaborate" class="menu-item"&gt;SAP Oversight&lt;/a&gt; under Admin Panel dropdown. Dashboard redirect for admins: If current_user.admin?, button "Collaborate with SAP" → path. Ensure 403/redirect for non-admins with message "Access restricted to admins/owners."
+- **Path**: /admin/sap-mission-control as the new default (admin/owner-gated via Devise/Pundit); /admin/sap-collaborate redirects with a deprecation banner.
+- **How**: From main nav (NavigationComponent): Add link &lt;a href="/admin/sap-mission-control" class="menu-item"&gt;SAP Oversight&lt;/a&gt; under Admin Panel dropdown. Dashboard redirect for admins: If current_user.admin?, button "Collaborate with SAP" → new path. Ensure 403/redirect for non-admins with message "Access restricted to admins/owners."
 
 ### Current Screen Elements to Remove
 - Static cards (e.g., form/status/audit cards)—replace with unified chat layout.
@@ -35,8 +35,8 @@ SapAgent basics (iterate_prompt with resume_token); SmartProxy ports (3001 dev/3
 - Fallback alert (hidden)—integrate as chat system message.
 - JS polling/Cable script—refactor into Stimulus controller for streams.
 
-### Recommendation: True Refactor vs. Side-by-Side Replacement
-- **Side-by-Side Replacement**: Preferred for low risk. Build new components/views in a feature branch (e.g., app/views/admin/sap_collaborate/chat.html.erb); test alongside current scaffold (toggle via env var or query param ?mode=chat). Once green, swap in routes/controller (e.g., index action renders chat if feature_flag on). Avoids breaking existing; easy rollback. True refactor (overwrite) risks mid-epic downtime—side-by-side better for iterative testing.
+### Recommendation: New Page Replacement
+- Build the new experience at /admin/sap-mission-control and deprecate /admin/sap-collaborate via redirect + banner (no side-by-side flag). Replace the old page once new flow is ready; keep redirect for discoverability/rollback messaging.
 
 ### End-of-Epic Capabilities
 At the completion of this epic (after implementing renumbered PRDs 0010A-D), the /admin/sap-collaborate page will function as a dynamic, conversational interface for overseeing SAP Agent runs. Users (owner/admin only) will be able to:
@@ -66,3 +66,6 @@ This results in a Grok/Libre-like experience: conversational flow, full visibili
 - **0010B**: Adds dynamics (Turbo polling for message appends)—provides live value, testable via run initiation (e.g., "start task → see phased bubbles appear incrementally"). Integrated style: Streaming in bubbles, quick feedback.
 - **0010C**: Integrates overrides/Heartbeat in gear—enables tweaks/health, testable via controls (e.g., "set token=4000 → run aborts at limit; heartbeat → banner shows latency"). Integrated style: Gear menu for hidden controls.
 - **0010D**: Completes with audit sidebar/artifacts—adds persistence/history, testable via lifecycle (e.g., "pause/run → see in sidebar with redacted details; download artifact"). Integrated style: Collapsible sidebar, responsive polish.
+
+### Test Approach
+- Live-proxy opt-in: nightly manual runs with captures (screenshots/HTML) against real SmartProxy; gated via `.env.testing`.
