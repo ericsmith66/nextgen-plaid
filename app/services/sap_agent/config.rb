@@ -1,7 +1,7 @@
 module SapAgent
   module Config
     ITERATION_CAP = 7
-    TOKEN_BUDGET = 500
+    TOKEN_BUDGET = 80000
     SCORE_STOP_THRESHOLD = 80
     SCORE_ESCALATE_THRESHOLD = 70
     OFFENSE_LIMIT = 20
@@ -14,7 +14,7 @@ module SapAgent
     ADAPTIVE_ESCALATION_ORDER = %w[grok-4.1 claude-sonnet-4.5 ollama].freeze
     ADAPTIVE_MAX_ESCALATIONS = 1
 
-    PRUNE_TARGET_TOKENS = 4000
+    PRUNE_TARGET_TOKENS = 8000
     PRUNE_MIN_KEEP_TOKENS = 2000
     PRUNE_BACKOFF_MS = [ 150, 300 ].freeze
 
