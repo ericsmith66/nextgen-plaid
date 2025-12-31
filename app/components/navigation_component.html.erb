@@ -32,6 +32,7 @@
           <li><a href="/dashboard">Dashboard</a></li>
           <% if admin? || owner? %>
             <li><a href="/admin/users">Admin Panel</a></li>
+            <li><a href="/admin/sap_mission_control">SAP Mission Control</a></li>
           <% end %>
           <li>
             <%= button_to "Sign Out", destroy_user_session_path, method: :delete, class: "text-error" %>

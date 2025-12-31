@@ -5,9 +5,15 @@ module Admin
     before_action :authenticate_user!
     before_action :authorize_sap_collaborate
     before_action :prepare_ids
-    before_action :load_sap_run, only: [ :index, :status, :pause, :resume, :artifact, :start_iterate, :start_conductor ]
+    before_action :load_sap_run, only: [ :index, :mission_control, :status, :pause, :resume, :artifact, :start_iterate, :start_conductor ]
 
     def index
+      flash[:notice] = "SAP Mission Control is the new experience. Redirecting now."
+      redirect_to admin_sap_mission_control_path(request.query_parameters.merge(correlation_id: @correlation_id, idempotency_uuid: @idempotency_uuid))
+    end
+
+    def mission_control
+      render :mission_control
     end
 
     def start_iterate
@@ -68,7 +74,7 @@ module Admin
       @sap_run.update!(status: "paused", resume_token: token, phase: "paused")
       cache_and_broadcast(@sap_run.output_json || {}, "Paused (resume token saved)")
       flash.now[:notice] = "Paused (corr: #{@correlation_id})"
-      render :index
+      render :mission_control
     end
 
     def resume
@@ -76,19 +82,19 @@ module Admin
 
       @sap_run.update!(status: "running", phase: "resumed")
       flash.now[:notice] = "Resumed (corr: #{@correlation_id})"
-      render :index
+      render :mission_control
     end
 
     def artifact
       unless @sap_run&.artifact_path
         flash[:alert] = "No artifact available for this run."
-        return redirect_to admin_sap_collaborate_path(correlation_id: @correlation_id, idempotency_uuid: @idempotency_uuid)
+        return redirect_to admin_sap_mission_control_path(correlation_id: @correlation_id, idempotency_uuid: @idempotency_uuid)
       end
 
       safe_path = safe_artifact_path(@sap_run.artifact_path)
       unless safe_path && File.exist?(safe_path)
         flash[:alert] = "Artifact file not found or not accessible."
-        return redirect_to admin_sap_collaborate_path(correlation_id: @correlation_id, idempotency_uuid: @idempotency_uuid)
+        return redirect_to admin_sap_mission_control_path(correlation_id: @correlation_id, idempotency_uuid: @idempotency_uuid)
       end
 
       send_file safe_path, disposition: :attachment

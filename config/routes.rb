@@ -49,6 +49,7 @@ Rails.application.routes.draw do
     resources :users
     resources :accounts
     get "rag_inspector", to: "rag_inspector#index"
+    get "sap_mission_control", to: "sap_collaborate#mission_control"
     get "sap_collaborate", to: "sap_collaborate#index"
     get "sap_collaborate/status", to: "sap_collaborate#status"
     post "sap_collaborate/start_iterate", to: "sap_collaborate#start_iterate"

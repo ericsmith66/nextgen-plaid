@@ -11,8 +11,12 @@ class ApplicationController < ActionController::Base
   private
 
   def user_not_authorized
-    flash[:alert] = "You are not authorized to perform this action."
-    redirect_to(request.referrer || authenticated_root_path)
+    if turbo_request?
+      render json: { error: "Forbidden" }, status: :forbidden
+    else
+      flash[:alert] = "You are not authorized to perform this action."
+      redirect_to(request.referrer || authenticated_root_path)
+    end
   end
 
   def set_environment_banner
@@ -28,5 +32,9 @@ class ApplicationController < ActionController::Base
       flash[:alert] = "You are not authorized to access Mission Control."
       redirect_to authenticated_root_path
     end
+  end
+
+  def turbo_request?
+    request.format.turbo_stream? || request.headers["Turbo-Frame"].present? || request.headers["Turbo-Visit"].present?
   end
 end

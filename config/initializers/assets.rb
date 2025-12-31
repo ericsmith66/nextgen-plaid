@@ -7,4 +7,4 @@ Rails.application.config.assets.version = "1.0"
 Rails.application.config.assets.paths << Rails.root.join("app", "assets", "javascripts")
 
 # Precompile additional assets.
-Rails.application.config.assets.precompile += %w[application.js]
+Rails.application.config.assets.precompile += %w[application.js chat_controller.js]
