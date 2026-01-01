@@ -76,6 +76,17 @@ export default class extends Controller {
     })
   }
 
+  // Submit on Enter, but allow newline with Shift+Enter.
+  maybeSubmit(event) {
+    if (event.key !== "Enter") return
+    if (event.shiftKey) return
+
+    event.preventDefault()
+
+    const form = this.element.querySelector("form")
+    if (form) form.requestSubmit()
+  }
+
   scrollToBottom() {
     if (!this.hasStreamTarget) return
 

@@ -25,7 +25,7 @@
             rows: 3,
             class: "textarea textarea-bordered flex-1",
             placeholder: "Ask SAP…",
-            data: { chat_target: "input" } %>
+            data: { chat_target: "input", action: "keydown->chat#maybeSubmit" } %>
       <%= f.submit "Send", class: "btn btn-primary" %>
     <% end %>
   </div>
