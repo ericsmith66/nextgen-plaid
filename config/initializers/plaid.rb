@@ -1,7 +1,12 @@
 require "plaid"
 
 # config/initializers/plaid.rb
-env_name = ENV.fetch("PLAID_ENV", Rails.env.production? ? "production" : "sandbox")
+# In test we always default to sandbox and ignore `PLAID_ENV` (which may be set locally to production).
+env_name = if Rails.env.test?
+  ENV.fetch("PLAID_ENV_TEST", "sandbox")
+else
+  ENV.fetch("PLAID_ENV", Rails.env.production? ? "production" : "sandbox")
+end
 config = Plaid::Configuration.new
 config.server_index = Plaid::Configuration::Environment[env_name]
 
