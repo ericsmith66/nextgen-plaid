@@ -1,4 +1,14 @@
 Rails.application.routes.draw do
+  # Turbo Streams use ActionCable websockets.
+  # Without this mount, the browser will never open a `/cable` websocket connection.
+  mount ActionCable.server => "/cable"
+
+  post "/plaid_items/:id/refresh", to: "plaid_refreshes#create", as: :plaid_item_refresh
+  namespace :agents do
+    get "monitor", to: "monitor#index"
+  end
+  get "plaid_oauth/initiate"
+  get "plaid_oauth/callback"
   devise_for :users
 
   # Authenticated users get dashboard FIRST
