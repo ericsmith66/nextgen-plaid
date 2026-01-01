@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  # Turbo Streams use ActionCable websockets.
+  # Without this mount, the browser will never open a `/cable` websocket connection.
+  mount ActionCable.server => "/cable"
+
   post "/plaid_items/:id/refresh", to: "plaid_refreshes#create", as: :plaid_item_refresh
   namespace :agents do
     get "monitor", to: "monitor#index"
@@ -50,11 +54,8 @@ Rails.application.routes.draw do
     resources :accounts
     get "rag_inspector", to: "rag_inspector#index"
     get "sap_collaborate", to: "sap_collaborate#index"
-    get "sap_collaborate/status", to: "sap_collaborate#status"
-    post "sap_collaborate/start_iterate", to: "sap_collaborate#start_iterate"
-    post "sap_collaborate/start_conductor", to: "sap_collaborate#start_conductor"
-    post "sap_collaborate/pause", to: "sap_collaborate#pause"
-    post "sap_collaborate/resume", to: "sap_collaborate#resume"
-    get "sap_collaborate/artifact", to: "sap_collaborate#artifact"
+    post "sap_collaborate/ask", to: "sap_collaborate#ask"
   end
 end
+
+#

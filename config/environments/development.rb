@@ -3,8 +3,8 @@ require "active_support/core_ext/integer/time"
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
-    config.hosts << "api.higroundsolutions.com"
-  config.web_console.permissions = ['192.168.0.0/16']
+  config.hosts << "api.higroundsolutions.com"
+  config.web_console.permissions = [ "192.168.0.0/16" ]
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
 
@@ -66,11 +66,25 @@ Rails.application.configure do
   # Uncomment if you wish to allow Action Cable access from any origin.
   # config.action_cable.disable_request_forgery_protection = true
 
-  # Allow ActionCable from local hosts
+  # If the app is accessed through a different port (e.g., via a proxy on :80)
+  # but Rails is running on :3000, set `ACTION_CABLE_URL` so the browser connects
+  # to the correct websocket endpoint.
+  # Example: ACTION_CABLE_URL=ws://192.168.4.200:3000/cable
+  config.action_cable.url = ENV["ACTION_CABLE_URL"] if ENV["ACTION_CABLE_URL"].present?
+
+  # Allow ActionCable from any dev host/IP (useful when hitting the app via LAN IP).
+  # Tighten this later if needed.
   config.action_cable.allowed_request_origins = [
-    %r{^http://192\.168\.4\.200(:\d+)?$},
-    /localhost/
+    %r{\Ahttp://},
+    %r{\Ahttps://}
   ]
+
+  # Propshaft note:
+  # If `public/assets/.manifest.json` exists (e.g., from a prior `assets:precompile`),
+  # Propshaft will switch to a static (manifest-only) resolver, which breaks importmap
+  # in development because pinned JS assets won’t resolve.
+  # Force a dev-only manifest path under `tmp/` so we use the dynamic resolver.
+  config.assets.manifest_path = Rails.root.join("tmp", "propshaft-manifest.dev.json")
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true

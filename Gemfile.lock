@@ -144,6 +144,10 @@ GEM
     hashdiff (1.2.1)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
+    importmap-rails (2.2.2)
+      actionpack (>= 6.0.0)
+      activesupport (>= 6.0.0)
+      railties (>= 6.0.0)
     io-console (0.8.1)
     irb (1.15.3)
       pp (>= 0.6.0)
@@ -378,6 +382,8 @@ GEM
       net-sftp (>= 2.1.2)
       net-ssh (>= 2.8.0)
       ostruct
+    stimulus-rails (1.3.4)
+      railties (>= 6.0.0)
     stringio (3.1.9)
     tailwindcss-rails (4.4.0)
       railties (>= 7.0.0)
@@ -397,6 +403,9 @@ GEM
     thruster (0.1.16-x86_64-linux)
     timeout (0.5.0)
     tsort (0.2.0)
+    turbo-rails (2.0.20)
+      actionpack (>= 7.1.0)
+      railties (>= 7.1.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unicode-display_width (3.2.0)
@@ -451,6 +460,7 @@ DEPENDENCIES
   debug
   devise
   dotenv-rails
+  importmap-rails
   jbuilder
   kamal
   kaminari (~> 1.2)
@@ -466,8 +476,10 @@ DEPENDENCIES
   solid_cable
   solid_cache
   solid_queue
+  stimulus-rails
   tailwindcss-rails
   thruster
+  turbo-rails
   tzinfo-data
   vcr
   view_component

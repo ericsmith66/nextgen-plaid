@@ -1,5 +1,6 @@
 class SapRun < ApplicationRecord
   belongs_to :user, optional: true
+  has_many :sap_messages, dependent: :destroy
 
   enum :status, {
     pending: "pending",
