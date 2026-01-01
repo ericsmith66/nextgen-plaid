@@ -13,6 +13,53 @@ RSpec.describe SmartProxyApp do
     end
   end
 
+  describe 'GET /v1/models' do
+    let(:auth_token) { 'test_token' }
+
+    before do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with('PROXY_AUTH_TOKEN').and_return(auth_token)
+    end
+
+    context 'when unauthorized' do
+      it 'returns 401' do
+        get '/v1/models', {}, { 'HTTP_HOST' => 'localhost' }
+        expect(last_response.status).to eq(401)
+      end
+    end
+
+    context 'when authorized' do
+      let(:headers) { { 'HTTP_AUTHORIZATION' => "Bearer #{auth_token}", 'HTTP_HOST' => 'localhost' } }
+
+      it 'returns OpenAI-compatible list of models from Ollama tags' do
+        stub_request(:get, 'http://localhost:11434/api/tags')
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: {
+              models: [
+                {
+                  name: 'llama3.1:8b',
+                  modified_at: '2026-01-01T00:00:00Z',
+                  size: 123,
+                  digest: 'sha256:abc',
+                  details: { family: 'llama', parameter_size: '8B' }
+                }
+              ]
+            }.to_json
+          )
+
+        get '/v1/models', {}, headers
+        expect(last_response).to be_ok
+
+        body = JSON.parse(last_response.body)
+        expect(body['object']).to eq('list')
+        expect(body['data']).to be_an(Array)
+        expect(body['data'].first).to include('id' => 'llama3.1:8b', 'object' => 'model', 'owned_by' => 'ollama')
+      end
+    end
+  end
+
   describe 'POST /proxy/generate' do
     let(:payload) { { 'model' => 'grok-beta', 'messages' => [{ 'role' => 'user', 'content' => 'Hello' }] } }
     let(:auth_token) { 'test_token' }

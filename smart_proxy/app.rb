@@ -8,6 +8,7 @@ require_relative 'lib/ollama_client'
 require_relative 'lib/tool_client'
 require_relative 'lib/anonymizer'
 require 'securerandom'
+require 'time'
 
 class SmartProxyApp < Sinatra::Base
   configure do
@@ -29,6 +30,10 @@ class SmartProxyApp < Sinatra::Base
         message: msg
       }.to_json + "\n"
     end
+
+    # In-memory cache for model listing (best-effort)
+    set :models_cache_ttl, Integer(ENV.fetch('SMART_PROXY_MODELS_CACHE_TTL', '60'))
+    set :models_cache, { fetched_at: Time.at(0), data: nil }
   end
 
   before do
@@ -41,7 +46,52 @@ class SmartProxyApp < Sinatra::Base
     { status: 'ok' }.to_json
   end
 
+  # OpenAI-compatible model listing endpoint.
+  # Backed by Ollama's HTTP API (`GET /api/tags`).
+  get '/v1/models' do
+    begin
+      cached = settings.models_cache
+      ttl = settings.models_cache_ttl
+      if cached[:data] && (Time.now - cached[:fetched_at] < ttl)
+        cached[:data].to_json
+      else
+        client = OllamaClient.new
+        resp = client.list_models
+
+        if resp.status == 200
+          body = resp.body.is_a?(String) ? JSON.parse(resp.body) : resp.body
+          models = (body['models'] || []).map do |m|
+            {
+              id: m['name'],
+              object: 'model',
+              owned_by: 'ollama',
+              created: (Time.parse(m['modified_at']).to_i rescue nil),
+              smart_proxy: {
+                size: m['size'],
+                digest: m['digest'],
+                details: m['details']
+              }.compact
+            }.compact
+          end
+
+          payload = { object: 'list', data: models }
+          settings.models_cache = { fetched_at: Time.now, data: payload }
+          payload.to_json
+        else
+          $logger.warn({ event: 'ollama_models_error', session_id: @session_id, status: resp.status, body: resp.body })
+          fallback = cached[:data] || { object: 'list', data: [] }
+          fallback.to_json
+        end
+      end
+    rescue StandardError => e
+      $logger.error({ event: 'models_endpoint_error', session_id: @session_id, error: e.message })
+      fallback = settings.models_cache[:data] || { object: 'list', data: [] }
+      fallback.to_json
+    end
+  end
+
   post '/proxy/tools' do
+    request.body.rewind if request.body.respond_to?(:rewind)
     body_content = request.body.read
     request_payload = JSON.parse(body_content)
     
@@ -90,6 +140,7 @@ class SmartProxyApp < Sinatra::Base
   end
 
   post '/proxy/generate' do
+    request.body.rewind if request.body.respond_to?(:rewind)
     body_content = request.body.read
     request_payload = JSON.parse(body_content)
     
