@@ -78,7 +78,7 @@ class PlaidOauthService
     )
     response = @plaid_client.institutions_get_by_id(request)
     response.institution.name
-  rescue Plaid::ApiError => e
+  rescue StandardError => e
     Rails.logger.error "Failed to fetch institution name: #{e.message}"
     "Unknown Institution"
   end

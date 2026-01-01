@@ -26,7 +26,8 @@ class SapAgentTest < ActiveSupport::TestCase
   test "GenerateCommand generates correct prompt" do
     command = SapAgent::GenerateCommand.new(@payload)
     prompt = command.send(:prompt)
-    assert_match /You are the SAP Agent/, prompt
+    assert_match /System Prompt/, prompt
+    assert_match /User Request:/, prompt
     assert_match /Test PRD query/, prompt
   end
 

@@ -26,7 +26,7 @@ class SapAgentPruneContextTest < ActiveSupport::TestCase
       SapAgent.stub(:ollama_relevance, ->(_chunk) { 1.0 }) do
         SapAgent.stub(:age_weight, ->(chunk) { chunk.include?("2025-10-01") ? 0.0 : 1.0 }) do
           SapAgent.stub(:log_conductor_event, true) do
-            result = SapAgent.prune_context(context: @context)
+            result = SapAgent.prune_context(context: @context, target_tokens: 5000)
 
             assert_equal "pruned", result[:status]
             assert result[:context].include?("accounts")
@@ -42,7 +42,7 @@ class SapAgentPruneContextTest < ActiveSupport::TestCase
     SapAgent.stub(:estimate_tokens, ->(*) { 5001 }) do
       SapAgent.stub(:prune_by_heuristic, "tiny") do
         SapAgent.stub(:log_conductor_event, true) do
-          result = SapAgent.prune_context(context: @context, min_keep: 6000)
+          result = SapAgent.prune_context(context: @context, min_keep: 6000, target_tokens: 5000)
 
           assert_equal "warning", result[:status]
           assert_equal "min_keep_floor", result[:warning]
