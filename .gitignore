@@ -5,6 +5,7 @@
 .env
 .env.production
 .env.local
+.env.testing
 .env.*.local
 .env.*.example
 config/environments/production.rb
