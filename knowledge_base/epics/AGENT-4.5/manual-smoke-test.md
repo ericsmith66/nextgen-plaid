@@ -61,3 +61,4 @@ These checks don’t validate browser-side Turbo behavior, but confirm the core 
 
 2. Job test (fast):
    - `bin/rails test test/jobs/sap_agent_job_test.rb`
+done
