@@ -1,40 +1,41 @@
 require "test_helper"
-require "webmock/minitest"
+require "ostruct"
 
 class PlaidOauthServiceTest < ActiveSupport::TestCase
   setup do
     @user = User.create!(email: "test@example.com", password: "password123")
-    @service = PlaidOauthService.new(@user)
-    @plaid_client = Rails.application.config.x.plaid_client
+    @original_plaid_client = Rails.application.config.x.plaid_client
+  end
+
+  teardown do
+    Rails.application.config.x.plaid_client = @original_plaid_client
   end
 
   test "create_link_token returns success with valid link token" do
     link_token = "link-sandbox-test-token"
-    
-    # Stub the Plaid API call
-    stub_request(:post, "https://sandbox.plaid.com/link/token/create")
-      .to_return(
-        status: 200,
-        body: { link_token: link_token, expiration: "2024-01-01T00:00:00Z", request_id: "req123" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
 
-    result = @service.create_link_token
+    plaid_client = Object.new
+    plaid_client.define_singleton_method(:link_token_create) do |_request|
+      OpenStruct.new(link_token: link_token)
+    end
+    Rails.application.config.x.plaid_client = plaid_client
+
+    service = PlaidOauthService.new(@user)
+    result = service.create_link_token
 
     assert result[:success]
     assert_equal link_token, result[:link_token]
   end
 
   test "create_link_token returns error on API failure" do
-    # Stub API error
-    stub_request(:post, "https://sandbox.plaid.com/link/token/create")
-      .to_return(
-        status: 400,
-        body: { error_code: "INVALID_REQUEST", error_message: "Invalid request" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    plaid_client = Object.new
+    plaid_client.define_singleton_method(:link_token_create) do |_request|
+      raise StandardError, "Invalid request"
+    end
+    Rails.application.config.x.plaid_client = plaid_client
 
-    result = @service.create_link_token
+    service = PlaidOauthService.new(@user)
+    result = service.create_link_token
 
     assert_not result[:success]
     assert result[:error].present?
@@ -47,41 +48,29 @@ class PlaidOauthServiceTest < ActiveSupport::TestCase
     institution_id = "ins_109508"
     institution_name = "Chase"
 
-    # Stub token exchange
-    stub_request(:post, "https://sandbox.plaid.com/item/public_token/exchange")
-      .with(body: hash_including({ public_token: public_token }))
-      .to_return(
-        status: 200,
-        body: { access_token: access_token, item_id: item_id, request_id: "req123" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    plaid_client = Object.new
+    plaid_client.define_singleton_method(:item_public_token_exchange) do |_request|
+      OpenStruct.new(access_token: access_token, item_id: item_id)
+    end
+    plaid_client.define_singleton_method(:item_get) do |_request|
+      OpenStruct.new(item: OpenStruct.new(institution_id: institution_id))
+    end
+    plaid_client.define_singleton_method(:institutions_get_by_id) do |_request|
+      OpenStruct.new(institution: OpenStruct.new(name: institution_name))
+    end
+    Rails.application.config.x.plaid_client = plaid_client
 
-    # Stub item/get
-    stub_request(:post, "https://sandbox.plaid.com/item/get")
-      .with(body: hash_including({ access_token: access_token }))
-      .to_return(
-        status: 200,
-        body: {
-          item: { item_id: item_id, institution_id: institution_id, webhook: nil },
-          status: { investments: nil, transactions: nil },
-          request_id: "req124"
-        }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    service = PlaidOauthService.new(@user)
 
-    # Stub institutions/get_by_id
-    stub_request(:post, "https://sandbox.plaid.com/institutions/get_by_id")
-      .with(body: hash_including({ institution_id: institution_id }))
-      .to_return(
-        status: 200,
-        body: {
-          institution: { institution_id: institution_id, name: institution_name },
-          request_id: "req125"
-        }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    result = nil
 
-    result = @service.exchange_token(public_token)
+    SyncHoldingsJob.stub(:perform_later, true) do
+      SyncTransactionsJob.stub(:perform_later, true) do
+        SyncLiabilitiesJob.stub(:perform_later, true) do
+          result = service.exchange_token(public_token)
+        end
+      end
+    end
 
     assert result[:success]
     assert_not_nil result[:plaid_item]
@@ -115,40 +104,29 @@ class PlaidOauthServiceTest < ActiveSupport::TestCase
       status: "good"
     )
 
-    # Stub token exchange
-    stub_request(:post, "https://sandbox.plaid.com/item/public_token/exchange")
-      .to_return(
-        status: 200,
-        body: { access_token: access_token, item_id: item_id, request_id: "req123" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    plaid_client = Object.new
+    plaid_client.define_singleton_method(:item_public_token_exchange) do |_request|
+      OpenStruct.new(access_token: access_token, item_id: item_id)
+    end
+    plaid_client.define_singleton_method(:item_get) do |_request|
+      OpenStruct.new(item: OpenStruct.new(institution_id: institution_id))
+    end
+    plaid_client.define_singleton_method(:institutions_get_by_id) do |_request|
+      OpenStruct.new(institution: OpenStruct.new(name: institution_name))
+    end
+    Rails.application.config.x.plaid_client = plaid_client
 
-    # Stub item/get
-    stub_request(:post, "https://sandbox.plaid.com/item/get")
-      .to_return(
-        status: 200,
-        body: {
-          item: { item_id: item_id, institution_id: institution_id, webhook: nil },
-          status: { investments: nil, transactions: nil },
-          request_id: "req124"
-        }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
-
-    # Stub institutions/get_by_id
-    stub_request(:post, "https://sandbox.plaid.com/institutions/get_by_id")
-      .to_return(
-        status: 200,
-        body: {
-          institution: { institution_id: institution_id, name: institution_name },
-          request_id: "req125"
-        }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    service = PlaidOauthService.new(@user)
 
     assert_no_difference "PlaidItem.count" do
-      result = @service.exchange_token(public_token)
-      assert result[:success]
+      SyncHoldingsJob.stub(:perform_later, true) do
+        SyncTransactionsJob.stub(:perform_later, true) do
+          SyncLiabilitiesJob.stub(:perform_later, true) do
+            result = service.exchange_token(public_token)
+            assert result[:success]
+          end
+        end
+      end
     end
 
     existing_item.reload
@@ -159,15 +137,14 @@ class PlaidOauthServiceTest < ActiveSupport::TestCase
   test "exchange_token returns error on API failure" do
     public_token = "public-sandbox-bad-token"
 
-    # Stub API error
-    stub_request(:post, "https://sandbox.plaid.com/item/public_token/exchange")
-      .to_return(
-        status: 400,
-        body: { error_code: "INVALID_PUBLIC_TOKEN", error_message: "Invalid public token" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    plaid_client = Object.new
+    plaid_client.define_singleton_method(:item_public_token_exchange) do |_request|
+      raise StandardError, "Invalid public token"
+    end
+    Rails.application.config.x.plaid_client = plaid_client
 
-    result = @service.exchange_token(public_token)
+    service = PlaidOauthService.new(@user)
+    result = service.exchange_token(public_token)
 
     assert_not result[:success]
     assert result[:error].present?
@@ -176,16 +153,16 @@ class PlaidOauthServiceTest < ActiveSupport::TestCase
   test "fetch_institution_name returns Unknown Institution on API error" do
     institution_id = "ins_bad"
 
-    # Stub API error
-    stub_request(:post, "https://sandbox.plaid.com/institutions/get_by_id")
-      .to_return(
-        status: 404,
-        body: { error_code: "INVALID_INSTITUTION", error_message: "Institution not found" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    plaid_client = Object.new
+    plaid_client.define_singleton_method(:institutions_get_by_id) do |_request|
+      raise StandardError, "Institution not found"
+    end
+    Rails.application.config.x.plaid_client = plaid_client
+
+    service = PlaidOauthService.new(@user)
 
     # Access private method for testing
-    institution_name = @service.send(:fetch_institution_name, institution_id)
+    institution_name = service.send(:fetch_institution_name, institution_id)
 
     assert_equal "Unknown Institution", institution_name
   end
