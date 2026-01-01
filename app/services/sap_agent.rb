@@ -462,6 +462,10 @@ module SapAgent
       raise e
     end
 
+    def estimate_tokens(text)
+      (text.to_s.length / 4.0).ceil
+    end
+
     private
 
     def git_log_for_uuid(idempotency_uuid)
@@ -668,10 +672,6 @@ module SapAgent
       }.merge(data).merge(event: event).compact
 
       logger.info(payload.to_json)
-    end
-
-    def estimate_tokens(text)
-      (text.to_s.length / 4.0).ceil
     end
 
     def prune_by_heuristic(context)

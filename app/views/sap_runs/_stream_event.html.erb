@@ -1,0 +1,9 @@
+<%= render BubbleComponent.new(
+  type: event[:type],
+  title: event[:title],
+  body: event[:body],
+  phase: event[:phase],
+  tokens: event[:tokens],
+  raw_payload: event[:raw],
+  correlation_id: event[:correlation_id]
+) %>

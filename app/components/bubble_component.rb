@@ -10,10 +10,14 @@ class BubbleComponent < ViewComponent::Base
     phase:  { label: "Phase", tone: :warning, align: :start }
   }.freeze
 
-  def initialize(type:, title: nil, body: nil)
+  def initialize(type:, title: nil, body: nil, tokens: nil, phase: nil, raw_payload: nil, correlation_id: nil)
     @type = type.to_sym
     @title = title
     @body = body
+    @tokens = tokens
+    @phase = phase
+    @raw_payload = raw_payload
+    @correlation_id = correlation_id
   end
 
   def align_class
@@ -34,6 +38,40 @@ class BubbleComponent < ViewComponent::Base
 
   def badge
     @type.to_s.titleize
+  end
+
+  def phase_badge
+    return unless @phase.present?
+
+    "Phase: #{@phase}"
+  end
+
+  def tokens_badge
+    return unless @tokens.present?
+
+    used = @tokens[:used] || @tokens["used"]
+    remaining = @tokens[:remaining] || @tokens["remaining"]
+
+    parts = []
+    parts << "Used: #{used}" if used
+    parts << "Remaining: #{remaining}" if remaining
+    parts.presence&.join(" · ")
+  end
+
+  def correlation_label
+    @correlation_id
+  end
+
+  def raw_payload
+    @raw_payload
+  end
+
+  def pretty_raw_payload
+    return unless raw_payload
+
+    JSON.pretty_generate(raw_payload)
+  rescue StandardError
+    raw_payload.to_s
   end
 
   private

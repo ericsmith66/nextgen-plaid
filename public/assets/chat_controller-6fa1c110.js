@@ -3,7 +3,7 @@ import { Application, Controller } from "https://unpkg.com/@hotwired/stimulus/di
 const application = Application.start();
 
 application.register("chat", class extends Controller {
-  static targets = ["footer", "stream", "indicator", "form"];
+  static targets = ["footer", "stream", "indicator"];
   static values = { pollUrl: String, sseUrl: String, correlationId: String };
 
   connect() {
@@ -19,34 +19,6 @@ application.register("chat", class extends Controller {
     this.observeStream();
     this.startSse();
     this.startPolling();
-  }
-
-  async submitForm(event) {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    try {
-      const response = await fetch(form.action, {
-        method: form.method,
-        body: formData,
-        headers: {
-          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-        }
-      });
-      
-      if (response.ok) {
-        // Clear the textarea after successful submission
-        const textarea = form.querySelector('textarea[name="task"]');
-        if (textarea) textarea.value = '';
-        // Polling will pick up the new events
-      } else {
-        const errorText = await response.text();
-        this.appendErrorBubble(`Submission failed: ${response.status} ${errorText}`);
-      }
-    } catch (error) {
-      this.appendErrorBubble(`Submission error: ${error.message}`);
-    }
   }
 
   disconnect() {

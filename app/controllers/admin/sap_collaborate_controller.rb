@@ -13,6 +13,9 @@ module Admin
     end
 
     def mission_control
+      # Always generate fresh IDs for mission_control to avoid uniqueness conflicts
+      @correlation_id = SecureRandom.uuid
+      @idempotency_uuid = SecureRandom.uuid
       render :mission_control
     end
 
@@ -28,6 +31,14 @@ module Admin
         correlation_id: @correlation_id,
         idempotency_uuid: @idempotency_uuid,
         started_at: Time.current
+      )
+
+      streamer.append_event(
+        type: :user,
+        title: "You",
+        body: @task,
+        tokens: token_badge(@task),
+        phase: "start"
       )
 
       response = SapAgent.iterate_prompt(
@@ -53,6 +64,14 @@ module Admin
         correlation_id: @correlation_id,
         idempotency_uuid: @idempotency_uuid,
         started_at: Time.current
+      )
+
+      streamer.append_event(
+        type: :user,
+        title: "You",
+        body: @task,
+        tokens: token_badge(@task),
+        phase: "start"
       )
 
       response = SapAgent.conductor(
@@ -101,12 +120,14 @@ module Admin
     end
 
     def status
-      payload = sap_run_payload || Rails.cache.read(cache_key)
-      if payload
-        render json: payload.merge(correlation_id: @correlation_id)
-      else
-        render json: { correlation_id: @correlation_id, status: "pending" }, status: :ok
-      end
+      last_event_id = params[:last_event_id]
+      summary = streamer.summary
+      events = last_event_id.present? ? streamer.events_after(last_event_id) : streamer.events
+
+      render json: summary.merge(
+        correlation_id: @correlation_id,
+        events: events
+      )
     end
 
     private
@@ -134,9 +155,19 @@ module Admin
       @sap_response = response
       @humanized_response = humanize_response(response)
       cache_and_broadcast(@sap_response, @humanized_response)
+      streamer.ingest_payload(@sap_response)
+      if @humanized_response.present?
+        streamer.append_event(
+          type: :system,
+          title: "Summary",
+          body: @humanized_response,
+          phase: @sap_response.is_a?(Hash) ? (@sap_response[:phase] || @sap_response["phase"]) : nil,
+          tokens: token_badge(@humanized_response),
+          raw: @sap_response
+        )
+      end
       update_sap_run(@sap_response)
-      flash.now[:notice] = "#{notice} (corr: #{@correlation_id})"
-      render :index
+      head :no_content
     end
 
     def humanize_response(payload)
@@ -184,6 +215,7 @@ module Admin
 
       Rails.cache.write(cache_key, body, expires_in: 1.hour)
       SapRunChannel.broadcast_to(@correlation_id, body)
+      streamer.ingest_payload(payload)
     end
 
     def update_sap_run(payload)
@@ -271,6 +303,18 @@ module Admin
     def render_error(error)
       flash.now[:alert] = "There was a problem starting the agent: #{error.message}"
       render :index, status: :internal_server_error
+    end
+
+    def streamer
+      @streamer ||= SapRunStream.new(correlation_id: @correlation_id)
+    end
+
+    def token_badge(text)
+      return nil if text.blank?
+
+      used = SapAgent.estimate_tokens(text)
+      remaining = [ SapAgent::Config::ADAPTIVE_TOKEN_BUDGET - used, 0 ].max
+      { used: used, remaining: remaining }
     end
   end
 end

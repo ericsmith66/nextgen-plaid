@@ -7,6 +7,13 @@ Rails.application.routes.draw do
   get "plaid_oauth/callback"
   devise_for :users
 
+  resources :sap_runs, only: [] do
+    member do
+      get :status
+      get :stream
+    end
+  end
+
   # Authenticated users get dashboard FIRST
   authenticated :user do
     root "dashboard#index", as: :authenticated_root
@@ -50,6 +57,12 @@ Rails.application.routes.draw do
     resources :accounts
     get "rag_inspector", to: "rag_inspector#index"
     get "sap_mission_control", to: "sap_collaborate#mission_control"
+    get "sap_mission_control/status", to: "sap_collaborate#status"
+    post "sap_mission_control/start_iterate", to: "sap_collaborate#start_iterate"
+    post "sap_mission_control/start_conductor", to: "sap_collaborate#start_conductor"
+    post "sap_mission_control/pause", to: "sap_collaborate#pause"
+    post "sap_mission_control/resume", to: "sap_collaborate#resume"
+    get "sap_mission_control/artifact", to: "sap_collaborate#artifact"
     get "sap_collaborate", to: "sap_collaborate#index"
     get "sap_collaborate/status", to: "sap_collaborate#status"
     post "sap_collaborate/start_iterate", to: "sap_collaborate#start_iterate"

@@ -1,10 +1,28 @@
 <div class="<%= align_class %> space-y-1">
-  <div class="chat-header flex items-center gap-2 text-xs text-base-content/70">
+  <div class="chat-header flex flex-wrap items-center gap-2 text-xs text-base-content/70">
     <span class="badge badge-ghost badge-sm"><%= badge %></span>
     <span class="font-semibold"><%= label %></span>
+    <% if phase_badge.present? %>
+      <span class="badge badge-warning badge-outline badge-sm"><%= phase_badge %></span>
+    <% end %>
+    <% if tokens_badge.present? %>
+      <span class="badge badge-accent badge-outline badge-sm"><%= tokens_badge %></span>
+    <% end %>
+    <% if correlation_label.present? %>
+      <span class="badge badge-ghost badge-outline badge-sm">Corr: <%= correlation_label %></span>
+    <% end %>
   </div>
 
-  <div class="<%= bubble_classes %> whitespace-pre-wrap">
-    <%= body %>
+  <div class="<%= bubble_classes %> whitespace-pre-wrap space-y-2">
+    <div><%= body %></div>
+
+    <% if raw_payload.present? %>
+      <details class="collapse collapse-arrow bg-base-200 text-base-content/80">
+        <summary class="collapse-title text-sm font-semibold">Show raw</summary>
+        <div class="collapse-content">
+          <pre class="whitespace-pre-wrap text-xs"><%= pretty_raw_payload %></pre>
+        </div>
+      </details>
+    <% end %>
   </div>
 </div>
