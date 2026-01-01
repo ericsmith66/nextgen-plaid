@@ -1,56 +1,78 @@
 require "test_helper"
 
 class AiWorkflowServiceTest < ActiveSupport::TestCase
-  test "runs a 2-agent chain and writes artifacts" do
-    fake_sap_result = Agents::RunResult.new(
-      output: "SAP draft",
-      messages: [ { role: :assistant, content: "SAP draft" } ],
-      usage: {},
-      context: { correlation_id: "cid-123", turn_count: 1 }
-    )
-    fake_coordinator_result = Agents::RunResult.new(
-      output: "Coordinator assigns ball_with=Coordinator",
-      messages: [ { role: :assistant, content: "Coordinator assigns ball_with=Coordinator" } ],
-      usage: {},
-      context: { correlation_id: "cid-123", turn_count: 2 }
-    )
+  test "handoff occurs and artifacts are written" do
+    url = "http://localhost:3002/v1/chat/completions"
 
-    runners = []
-    Agents::Runner.stub(:with_agents, ->(*_agents) {
-      # First call: SAP, second call: Coordinator
-      seq = runners.length
-      runner = Object.new
-      def runner.on_run_start(&); self; end
-      def runner.on_agent_thinking(&); self; end
-      def runner.on_agent_handoff(&); self; end
-      def runner.on_agent_complete(&); self; end
-      def runner.on_run_complete(&); self; end
-      def runner.on_tool_start(&); self; end
-      def runner.on_tool_complete(&); self; end
-      runner.define_singleton_method(:run) do |_input, context:, **_kwargs|
-        # Preserve context chaining semantics
-        merged = context.merge(correlation_id: "cid-123")
-        if seq == 0
-          fake_sap_result.context = merged.merge(turn_count: 1)
-          fake_sap_result
-        else
-          fake_coordinator_result.context = merged.merge(turn_count: 2)
-          fake_coordinator_result
-        end
-      end
-      runners << runner
-      runner
-    }) do
-      result = AiWorkflowService.run(prompt: "Generate PRD", correlation_id: "cid-123")
+    stub_request(:post, url)
+      .to_return(
+        {
+          status: 200,
+          headers: { "Content-Type" => "application/json" },
+          body: {
+            id: "chatcmpl-1",
+            object: "chat.completion",
+            created: 1,
+            model: "llama3.1:70b",
+            choices: [
+              {
+                index: 0,
+                finish_reason: "tool_calls",
+                message: {
+                  role: "assistant",
+                  content: nil,
+                  tool_calls: [
+                    {
+                      id: "call_1",
+                      type: "function",
+                      function: {
+                        name: "handoff_to_coordinator",
+                        arguments: "{}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+          }.to_json
+        },
+        {
+          status: 200,
+          headers: { "Content-Type" => "application/json" },
+          body: {
+            id: "chatcmpl-2",
+            object: "chat.completion",
+            created: 2,
+            model: "llama3.1:70b",
+            choices: [
+              {
+                index: 0,
+                finish_reason: "stop",
+                message: {
+                  role: "assistant",
+                  content: "Coordinator assigns ball_with=Coordinator"
+                }
+              }
+            ],
+            usage: { prompt_tokens: 12, completion_tokens: 6, total_tokens: 18 }
+          }.to_json
+        }
+      )
 
-      assert_equal "Coordinator", result.context[:ball_with]
-      assert_equal "SAP draft", result.context[:sap_output]
-      assert_includes result.output, "Coordinator"
+    correlation_id = "cid-123"
+    result = AiWorkflowService.run(prompt: "Please assign this task", correlation_id: correlation_id)
 
-      run_dir = Rails.root.join("agent_logs", "ai_workflow", "cid-123")
-      assert File.exist?(run_dir.join("run.json")), "expected run.json to exist"
-      assert File.exist?(run_dir.join("events.ndjson")), "expected events.ndjson to exist"
-    end
+    assert_equal "Coordinator", result.context[:ball_with]
+    assert_includes result.output.to_s, "Coordinator"
+
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    assert File.exist?(run_dir.join("run.json")), "expected run.json to exist"
+    assert File.exist?(run_dir.join("events.ndjson")), "expected events.ndjson to exist"
+
+    events = File.read(run_dir.join("events.ndjson")).lines.map { |l| JSON.parse(l) }
+    assert events.any? { |e| e["type"] == "agent_handoff" && e["from"] == "SAP" && e["to"] == "Coordinator" },
+           "expected an agent_handoff event SAP -> Coordinator"
   end
 
   test "guardrail rejects empty prompt" do

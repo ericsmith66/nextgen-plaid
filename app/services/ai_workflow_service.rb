@@ -17,13 +17,6 @@ class AiWorkflowService
     context = build_initial_context(correlation_id)
     artifacts = ArtifactWriter.new(correlation_id)
 
-    sap_agent = build_agent(
-      name: "SAP",
-      instructions: persona_instructions("sap"),
-      model: model,
-      handoff_agents: []
-    )
-
     coordinator_agent = build_agent(
       name: "Coordinator",
       instructions: persona_instructions("coordinator"),
@@ -31,34 +24,43 @@ class AiWorkflowService
       handoff_agents: []
     )
 
+    sap_agent = build_agent(
+      name: "SAP",
+      instructions: persona_instructions("sap"),
+      model: model,
+      handoff_agents: [ coordinator_agent ]
+    )
+
     headers = {
       "X-Request-ID" => correlation_id
     }
 
-    # Spike approach: explicit 2-agent chain (SAP -> Coordinator).
-    # This avoids relying on model-driven tool handoffs while still proving multi-agent execution + shared context.
-    sap_runner = Agents::Runner.with_agents(sap_agent)
-    artifacts.attach_callbacks!(sap_runner)
+    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent)
+    artifacts.attach_callbacks!(runner)
 
-    sap_result = sap_runner.run(prompt, context: context, max_turns: max_turns, headers: headers)
+    # Encourage tool-based handoff (the gem will expose `handoff_to_coordinator` as a tool).
+    handoff_instruction = <<~TEXT
+      If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
+      Otherwise, answer directly.
+    TEXT
 
-    artifacts.record_event(type: "agent_handoff", from: "SAP", to: "Coordinator", reason: "manual_chain")
-
-    coordinator_runner = Agents::Runner.with_agents(coordinator_agent)
-    artifacts.attach_callbacks!(coordinator_runner)
-
-    sap_output_text = extract_text_output(sap_result)
-    coordinator_input = "SAP output:\n#{sap_output_text}"
-    final_result = coordinator_runner.run(coordinator_input, context: sap_result.context, max_turns: max_turns, headers: headers)
+    result = runner.run(
+      "#{handoff_instruction}\n\nUser request:\n#{prompt}",
+      context: context,
+      max_turns: max_turns,
+      headers: headers
+    )
 
     # Normalize ownership tracking.
-    final_result.context[:ball_with] = "Coordinator"
-    final_result.context[:turns_count] = final_result.context[:turn_count]
-    final_result.context[:sap_output] = sap_output_text
+    current_agent = result.context[:current_agent] || result.context["current_agent"]
+    result.context[:ball_with] = current_agent
 
-    artifacts.write_run_json(final_result)
+    turn_count = result.context[:turn_count] || result.context["turn_count"]
+    result.context[:turns_count] = turn_count
 
-    final_result
+    artifacts.write_run_json(result)
+
+    result
   rescue StandardError => e
     # Best-effort event + run.json on failures.
     begin
@@ -97,14 +99,6 @@ class AiWorkflowService
       handoff_agents: handoff_agents,
       tools: []
     )
-  end
-
-  def self.extract_text_output(result)
-    text = result.output.to_s
-    return text unless text.strip.empty?
-
-    last_assistant = (result.messages || []).reverse.find { |m| m[:role] == :assistant && m[:content].is_a?(String) }
-    last_assistant ? last_assistant[:content].to_s : ""
   end
 
   class ArtifactWriter

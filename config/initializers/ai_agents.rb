@@ -25,3 +25,29 @@ Agents.configure do |config|
 
   config.debug = ENV["AI_DEBUG"] == "true"
 end
+
+# --- SmartProxy model registry hook (RubyLLM) ---
+#
+# `ai-agents` uses `RubyLLM::Chat.new(model: <id>)` internally.
+# RubyLLM validates model ids against its registry (models.json).
+# For SmartProxy, we often want to send arbitrary model ids like `llama3.1:70b`.
+# To avoid `RubyLLM::Models::ModelNotFoundError`, we register those ids at boot.
+if defined?(RubyLLM)
+  begin
+    models = RubyLLM::Models.instance.instance_variable_get(:@models)
+    provider_slug = "openai"
+
+    base_models = [
+      ENV.fetch("AI_DEFAULT_MODEL", "llama3.1:70b"),
+      ENV.fetch("AI_DEV_MODEL", "llama3.1:8b")
+    ]
+
+    extra_models = ENV.fetch("AI_EXTRA_MODELS", "").split(",").map(&:strip).reject(&:empty?)
+    (base_models + extra_models).uniq.each do |model_id|
+      next if models.any? { |m| m.id == model_id }
+      models << RubyLLM::Model::Info.default(model_id, provider_slug)
+    end
+  rescue StandardError => e
+    Rails.logger&.warn("RubyLLM model registry hook failed: #{e.class}: #{e.message}")
+  end
+end
