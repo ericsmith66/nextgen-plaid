@@ -1,0 +1,210 @@
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+require "fileutils"
+require "securerandom"
+require "time"
+
+class AiWorkflowService
+  class GuardrailError < StandardError; end
+
+  DEFAULT_MAX_TURNS = 3
+
+  def self.run(prompt:, correlation_id: SecureRandom.uuid, max_turns: DEFAULT_MAX_TURNS, model: nil)
+    raise GuardrailError, "prompt must be present" if prompt.nil? || prompt.strip.empty?
+
+    context = build_initial_context(correlation_id)
+    artifacts = ArtifactWriter.new(correlation_id)
+
+    sap_agent = build_agent(
+      name: "SAP",
+      instructions: persona_instructions("sap"),
+      model: model,
+      handoff_agents: []
+    )
+
+    coordinator_agent = build_agent(
+      name: "Coordinator",
+      instructions: persona_instructions("coordinator"),
+      model: model,
+      handoff_agents: []
+    )
+
+    headers = {
+      "X-Request-ID" => correlation_id
+    }
+
+    # Spike approach: explicit 2-agent chain (SAP -> Coordinator).
+    # This avoids relying on model-driven tool handoffs while still proving multi-agent execution + shared context.
+    sap_runner = Agents::Runner.with_agents(sap_agent)
+    artifacts.attach_callbacks!(sap_runner)
+
+    sap_result = sap_runner.run(prompt, context: context, max_turns: max_turns, headers: headers)
+
+    artifacts.record_event(type: "agent_handoff", from: "SAP", to: "Coordinator", reason: "manual_chain")
+
+    coordinator_runner = Agents::Runner.with_agents(coordinator_agent)
+    artifacts.attach_callbacks!(coordinator_runner)
+
+    sap_output_text = extract_text_output(sap_result)
+    coordinator_input = "SAP output:\n#{sap_output_text}"
+    final_result = coordinator_runner.run(coordinator_input, context: sap_result.context, max_turns: max_turns, headers: headers)
+
+    # Normalize ownership tracking.
+    final_result.context[:ball_with] = "Coordinator"
+    final_result.context[:turns_count] = final_result.context[:turn_count]
+    final_result.context[:sap_output] = sap_output_text
+
+    artifacts.write_run_json(final_result)
+
+    final_result
+  rescue StandardError => e
+    # Best-effort event + run.json on failures.
+    begin
+      artifacts ||= ArtifactWriter.new(correlation_id)
+      artifacts.write_error(e)
+    rescue StandardError
+      # ignore
+    end
+    raise
+  end
+
+  def self.build_initial_context(correlation_id)
+    {
+      correlation_id: correlation_id,
+      state: "in_progress",
+      ball_with: "SAP",
+      turns_count: 0,
+      feedback_history: [],
+      artifacts: [],
+      micro_tasks: []
+    }
+  end
+
+  def self.persona_instructions(key)
+    personas_path = Rails.root.join("knowledge_base", "personas.yml")
+    personas = YAML.safe_load(File.read(personas_path))
+    persona = personas.fetch(key)
+    persona.fetch("description")
+  end
+
+  def self.build_agent(name:, instructions:, model:, handoff_agents:)
+    Agents::Agent.new(
+      name: name,
+      instructions: instructions,
+      model: model || Agents.configuration.default_model,
+      handoff_agents: handoff_agents,
+      tools: []
+    )
+  end
+
+  def self.extract_text_output(result)
+    text = result.output.to_s
+    return text unless text.strip.empty?
+
+    last_assistant = (result.messages || []).reverse.find { |m| m[:role] == :assistant && m[:content].is_a?(String) }
+    last_assistant ? last_assistant[:content].to_s : ""
+  end
+
+  class ArtifactWriter
+    def initialize(correlation_id)
+      @correlation_id = correlation_id
+    end
+
+    def attach_callbacks!(runner)
+      runner.on_run_start(&method(:on_run_start))
+      runner.on_agent_thinking(&method(:on_agent_thinking))
+      runner.on_agent_handoff(&method(:on_agent_handoff))
+      runner.on_agent_complete(&method(:on_agent_complete))
+      runner.on_run_complete(&method(:on_run_complete))
+      runner.on_tool_start(&method(:on_tool_start))
+      runner.on_tool_complete(&method(:on_tool_complete))
+      runner
+    end
+
+    def record_event(payload)
+      write_event(payload)
+    end
+
+    def write_run_json(result)
+      write_json("run.json", {
+        correlation_id: @correlation_id,
+        output: result.output,
+        error: result.error&.message,
+        context: result.context,
+        usage: result.usage
+      })
+    end
+
+    def write_error(error)
+      write_event(type: "error", message: error.message, error_class: error.class.name)
+      write_json("run.json", {
+        correlation_id: @correlation_id,
+        error: error.message,
+        error_class: error.class.name
+      })
+    end
+
+    private
+
+    def base_dir
+      Rails.root.join("agent_logs", "ai_workflow", @correlation_id)
+    end
+
+    def ensure_dir!
+      FileUtils.mkdir_p(base_dir)
+    end
+
+    def events_path
+      base_dir.join("events.ndjson")
+    end
+
+    def write_json(filename, payload)
+      ensure_dir!
+      File.write(base_dir.join(filename), JSON.pretty_generate(payload) + "\n")
+    end
+
+    def write_event(payload)
+      ensure_dir!
+      enriched = payload.merge(
+        correlation_id: @correlation_id,
+        ts: Time.now.utc.iso8601
+      )
+      File.open(events_path, "a") { |f| f.puts(enriched.to_json) }
+    end
+
+    def on_run_start(agent_name, input, _context_wrapper)
+      write_event(type: "run_start", agent: agent_name, input: input)
+    end
+
+    def on_agent_thinking(agent_name, input)
+      write_event(type: "agent_thinking", agent: agent_name, input: input)
+    end
+
+    def on_agent_handoff(from_agent, to_agent, reason)
+      write_event(type: "agent_handoff", from: from_agent, to: to_agent, reason: reason)
+    end
+
+    def on_agent_complete(agent_name, result, error, _context_wrapper)
+      write_event(
+        type: "agent_complete",
+        agent: agent_name,
+        output: result&.output,
+        error: error&.message
+      )
+    end
+
+    def on_run_complete(agent_name, result, _context_wrapper)
+      write_event(type: "run_complete", agent: agent_name, output: result&.output)
+    end
+
+    def on_tool_start(tool_name, args)
+      write_event(type: "tool_start", tool: tool_name, args: args)
+    end
+
+    def on_tool_complete(tool_name, result)
+      write_event(type: "tool_complete", tool: tool_name, result: result)
+    end
+  end
+end

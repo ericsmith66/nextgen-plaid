@@ -63,3 +63,6 @@ storage/*
 plaid_dev/*
 /app/assets/builds/*
 !/app/assets/builds/.keep
+
+# Agent workflow artifacts
+agent_logs/

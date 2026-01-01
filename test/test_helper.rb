@@ -3,6 +3,7 @@ require_relative "../config/environment"
 require "rails/test_help"
 require "minitest/mock"
 require "warden/test/helpers"
+require "webmock/minitest"
 require "vcr"
 
 VCR.configure do |config|
