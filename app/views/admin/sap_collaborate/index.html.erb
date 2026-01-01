@@ -1,210 +1,32 @@
-<div class="space-y-6">
-  <div class="card bg-base-100 shadow-xl">
-    <div class="card-body space-y-4">
-      <div class="flex flex-col gap-2">
-        <h1 class="card-title">SAP Oversight</h1>
-        <p class="text-sm text-base-content/70">Admin-only workspace to start Adaptive Iterate or Conductor runs. Enter a task, confirm IDs, and launch. Raw JSON is tucked behind a toggle.</p>
-      </div>
-
-      <%= form_with url: admin_sap_collaborate_start_iterate_path, method: :post, local: true, html: { class: "space-y-4" } do |f| %>
-        <div class="form-control">
-          <label class="label" for="task">
-            <span class="label-text">Task<span class="text-error">*</span></span>
-          </label>
-          <%= f.text_area :task, value: @task, required: true, class: "textarea textarea-bordered", placeholder: "Describe the task (e.g., Generate PRD for webhook ingestion)" %>
-          <label class="label">
-            <span class="label-text-alt text-error">Task is required.</span>
-          </label>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="form-control">
-            <label class="label" for="branch">
-              <span class="label-text">Branch (optional)</span>
-            </label>
-            <%= f.text_field :branch, value: @branch, class: "input input-bordered", placeholder: "feature/agent-03" %>
-            <label class="label">
-              <span class="label-text-alt">Optional: note the git branch for this run.</span>
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label" for="flow">
-              <span class="label-text">Flow</span>
-            </label>
-            <select class="select select-bordered" id="flow" disabled>
-              <option>Adaptive Iterate</option>
-              <option>Conductor</option>
-            </select>
-            <label class="label">
-              <span class="label-text-alt">Choose via the buttons below.</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="form-control">
-            <label class="label" for="correlation_id">
-              <span class="label-text">Correlation ID (auto-generated)</span>
-            </label>
-            <%= f.text_field :correlation_id, value: @correlation_id, class: "input input-bordered" %>
-            <label class="label">
-              <span class="label-text-alt">Used to track logs and live updates.</span>
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label" for="idempotency_uuid">
-              <span class="label-text">Idempotency UUID (auto-generated)</span>
-            </label>
-            <%= f.text_field :idempotency_uuid, value: @idempotency_uuid, class: "input input-bordered" %>
-            <label class="label">
-              <span class="label-text-alt">Keeps repeated submissions aligned.</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <button class="btn btn-primary" type="submit">Start Adaptive Iterate</button>
-          <button class="btn btn-secondary" type="submit" formaction="<%= admin_sap_collaborate_start_conductor_path %>">Start Conductor</button>
-          <button class="btn" type="submit" formaction="<%= admin_sap_collaborate_pause_path %>" <%= @pause_disabled ? "disabled" : nil %>>Pause</button>
-          <button class="btn" type="submit" formaction="<%= admin_sap_collaborate_resume_path %>" <%= @resume_disabled ? "disabled" : nil %>>Resume</button>
-        </div>
-      <% end %>
+<div class="h-[calc(100vh-4rem)] flex flex-col" data-controller="chat">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-base-300 bg-base-200">
+    <div>
+      <h1 class="text-lg font-semibold">SAP Collaborate</h1>
+      <p class="text-xs text-base-content/70">Bare-metal streaming chat (one assistant bubble updated over time).</p>
     </div>
+    <div class="w-10 h-10"></div>
   </div>
 
-  <div class="card bg-base-100 shadow-lg" id="sap-status-card"
-       data-correlation="<%= @correlation_id %>"
-       data-status-url="<%= admin_sap_collaborate_status_path(correlation_id: @correlation_id) %>">
-    <div class="card-body space-y-3">
-      <h2 class="card-title">Status & Output</h2>
-      <p class="text-sm text-base-content/70">Correlation ID: <span class="font-mono"><%= @correlation_id %></span></p>
-      <p class="text-sm text-base-content/70">Idempotency UUID: <span class="font-mono"><%= @idempotency_uuid %></span></p>
+  <%= turbo_stream_from "sap_run_#{@sap_run.id}" %>
 
-      <div id="sap-status-alert">
-        <% if @humanized_response.present? %>
-          <div class="alert alert-success">
-            <span><%= @humanized_response %></span>
-          </div>
-        <% elsif @sap_response.present? %>
-          <div class="alert alert-info">
-            <span>Response ready. Open raw JSON below.</span>
-          </div>
-        <% else %>
-          <div class="alert">
-            <span>No run started yet. Submit a task to see results.</span>
-          </div>
-        <% end %>
-      </div>
-
-      <div id="sap-status-raw" class="hidden">
-        <% if @sap_response.present? %>
-          <details class="collapse collapse-arrow bg-base-200">
-            <summary class="collapse-title text-md font-medium">Show raw JSON</summary>
-            <div class="collapse-content">
-              <pre class="whitespace-pre-wrap text-xs"><%= JSON.pretty_generate(@sap_response) rescue @sap_response.to_json %></pre>
-            </div>
-          </details>
-        <% end %>
-      </div>
-
-      <div id="sap-fallback" class="hidden alert alert-warning">
-        <span>Live updates unavailable; falling back to periodic refresh.</span>
-      </div>
-    </div>
+  <div
+    id="chat-stream"
+    class="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+    data-chat-target="stream"
+  >
+    <%= render partial: "message", collection: @messages, as: :message %>
   </div>
 
-  <div class="alert alert-info shadow-lg">
-    <span>Real-time updates, pause/resume, and audit history will be added in PRDs 0041C–0041E. Access is owner/admin only.</span>
-  </div>
-
-  <div class="card bg-base-100 shadow-lg">
-    <div class="card-body space-y-3">
-      <h2 class="card-title">Recent Runs (Audit)</h2>
-      <div class="overflow-x-auto">
-        <table class="table table-sm">
-          <thead>
-            <tr>
-              <th>Started</th>
-              <th>Status</th>
-              <th>Task</th>
-              <th>Model</th>
-              <th>Correlation</th>
-              <th>User</th>
-              <th>Artifact</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @sap_runs&.each do |run| %>
-              <tr>
-                <td><%= run.started_at&.strftime('%Y-%m-%d %H:%M:%S') || run.created_at.strftime('%Y-%m-%d %H:%M:%S') %></td>
-                <td><%= run.status %></td>
-                <td class="truncate max-w-xs"><%= run.task&.first(80) %></td>
-                <td><%= run.model_used %></td>
-                <td class="font-mono text-xs"><%= run.correlation_id %></td>
-                <td><%= run.redacted_user_label %></td>
-                <td>
-                  <% if run.artifact_path.present? %>
-                    <a class="link" href="<%= admin_sap_collaborate_artifact_path(correlation_id: run.correlation_id) %>">Download</a>
-                  <% else %>
-                    <span class="text-xs text-base-content/60">—</span>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <div class="sticky bottom-0 bg-base-200 border-t border-base-300 px-4 py-3">
+    <%= form_with url: admin_sap_collaborate_ask_path, method: :post, data: { action: "turbo:submit-end->chat#afterSubmit" }, class: "flex gap-2 items-end" do |f| %>
+      <%= f.hidden_field :sap_run_id, value: @sap_run.id %>
+      <%= f.text_area :prompt,
+            required: true,
+            rows: 3,
+            class: "textarea textarea-bordered flex-1",
+            placeholder: "Ask SAP…",
+            data: { chat_target: "input" } %>
+      <%= f.submit "Send", class: "btn btn-primary" %>
+    <% end %>
   </div>
 </div>
-
-<script type="module">
-  const card = document.getElementById("sap-status-card");
-  if (card) {
-    const correlationId = card.dataset.correlation;
-    const statusUrl = card.dataset.statusUrl;
-    const alertBox = document.getElementById("sap-status-alert");
-    const rawBox = document.getElementById("sap-status-raw");
-    const fallback = document.getElementById("sap-fallback");
-
-    const renderPayload = (payload) => {
-      if (!payload) return;
-      const message = payload.humanized || `Status: ${payload.status}`;
-      alertBox.innerHTML = `<div class="alert alert-info"><span>${message}</span></div>`;
-      rawBox.classList.remove("hidden");
-      rawBox.innerHTML = `<details class="collapse collapse-arrow bg-base-200"><summary class="collapse-title text-md font-medium">Show raw JSON</summary><div class="collapse-content"><pre class="whitespace-pre-wrap text-xs">${JSON.stringify(payload.payload || payload, null, 2)}</pre></div></details>`;
-    };
-
-    const poll = () => {
-      fetch(statusUrl).then(r => r.ok ? r.json() : null).then(renderPayload).catch(() => {});
-    };
-
-    const startPolling = () => {
-      if (fallback) fallback.classList.remove("hidden");
-      poll();
-      setInterval(poll, 5000);
-    };
-
-    const connectCable = async () => {
-      try {
-        if (window.ActionCable && window.ActionCable.createConsumer) {
-          const consumer = window.ActionCable.createConsumer();
-          consumer.subscriptions.create({ channel: "SapRunChannel", correlation_id: correlationId }, {
-            received(data) { renderPayload(data); },
-            connected() {},
-            rejected() { startPolling(); }
-          });
-          return;
-        }
-      } catch (e) {
-        // fall through to polling
-      }
-
-      startPolling();
-    };
-
-    connectCable();
-  }
-</script>

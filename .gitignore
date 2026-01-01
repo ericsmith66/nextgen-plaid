@@ -63,3 +63,4 @@ storage/*
 plaid_dev/*
 /app/assets/builds/*
 !/app/assets/builds/.keep
+/.env.testing

@@ -6,6 +6,11 @@
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
+  # Propshaft: force a test-only manifest path under `tmp/` so we use the dynamic resolver.
+  # (If a precompiled manifest exists under `public/assets`, Propshaft would otherwise
+  # switch to the static resolver and break importmap resolution in tests.)
+  config.assets.manifest_path = Rails.root.join("tmp", "propshaft-manifest.test.json")
+
   # While tests run files are not watched, reloading is not necessary.
   config.enable_reloading = false
 

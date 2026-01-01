@@ -1,0 +1,15 @@
+<% alignment_class = message.user_role? ? "justify-end" : "justify-start" %>
+<% bubble_class = message.user_role? ? "bg-primary text-primary-content" : "bg-base-300 text-base-content" %>
+
+<div id="<%= dom_id(message) %>" class="flex <%= alignment_class %>">
+  <div class="max-w-[80ch] rounded-lg px-3 py-2 <%= bubble_class %>">
+    <div class="text-xs opacity-60 mb-1">
+      <%= message.role %>
+      ·
+      <%= message.created_at.strftime("%H:%M:%S") %>
+    </div>
+    <div class="prose prose-sm max-w-none">
+      <%= simple_format(message.content) %>
+    </div>
+  </div>
+</div>
