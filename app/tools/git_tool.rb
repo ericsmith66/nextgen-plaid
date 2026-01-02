@@ -8,7 +8,7 @@ class GitTool < Agents::Tool
   param :action, type: "string", desc: "One of: init_sandbox, status, diff, add, commit"
   param :args, type: "object", desc: "Action-specific arguments"
 
-  MAX_CALLS_PER_TURN = 10
+  MAX_CALLS_PER_TURN = 5
   MAX_RETRIES = 2
 
   BRANCH_NAME = /\A[a-z0-9][a-z0-9._\/-]*\z/i

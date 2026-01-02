@@ -18,13 +18,7 @@ class AiWorkflowService
     context = build_initial_context(correlation_id)
     artifacts = ArtifactWriter.new(correlation_id)
 
-    cwa_agent = build_agent(
-      name: "CWA",
-      instructions: persona_instructions("intp"),
-      model: model,
-      handoff_agents: [],
-      tools: [ GitTool.new, SafeShellTool.new ]
-    )
+    cwa_agent = Agents::Registry.fetch(:cwa, model: model)
 
     coordinator_agent = build_agent(
       name: "Coordinator",
@@ -228,13 +222,7 @@ class AiWorkflowService
       chosen_model: chosen_model
     )
 
-    cwa_agent = build_agent(
-      name: "CWA",
-      instructions: persona_instructions("intp"),
-      model: chosen_model,
-      handoff_agents: [],
-      tools: [ GitTool.new, SafeShellTool.new ]
-    )
+    cwa_agent = Agents::Registry.fetch(:cwa, model: chosen_model)
 
     planner_agent = build_agent(
       name: "Planner",

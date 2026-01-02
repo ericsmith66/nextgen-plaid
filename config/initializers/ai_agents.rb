@@ -5,6 +5,8 @@
 # Require: agents
 
 require "agents"
+require Rails.root.join("app", "services", "agents", "registry")
+require Rails.root.join("app", "services", "ai", "smart_proxy_model_registry")
 
 Agents.logger = defined?(Rails) ? Rails.logger : nil
 
@@ -37,28 +39,25 @@ require Rails.root.join("app", "tools", "git_tool")
 require Rails.root.join("app", "tools", "task_breakdown_tool")
 require Rails.root.join("app", "services", "agent_sandbox_runner")
 
-# --- SmartProxy model registry hook (RubyLLM) ---
+# --- Global agent registration (PRD 0010) ---
 #
-# `ai-agents` uses `RubyLLM::Chat.new(model: <id>)` internally.
-# RubyLLM validates model ids against its registry (models.json).
-# For SmartProxy, we often want to send arbitrary model ids like `llama3.1:70b`.
-# To avoid `RubyLLM::Models::ModelNotFoundError`, we register those ids at boot.
-if defined?(RubyLLM)
-  begin
-    models = RubyLLM::Models.instance.instance_variable_get(:@models)
-    provider_slug = "openai"
+# Register CWA (Code Writing Agent) once at boot, as a factory. Workflows can
+# fetch it with `Agents::Registry.fetch(:cwa, model: ...)`.
+Agents::Registry.register(:cwa) do |model: nil, instructions: nil|
+  # Load persona instructions from YAML to keep runtime logic aligned with Agent-05.
+  require "yaml"
+  personas_path = Rails.root.join("knowledge_base", "personas.yml")
+  personas = YAML.safe_load(File.read(personas_path))
+  instructions ||= personas.fetch("intp").fetch("description")
 
-    base_models = [
-      ENV.fetch("AI_DEFAULT_MODEL", "llama3.1:70b"),
-      ENV.fetch("AI_DEV_MODEL", "llama3.1:8b")
-    ]
-
-    extra_models = ENV.fetch("AI_EXTRA_MODELS", "").split(",").map(&:strip).reject(&:empty?)
-    (base_models + extra_models).uniq.each do |model_id|
-      next if models.any? { |m| m.id == model_id }
-      models << RubyLLM::Model::Info.default(model_id, provider_slug)
-    end
-  rescue StandardError => e
-    Rails.logger&.warn("RubyLLM model registry hook failed: #{e.class}: #{e.message}")
-  end
+  Agents::Agent.new(
+    name: "CWA",
+    instructions: instructions,
+    model: model || Agents.configuration.default_model,
+    handoff_agents: [],
+    tools: [ GitTool.new, SafeShellTool.new ]
+  )
 end
+
+# --- SmartProxy model registry hook (RubyLLM) ---
+Ai::SmartProxyModelRegistry.register_models!(logger: Rails.logger)

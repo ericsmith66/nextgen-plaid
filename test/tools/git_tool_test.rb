@@ -68,7 +68,7 @@ class GitToolTest < ActiveSupport::TestCase
     ctx = build_tool_context(state: {})
 
     AgentSandboxRunner.stub(:ensure_worktree!, "/tmp/sandbox/repo") do
-      10.times do
+      5.times do
         JSON.parse(tool.perform(ctx, action: "init_sandbox", args: { branch: "feature/test-branch" }))
       end
 

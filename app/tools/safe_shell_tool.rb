@@ -9,7 +9,7 @@ class SafeShellTool < Agents::Tool
   description "Run an allowlisted shell command inside the per-run sandbox worktree (dry-run by default)."
   param :cmd, type: "string", desc: "Shell command to run (deny-by-default allowlist)"
 
-  MAX_CALLS_PER_TURN = 10
+  MAX_CALLS_PER_TURN = 5
   MAX_RETRIES = 2
 
   # Deny-by-default: only allow a small, explicit set of common dev commands.
@@ -75,7 +75,7 @@ class SafeShellTool < Agents::Tool
     if cmd.match?(/\Abundle\s+exec\s+(rake\s+test|rails\s+test)/i)
       timeout_seconds = Integer(ENV.fetch("AI_TOOLS_TEST_TIMEOUT_SECONDS", "300"))
     else
-      timeout_seconds = Integer(ENV.fetch("AI_TOOLS_CMD_TIMEOUT_SECONDS", "60"))
+      timeout_seconds = Integer(ENV.fetch("AI_TOOLS_CMD_TIMEOUT_SECONDS", "30"))
     end
 
     result = AgentSandboxRunner.run(

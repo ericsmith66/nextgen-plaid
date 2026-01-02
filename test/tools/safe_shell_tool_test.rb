@@ -60,7 +60,7 @@ class SafeShellToolTest < ActiveSupport::TestCase
     tool = SafeShellTool.new
     ctx = build_tool_context(state: { sandbox_repo: Rails.root.to_s })
 
-    10.times do
+    5.times do
       JSON.parse(tool.perform(ctx, cmd: "bundle exec rake test"))
     end
 

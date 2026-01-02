@@ -25,4 +25,10 @@ namespace :ai do
     warn "GuardrailError: #{e.message}"
     exit 1
   end
+
+  desc "Refresh SmartProxy model ids into RubyLLM registry (best-effort)"
+  task refresh_models: :environment do
+    Ai::SmartProxyModelRegistry.register_models!(logger: Rails.logger)
+    puts "Registered RubyLLM models (count=#{RubyLLM::Models.instance.instance_variable_get(:@models).size})" if defined?(RubyLLM)
+  end
 end
