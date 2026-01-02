@@ -6,7 +6,7 @@ ruby "3.3.10"
 
 gem "rails", "~> 8.0.4"
 gem "propshaft"
-gem "pg", "~> 1.5"
+gem "pg", "~> 1.6"
 gem "puma", ">= 6.0"
 gem "jbuilder"
 
