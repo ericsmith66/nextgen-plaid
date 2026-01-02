@@ -85,7 +85,14 @@ class GitTool < Agents::Tool
       return JSON.pretty_generate(action: "dry_run", cmd: cmd, cwd: cwd)
     end
 
-    result = AgentSandboxRunner.run(cmd: cmd, argv: [ "git" ] + argv, cwd: cwd, correlation_id: correlation_id, tool_name: self.class.name)
+    result = AgentSandboxRunner.run(
+      cmd: cmd,
+      argv: [ "git" ] + argv,
+      cwd: cwd,
+      correlation_id: correlation_id,
+      tool_name: self.class.name,
+      timeout_seconds: 60
+    )
     JSON.pretty_generate(action: "executed", cmd: cmd, cwd: cwd, result: result)
   end
 

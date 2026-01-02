@@ -68,7 +68,21 @@ class SafeShellTool < Agents::Tool
     end
 
     argv = Shellwords.split(cmd)
-    result = AgentSandboxRunner.run(cmd: cmd, argv: argv, cwd: sandbox_repo, correlation_id: correlation_id, tool_name: self.class.name)
+
+    if cmd.match?(/\Abundle\s+exec\s+(rake\s+test|rails\s+test)/i)
+      timeout_seconds = Integer(ENV.fetch("AI_TOOLS_TEST_TIMEOUT_SECONDS", "300"))
+    else
+      timeout_seconds = Integer(ENV.fetch("AI_TOOLS_CMD_TIMEOUT_SECONDS", "60"))
+    end
+
+    result = AgentSandboxRunner.run(
+      cmd: cmd,
+      argv: argv,
+      cwd: sandbox_repo,
+      correlation_id: correlation_id,
+      tool_name: self.class.name,
+      timeout_seconds: timeout_seconds
+    )
 
     record_test_status!(tool_context, cmd: cmd, result: result)
     format_result(action: "executed", cmd: cmd, cwd: sandbox_repo, result: result)

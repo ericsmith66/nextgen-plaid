@@ -5,6 +5,7 @@ require "json"
 require "open3"
 require "fileutils"
 require "shellwords"
+require "timeout"
 
 payload_raw = ENV.fetch("AGENT_SANDBOX_PAYLOAD")
 payload = JSON.parse(payload_raw)
@@ -12,6 +13,7 @@ payload = JSON.parse(payload_raw)
 cmd = payload.fetch("cmd")
 argv = payload["argv"]
 cwd = payload.fetch("cwd")
+timeout_seconds = payload["timeout_seconds"]
 
 FileUtils.mkdir_p(cwd)
 
@@ -21,7 +23,56 @@ argv = if argv.nil? || argv.empty?
          Array(argv).map(&:to_s)
        end
 
-stdout, stderr, status = Open3.capture3(*argv, chdir: cwd)
+# Default timeout to prevent indefinite hangs (e.g., interactive prompts, stuck tests).
+timeout_seconds = timeout_seconds.nil? ? Integer(ENV.fetch("AGENT_SANDBOX_TIMEOUT_SECONDS", "300")) : timeout_seconds.to_i
+
+# Hard-disable interactive git prompts inside the sandbox.
+env = {
+  "GIT_TERMINAL_PROMPT" => "0",
+  "GIT_SSH_COMMAND" => "ssh -o BatchMode=yes"
+}
+
+stdout = ""
+stderr = ""
+status = nil
+pid = nil
+
+begin
+  Timeout.timeout(timeout_seconds) do
+    Open3.popen3(env, *argv, chdir: cwd) do |stdin, out, err, wait_thr|
+      stdin.close
+      pid = wait_thr.pid
+
+      # Put the subprocess in its own process group so we can terminate the whole tree on timeout.
+      begin
+        Process.setpgid(pid, pid)
+      rescue Errno::EACCES, Errno::ESRCH
+        # best-effort
+      end
+
+      # Read stdout/stderr concurrently to avoid pipe deadlocks for chatty commands.
+      stdout_thread = Thread.new { out.read }
+      stderr_thread = Thread.new { err.read }
+
+      stdout = stdout_thread.value
+      stderr = stderr_thread.value
+      status = wait_thr.value
+    end
+  end
+rescue Timeout::Error
+  if pid
+    begin
+      Process.kill("TERM", -pid)
+      sleep 0.5
+      Process.kill("KILL", -pid)
+    rescue Errno::ESRCH
+      # already exited
+    end
+  end
+
+  stderr = "agent_sandbox_runner timeout after #{timeout_seconds}s (cmd=#{argv.join(" ")})"
+  status = Struct.new(:exitstatus).new(124)
+end
 
 print JSON.generate(
   status: status.exitstatus,
