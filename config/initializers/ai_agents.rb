@@ -36,6 +36,9 @@ end
 # Eager-load tool classes in production so `Agents::Tool` subclasses are available.
 require Rails.root.join("app", "tools", "safe_shell_tool")
 require Rails.root.join("app", "tools", "git_tool")
+require Rails.root.join("app", "tools", "project_search_tool")
+require Rails.root.join("app", "tools", "vc_tool")
+require Rails.root.join("app", "tools", "code_analysis_tool")
 require Rails.root.join("app", "tools", "task_breakdown_tool")
 require Rails.root.join("app", "services", "agent_sandbox_runner")
 
@@ -55,7 +58,7 @@ Agents::Registry.register(:cwa) do |model: nil, instructions: nil|
     instructions: instructions,
     model: model || Agents.configuration.default_model,
     handoff_agents: [],
-    tools: [ GitTool.new, SafeShellTool.new ]
+    tools: [ GitTool.new, SafeShellTool.new, ProjectSearchTool.new, VcTool.new, CodeAnalysisTool.new ]
   )
 end
 
