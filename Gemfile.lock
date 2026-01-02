@@ -135,7 +135,7 @@ GEM
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
-    faraday-multipart (1.1.1)
+    faraday-multipart (1.2.0)
       multipart-post (~> 2.0)
     faraday-net_http (3.4.2)
       net-http (~> 0.5)
@@ -161,7 +161,7 @@ GEM
     jbuilder (2.14.1)
       actionview (>= 7.0.0)
       activesupport (>= 7.0.0)
-    json (2.17.1)
+    json (2.18.0)
     kamal (2.9.0)
       activesupport (>= 7.0)
       base64 (~> 0.2)
@@ -204,7 +204,7 @@ GEM
     minitest (5.26.2)
     msgpack (1.8.0)
     multipart-post (2.4.1)
-    net-http (0.8.0)
+    net-http (0.9.1)
       uri (>= 0.11.1)
     net-imap (0.5.12)
       date
@@ -250,7 +250,7 @@ GEM
     pg (1.6.2-x86_64-darwin)
     pg (1.6.2-x86_64-linux)
     pg (1.6.2-x86_64-linux-musl)
-    plaid (36.1.0)
+    plaid (45.0.0)
       faraday (>= 1.0.1, < 3.0)
       faraday-multipart (>= 1.0.1, < 2.0)
     pp (0.6.3)
@@ -480,7 +480,7 @@ DEPENDENCIES
   kamal
   kaminari (~> 1.2)
   pg (~> 1.5)
-  plaid (~> 36.0)
+  plaid (~> 45.0)
   propshaft
   pry-rails
   puma (>= 6.0)
