@@ -54,11 +54,15 @@ Persistence may use a minimal DB model (`AiWorkflowRun`) if required for resumab
 - UI banners/tabs for workflow visibility.
 - Deprecation path for Junie via CWA integration.
 
-### Atomic PRDs Table
+### Atomic PRDs Table (Numeric)
 | Priority | Feature | Status | Dependencies |
 |----------|---------|--------|--------------|
-| 1 | 0050A: Spike — Persona Setup & Console Handoffs (gem validation + minimal runner; multi-provider proof) | Todo | None |
-| 2 | 0050B: Feedback & Resolution Loop (FSM states, guardrails/timeouts, file transport) | Todo | #1 |
-| 3 | 0050E: Planning Phase for CWA (micro-task JSON contract) | Todo | #2 |
-| 4 | 0050C: Impl/Test/Commit with CWA (sandboxed tools; AI local commits, human push/merge) | Todo | #3 |
-| 5 | 0050D: UI Layer & Tracking (read-only v1; optional realtime later) | Todo | #4 |
+| 1 | 0010: Spike — Persona Setup & Console Handoffs (gem validation + minimal runner; multi-provider proof) | Todo | None |
+| 2 | 0020: Feedback & Resolution Loop (FSM states, guardrails/timeouts, file transport) | Todo | #1 |
+| 3 | 0030: Planning Phase for CWA (micro-task JSON contract) | Todo | #2 |
+| 4 | 0040: Impl/Test/Commit with CWA (sandboxed tools; AI local commits, human push/merge) | Todo | #3 |
+| 5 | 0050: UI Layer & Tracking (read-only v1; optional realtime later) | Todo | #4 |
+
+### Provider Support Notes
+- **Preferred model source of truth**: SmartProxy `GET /v1/models`.
+- **Fallback**: environment config (`AI_DEFAULT_MODEL`, `AI_DEV_MODEL`, `AI_EXTRA_MODELS`).
