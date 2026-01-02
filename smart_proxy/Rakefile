@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+
+require "rspec/core/rake_task"
+
+RSpec::Core::RakeTask.new(:spec)
+
+# Keep compatibility with `bundle exec rake test`.
+task test: :spec
+
+task default: :test

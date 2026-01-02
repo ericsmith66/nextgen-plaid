@@ -24,7 +24,7 @@ module SapAgent
     #   SapAgent.process("my question", research: true)
     #   #=> { response:, tools_used:, loop_count:, model_used: }
     def process(query_or_type, payload = nil, research: false, request_id: nil, privacy_level: nil, max_cost_tier: nil)
-      if payload.is_a?(Hash) && COMMAND_MAPPING.key?(query_or_type.to_s)
+      if payload.is_a?(Hash)
         return process_command(query_or_type, payload)
       end
 
@@ -95,6 +95,8 @@ module SapAgent
         max_loops: decision.max_loops
       )
 
+      resp = { "response" => resp } unless resp.is_a?(Hash)
+
       smart_proxy = resp["smart_proxy"].is_a?(Hash) ? resp["smart_proxy"] : {}
       tool_loop = smart_proxy["tool_loop"].is_a?(Hash) ? smart_proxy["tool_loop"] : {}
 
@@ -107,7 +109,7 @@ module SapAgent
     end
 
     def code_review(branch: nil, files: nil, task_id: nil, correlation_id: SecureRandom.uuid)
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      started_at = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
       self.task_id = task_id
       self.branch = branch
       self.correlation_id = correlation_id
@@ -143,14 +145,14 @@ module SapAgent
       redacted_contents = contents.transform_values { |val| SapAgent::Redactor.redact(val) }
       output = build_output(offenses, redacted_contents)
 
-      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      elapsed = ((::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started_at) * 1000).round
       log_review_event("code_review.complete", score: score, elapsed_ms: elapsed, model_used: model_used)
 
       output
     end
 
     def iterate_prompt(task:, branch: nil, correlation_id: SecureRandom.uuid, resume_token: nil, human_feedback: nil, pause: false)
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      started_at = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
       self.task_id = task
       self.branch = branch
       self.correlation_id = correlation_id
@@ -187,7 +189,7 @@ module SapAgent
         context << "Iteration #{iteration_number} output: #{output}"
 
         if score >= SapAgent::Config::SCORE_STOP_THRESHOLD
-          elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          elapsed = ((::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started_at) * 1000).round
           log_iterate_event("iterate.complete", iteration: iteration_number, score: score, elapsed_ms: elapsed, model_used: current_model)
           return { status: "completed", iterations: iterations, final_output: output, score: score, model_used: current_model, resume_token: current_resume_token }
         end
@@ -212,7 +214,7 @@ module SapAgent
     end
 
     def adaptive_iterate(task:, branch: nil, correlation_id: SecureRandom.uuid, human_feedback: nil, start_model: nil)
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      started_at = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
       self.task_id = task
       self.branch = branch
       self.correlation_id = correlation_id
@@ -252,7 +254,7 @@ module SapAgent
         context << "Iteration #{iteration_number} output: #{output}"
 
         if normalized_score >= SapAgent::Config::SCORE_STOP_THRESHOLD
-          elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          elapsed = ((::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started_at) * 1000).round
           log_iterate_event("adaptive.complete", iteration: iteration_number, score: normalized_score, elapsed_ms: elapsed, model_used: current_model)
           return { status: "completed", iterations: iterations, final_output: output, score: normalized_score, model_used: current_model }
         end
@@ -288,7 +290,7 @@ module SapAgent
     end
 
     def conductor(task:, branch: nil, correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, refiner_iterations: 3, max_jobs: 5)
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      started_at = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
       self.task_id = task
       self.branch = branch
       self.correlation_id = correlation_id
@@ -332,7 +334,7 @@ module SapAgent
         return circuit_breaker_fallback(state)
       end
 
-      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      elapsed = ((::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started_at) * 1000).round
       log_conductor_event("conductor.complete", idempotency_uuid: idempotency_uuid, elapsed_ms: elapsed, queue_job_id: reviewer_result[:queue_job_id])
 
       { status: "completed", state: state, elapsed_ms: elapsed }
@@ -341,7 +343,7 @@ module SapAgent
       { status: "error", reason: e.message }
     end
     def queue_handshake(artifact:, task_summary:, task_id:, branch: "main", correlation_id: SecureRandom.uuid, idempotency_uuid: SecureRandom.uuid, artifact_path: nil)
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      started_at = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
       self.task_id = task_id
       self.branch = branch
       self.correlation_id = correlation_id
@@ -399,7 +401,7 @@ module SapAgent
           return { status: "error", reason: "stash_apply_conflict", commit_hash: commit_hash, idempotency_uuid: idempotency_uuid }
         end
       end
-      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      elapsed = ((::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started_at) * 1000).round
       log_queue_event("queue_handshake.complete", idempotency_uuid: idempotency_uuid, commit_hash: commit_hash, elapsed_ms: elapsed)
       { status: "committed", commit_hash: commit_hash, idempotency_uuid: idempotency_uuid, elapsed_ms: elapsed }
     rescue StandardError => e
@@ -468,7 +470,7 @@ module SapAgent
     end
 
     def prune_context(context:, correlation_id: SecureRandom.uuid, min_keep: SapAgent::Config::PRUNE_MIN_KEEP_TOKENS, target_tokens: SapAgent::Config::PRUNE_TARGET_TOKENS)
-      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      started_at = ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
       self.correlation_id = correlation_id
 
       tokens = estimate_tokens(context.to_s)
@@ -485,7 +487,7 @@ module SapAgent
         return { status: "warning", context: context, token_count: tokens, warning: "min_keep_floor" }
       end
 
-      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+      elapsed = ((::Process.clock_gettime(::Process::CLOCK_MONOTONIC) - started_at) * 1000).round
       log_conductor_event("prune.complete", pruned_tokens: pruned_tokens, original_tokens: tokens, correlation_id: correlation_id, elapsed_ms: elapsed)
 
       { status: "pruned", context: minify_context(pruned), token_count: pruned_tokens, original_tokens: tokens, elapsed_ms: elapsed }
