@@ -5,7 +5,7 @@ require "json"
 require "open3"
 require "fileutils"
 require "shellwords"
-require "timeout"
+require "time"
 
 payload_raw = ENV.fetch("AGENT_SANDBOX_PAYLOAD")
 payload = JSON.parse(payload_raw)
@@ -29,49 +29,128 @@ timeout_seconds = timeout_seconds.nil? ? Integer(ENV.fetch("AGENT_SANDBOX_TIMEOU
 # Hard-disable interactive git prompts inside the sandbox.
 env = {
   "GIT_TERMINAL_PROMPT" => "0",
-  "GIT_SSH_COMMAND" => "ssh -o BatchMode=yes"
+  "GIT_SSH_COMMAND" => "ssh -o BatchMode=yes",
+  # Prevent nested tool execution (e.g., running tool tests inside the sandbox can otherwise recurse).
+  "AGENT_SANDBOX_ACTIVE" => "1",
+  "AI_TOOLS_EXECUTE" => "false"
 }
 
 stdout = ""
 stderr = ""
 status = nil
 pid = nil
+timed_out = false
 
-begin
-  Timeout.timeout(timeout_seconds) do
-    Open3.popen3(env, *argv, chdir: cwd) do |stdin, out, err, wait_thr|
-      stdin.close
-      pid = wait_thr.pid
+def kill_process_tree(pid)
+  return if pid.nil?
 
-      # Put the subprocess in its own process group so we can terminate the whole tree on timeout.
-      begin
-        Process.setpgid(pid, pid)
-      rescue Errno::EACCES, Errno::ESRCH
-        # best-effort
-      end
-
-      # Read stdout/stderr concurrently to avoid pipe deadlocks for chatty commands.
-      stdout_thread = Thread.new { out.read }
-      stderr_thread = Thread.new { err.read }
-
-      stdout = stdout_thread.value
-      stderr = stderr_thread.value
-      status = wait_thr.value
+  begin
+    Process.kill("TERM", -pid)
+  rescue Errno::ESRCH
+    # Process group may not exist even if the pid does; fall back to single pid.
+    begin
+      Process.kill("TERM", pid)
+    rescue Errno::ESRCH
+      return
+    end
+  rescue Errno::EINVAL
+    # Fall back to single pid.
+    begin
+      Process.kill("TERM", pid)
+    rescue Errno::ESRCH
+      return
     end
   end
-rescue Timeout::Error
-  if pid
+
+  sleep 0.5
+
+  begin
+    Process.kill("KILL", -pid)
+  rescue Errno::ESRCH
+    # Group may not exist; try single pid (it might still be alive).
     begin
-      Process.kill("TERM", -pid)
-      sleep 0.5
-      Process.kill("KILL", -pid)
+      Process.kill("KILL", pid)
+    rescue Errno::ESRCH
+      # already exited
+    end
+  rescue Errno::EINVAL
+    begin
+      Process.kill("KILL", pid)
     rescue Errno::ESRCH
       # already exited
     end
   end
+end
 
-  stderr = "agent_sandbox_runner timeout after #{timeout_seconds}s (cmd=#{argv.join(" ")})"
-  status = Struct.new(:exitstatus).new(124)
+begin
+  started_at = Time.now.utc.iso8601
+  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
+
+  Open3.popen3(env, *argv, chdir: cwd, pgroup: true) do |stdin, out, err, wait_thr|
+    stdin.close
+    pid = wait_thr.pid
+
+    out_buf = +""
+    err_buf = +""
+    out_eof = false
+    err_eof = false
+
+    # Non-blocking reads so we can enforce timeouts reliably on macOS.
+    out.sync = true
+    err.sync = true
+
+    # Exit when we've drained stdout/stderr AND the child process has finished.
+    # NOTE: `Process::Status#exitstatus` can be `nil` when the child was terminated by a signal,
+    # so we must not use `exitstatus` as the loop terminator (it can cause an infinite loop).
+    until (out_eof && err_eof) && status
+      # Check for timeout.
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+        timed_out = true
+        kill_process_tree(pid)
+      end
+
+      # Drain available output.
+      readable, = IO.select([out, err].compact, nil, nil, 0.1)
+      Array(readable).each do |io|
+        begin
+          chunk = io.read_nonblock(16_384)
+          if io == out
+            out_buf << chunk
+          else
+            err_buf << chunk
+          end
+        rescue IO::WaitReadable
+          next
+        rescue EOFError
+          out_eof = true if io == out
+          err_eof = true if io == err
+        end
+      end
+
+      # Check process status without racing `wait_thr` (which also waits/reaps).
+      if wait_thr.join(0)
+        status = wait_thr.value
+      end
+
+      break if timed_out && status
+    end
+
+    # Ensure we have a final status.
+    status ||= wait_thr.value
+
+    stdout = out_buf
+    stderr = err_buf
+
+    if timed_out
+      stderr = "agent_sandbox_runner timeout after #{timeout_seconds}s (cmd=#{argv.join(" ")}, cwd=#{cwd})\n#{stderr}".strip
+      status = Struct.new(:exitstatus).new(124)
+    end
+  ensure
+    finished_at = Time.now.utc.iso8601
+  end
+rescue StandardError => e
+  stderr = "agent_sandbox_runner error: #{e.class}: #{e.message}"
+  status = Struct.new(:exitstatus).new(125)
 end
 
 print JSON.generate(

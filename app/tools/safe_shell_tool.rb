@@ -62,7 +62,10 @@ class SafeShellTool < Agents::Tool
     sandbox_repo = tool_context.state[:sandbox_repo]
     return format_result(action: "blocked", cmd: cmd, reason: "sandbox_not_initialized") if sandbox_repo.nil? || sandbox_repo.to_s.empty?
 
-    execute_enabled = ENV.fetch("AI_TOOLS_EXECUTE", "false").to_s.downcase == "true"
+    # Never allow tool execution from inside the sandbox runner itself; this can recurse
+    # (e.g., running tool tests in the sandbox calling tools again).
+    nested_sandbox = ENV.fetch("AGENT_SANDBOX_ACTIVE", "0").to_s == "1"
+    execute_enabled = !nested_sandbox && ENV.fetch("AI_TOOLS_EXECUTE", "false").to_s.downcase == "true"
     unless execute_enabled
       return format_result(action: "dry_run", cmd: cmd, cwd: sandbox_repo)
     end

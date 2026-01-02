@@ -19,7 +19,10 @@ class GitTool < Agents::Tool
 
     enforce_tool_guardrails!(tool_context)
 
-    execute_enabled = ENV.fetch("AI_TOOLS_EXECUTE", "false").to_s.downcase == "true"
+    # Never allow tool execution from inside the sandbox runner itself; this can recurse
+    # (e.g., running tool tests in the sandbox calling tools again).
+    nested_sandbox = ENV.fetch("AGENT_SANDBOX_ACTIVE", "0").to_s == "1"
+    execute_enabled = !nested_sandbox && ENV.fetch("AI_TOOLS_EXECUTE", "false").to_s.downcase == "true"
     if !execute_enabled && action.to_s != "init_sandbox"
       return JSON.pretty_generate(action: "dry_run", requested: action, args: args)
     end

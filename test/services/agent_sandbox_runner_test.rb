@@ -1,6 +1,24 @@
 require "test_helper"
 
 class AgentSandboxRunnerTest < ActiveSupport::TestCase
+  test "script/agent_sandbox_runner enforces timeout without hanging" do
+    script = Rails.root.join("script", "agent_sandbox_runner")
+
+    payload = {
+      cmd: "ruby -e \"sleep 5\"",
+      argv: [ "ruby", "-e", "sleep 5" ],
+      cwd: Rails.root.to_s,
+      timeout_seconds: 1
+    }
+
+    stdout, _stderr, status = Open3.capture3({ "AGENT_SANDBOX_PAYLOAD" => JSON.generate(payload) }, script.to_s)
+    result = JSON.parse(stdout)
+
+    assert_equal 124, result.fetch("status")
+    assert_includes result.fetch("stderr"), "timeout after 1s"
+    assert_equal 124, status.exitstatus
+  end
+
   test "run parses inner JSON output from sandbox runner" do
     inner = {
       status: 7,
