@@ -90,6 +90,106 @@ class SmartProxyApp < Sinatra::Base
     end
   end
 
+  # OpenAI-compatible chat completions endpoint.
+  # This is the primary endpoint used by the Rails app (via `ai-agents` / RubyLLM).
+  post '/v1/chat/completions' do
+    request.body.rewind if request.body.respond_to?(:rewind)
+    body_content = request.body.read
+    request_payload = JSON.parse(body_content)
+
+    anonymized_payload = Anonymizer.anonymize(request_payload)
+
+    $logger.info({
+      event: 'chat_completions_request_received',
+      session_id: @session_id,
+      payload: anonymized_payload
+    })
+
+    model = anonymized_payload['model'].to_s
+
+    # Ollama model ids in this repo look like `llama3.1:8b`.
+    # Route to Ollama unless it clearly looks like a Grok model.
+    use_grok = model.start_with?('grok') && (ENV['GROK_API_KEY_SAP'] || ENV['GROK_API_KEY'])
+
+    response = if use_grok
+      client = GrokClient.new(api_key: ENV['GROK_API_KEY_SAP'] || ENV['GROK_API_KEY'])
+      client.chat_completions(anonymized_payload)
+    else
+      client = OllamaClient.new
+      client.chat(anonymized_payload)
+    end
+
+    $logger.info({
+      event: 'chat_completions_response_received',
+      session_id: @session_id,
+      status: response.status,
+      body: response.body
+    })
+
+    status response.status
+
+    raw_body = response.body
+    parsed = raw_body.is_a?(String) ? (JSON.parse(raw_body) rescue nil) : raw_body
+
+    # If upstream already returned OpenAI-compatible JSON, pass it through.
+    if parsed.is_a?(Hash) && parsed.key?('choices')
+      parsed.to_json
+    # Map Ollama `/api/chat` response into OpenAI `/v1/chat/completions` format.
+    # Ollama commonly returns: {"model":"...","created_at":"...","message":{"role":"assistant","content":"..."},"done":true}
+    elsif parsed.is_a?(Hash) && parsed['message'].is_a?(Hash)
+      msg = parsed['message']
+
+      created = begin
+        Time.parse(parsed['created_at'].to_s).to_i
+      rescue StandardError
+        Time.now.to_i
+      end
+
+      {
+        id: "chatcmpl-#{SecureRandom.hex(8)}",
+        object: 'chat.completion',
+        created: created,
+        model: model.empty? ? parsed['model'] : model,
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: msg['role'] || 'assistant',
+              content: msg['content']
+            }
+          }
+        ]
+      }.to_json
+    else
+      # Fallback: return a minimal OpenAI-shaped response with stringified body.
+      {
+        id: "chatcmpl-#{SecureRandom.hex(8)}",
+        object: 'chat.completion',
+        created: Time.now.to_i,
+        model: model,
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: raw_body.to_s
+            }
+          }
+        ]
+      }.to_json
+    end
+  rescue JSON::ParserError => e
+    $logger.error({ event: 'chat_completions_json_parse_error', session_id: @session_id, error: e.message })
+    status 400
+    { error: 'Invalid JSON payload' }.to_json
+  rescue StandardError => e
+    $logger.error({ event: 'chat_completions_internal_error', session_id: @session_id, error: e.message, backtrace: (e.backtrace || []).first(5) })
+    status 500
+    { error: e.message }.to_json
+  end
+
   post '/proxy/tools' do
     request.body.rewind if request.body.respond_to?(:rewind)
     body_content = request.body.read

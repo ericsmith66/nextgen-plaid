@@ -139,4 +139,51 @@ RSpec.describe SmartProxyApp do
       end
     end
   end
+
+  describe 'POST /v1/chat/completions' do
+    let(:auth_token) { 'test_token' }
+
+    before do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with('PROXY_AUTH_TOKEN').and_return(auth_token)
+    end
+
+    context 'when unauthorized' do
+      it 'returns 401' do
+        post '/v1/chat/completions', { model: 'llama3.1:8b', messages: [ { role: 'user', content: 'Hello' } ] }.to_json, { 'HTTP_HOST' => 'localhost' }
+        expect(last_response.status).to eq(401)
+      end
+    end
+
+    context 'when authorized' do
+      let(:headers) { { 'HTTP_AUTHORIZATION' => "Bearer #{auth_token}", 'HTTP_HOST' => 'localhost' } }
+
+      it 'maps Ollama /api/chat response into OpenAI chat.completion format' do
+        stub_request(:post, 'http://localhost:11434/api/chat')
+          .to_return(
+            status: 200,
+            headers: { 'Content-Type' => 'application/json' },
+            body: {
+              model: 'llama3.1:8b',
+              created_at: '2026-01-01T00:00:00Z',
+              message: { role: 'assistant', content: 'Hi from Ollama' },
+              done: true
+            }.to_json
+          )
+
+        payload = {
+          'model' => 'llama3.1:8b',
+          'messages' => [ { 'role' => 'user', 'content' => 'Hello' } ],
+          'stream' => false
+        }
+
+        post '/v1/chat/completions', payload.to_json, headers
+        expect(last_response).to be_ok
+
+        body = JSON.parse(last_response.body)
+        expect(body['object']).to eq('chat.completion')
+        expect(body['choices'].first['message']['content']).to eq('Hi from Ollama')
+      end
+    end
+  end
 end
