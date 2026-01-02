@@ -64,3 +64,6 @@ plaid_dev/*
 /app/assets/builds/*
 !/app/assets/builds/.keep
 /.env.testing
+
+# Agent workflow artifacts
+agent_logs/

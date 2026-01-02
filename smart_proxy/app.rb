@@ -8,6 +8,7 @@ require_relative 'lib/ollama_client'
 require_relative 'lib/tool_client'
 require_relative 'lib/anonymizer'
 require 'securerandom'
+require 'time'
 
 class SmartProxyApp < Sinatra::Base
   configure do
@@ -29,6 +30,10 @@ class SmartProxyApp < Sinatra::Base
         message: msg
       }.to_json + "\n"
     end
+
+    # In-memory cache for model listing (best-effort)
+    set :models_cache_ttl, Integer(ENV.fetch('SMART_PROXY_MODELS_CACHE_TTL', '60'))
+    set :models_cache, { fetched_at: Time.at(0), data: nil }
   end
 
   before do
@@ -41,7 +46,152 @@ class SmartProxyApp < Sinatra::Base
     { status: 'ok' }.to_json
   end
 
+  # OpenAI-compatible model listing endpoint.
+  # Backed by Ollama's HTTP API (`GET /api/tags`).
+  get '/v1/models' do
+    begin
+      cached = settings.models_cache
+      ttl = settings.models_cache_ttl
+      if cached[:data] && (Time.now - cached[:fetched_at] < ttl)
+        cached[:data].to_json
+      else
+        client = OllamaClient.new
+        resp = client.list_models
+
+        if resp.status == 200
+          body = resp.body.is_a?(String) ? JSON.parse(resp.body) : resp.body
+          models = (body['models'] || []).map do |m|
+            {
+              id: m['name'],
+              object: 'model',
+              owned_by: 'ollama',
+              created: (Time.parse(m['modified_at']).to_i rescue nil),
+              smart_proxy: {
+                size: m['size'],
+                digest: m['digest'],
+                details: m['details']
+              }.compact
+            }.compact
+          end
+
+          payload = { object: 'list', data: models }
+          settings.models_cache = { fetched_at: Time.now, data: payload }
+          payload.to_json
+        else
+          $logger.warn({ event: 'ollama_models_error', session_id: @session_id, status: resp.status, body: resp.body })
+          fallback = cached[:data] || { object: 'list', data: [] }
+          fallback.to_json
+        end
+      end
+    rescue StandardError => e
+      $logger.error({ event: 'models_endpoint_error', session_id: @session_id, error: e.message })
+      fallback = settings.models_cache[:data] || { object: 'list', data: [] }
+      fallback.to_json
+    end
+  end
+
+  # OpenAI-compatible chat completions endpoint.
+  # This is the primary endpoint used by the Rails app (via `ai-agents` / RubyLLM).
+  post '/v1/chat/completions' do
+    request.body.rewind if request.body.respond_to?(:rewind)
+    body_content = request.body.read
+    request_payload = JSON.parse(body_content)
+
+    anonymized_payload = Anonymizer.anonymize(request_payload)
+
+    $logger.info({
+      event: 'chat_completions_request_received',
+      session_id: @session_id,
+      payload: anonymized_payload
+    })
+
+    model = anonymized_payload['model'].to_s
+
+    # Ollama model ids in this repo look like `llama3.1:8b`.
+    # Route to Ollama unless it clearly looks like a Grok model.
+    use_grok = model.start_with?('grok') && (ENV['GROK_API_KEY_SAP'] || ENV['GROK_API_KEY'])
+
+    response = if use_grok
+      client = GrokClient.new(api_key: ENV['GROK_API_KEY_SAP'] || ENV['GROK_API_KEY'])
+      client.chat_completions(anonymized_payload)
+    else
+      client = OllamaClient.new
+      client.chat(anonymized_payload)
+    end
+
+    $logger.info({
+      event: 'chat_completions_response_received',
+      session_id: @session_id,
+      status: response.status,
+      body: response.body
+    })
+
+    status response.status
+
+    raw_body = response.body
+    parsed = raw_body.is_a?(String) ? (JSON.parse(raw_body) rescue nil) : raw_body
+
+    # If upstream already returned OpenAI-compatible JSON, pass it through.
+    if parsed.is_a?(Hash) && parsed.key?('choices')
+      parsed.to_json
+    # Map Ollama `/api/chat` response into OpenAI `/v1/chat/completions` format.
+    # Ollama commonly returns: {"model":"...","created_at":"...","message":{"role":"assistant","content":"..."},"done":true}
+    elsif parsed.is_a?(Hash) && parsed['message'].is_a?(Hash)
+      msg = parsed['message']
+
+      created = begin
+        Time.parse(parsed['created_at'].to_s).to_i
+      rescue StandardError
+        Time.now.to_i
+      end
+
+      {
+        id: "chatcmpl-#{SecureRandom.hex(8)}",
+        object: 'chat.completion',
+        created: created,
+        model: model.empty? ? parsed['model'] : model,
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: msg['role'] || 'assistant',
+              content: msg['content']
+            }
+          }
+        ]
+      }.to_json
+    else
+      # Fallback: return a minimal OpenAI-shaped response with stringified body.
+      {
+        id: "chatcmpl-#{SecureRandom.hex(8)}",
+        object: 'chat.completion',
+        created: Time.now.to_i,
+        model: model,
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: raw_body.to_s
+            }
+          }
+        ]
+      }.to_json
+    end
+  rescue JSON::ParserError => e
+    $logger.error({ event: 'chat_completions_json_parse_error', session_id: @session_id, error: e.message })
+    status 400
+    { error: 'Invalid JSON payload' }.to_json
+  rescue StandardError => e
+    $logger.error({ event: 'chat_completions_internal_error', session_id: @session_id, error: e.message, backtrace: (e.backtrace || []).first(5) })
+    status 500
+    { error: e.message }.to_json
+  end
+
   post '/proxy/tools' do
+    request.body.rewind if request.body.respond_to?(:rewind)
     body_content = request.body.read
     request_payload = JSON.parse(body_content)
     
@@ -90,6 +240,7 @@ class SmartProxyApp < Sinatra::Base
   end
 
   post '/proxy/generate' do
+    request.body.rewind if request.body.respond_to?(:rewind)
     body_content = request.body.read
     request_payload = JSON.parse(body_content)
     

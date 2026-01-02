@@ -28,6 +28,18 @@ rackup -p 4567
 Basic health check.
 Returns: `{ "status": "ok" }`
 
+#### GET /v1/models
+OpenAI-compatible model listing endpoint.
+
+- **Auth**: Requires `Authorization: Bearer <PROXY_AUTH_TOKEN>` (unless `PROXY_AUTH_TOKEN` is unset)
+- **Backed by**: Ollama HTTP API (`GET http://localhost:11434/api/tags`)
+- **Returns**:
+  - `{ "object": "list", "data": [ { "id": "llama3.1:8b", "object": "model", "owned_by": "ollama" } ] }`
+
+**Environment variables**:
+- `OLLAMA_TAGS_URL` (optional, default: `http://localhost:11434/api/tags`)
+- `SMART_PROXY_MODELS_CACHE_TTL` (optional, default: `60` seconds)
+
 #### POST /proxy/generate
 Forwards a request to Grok API after anonymization.
 

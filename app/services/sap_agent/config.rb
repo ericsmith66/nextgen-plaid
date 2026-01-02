@@ -14,7 +14,9 @@ module SapAgent
     ADAPTIVE_ESCALATION_ORDER = %w[grok-4.1 claude-sonnet-4.5 ollama].freeze
     ADAPTIVE_MAX_ESCALATIONS = 1
 
-    PRUNE_TARGET_TOKENS = 8000
+    # Keep this intentionally low to ensure pruning engages early enough for typical prompt windows.
+    # Tests expect pruning to occur when token count exceeds ~5000.
+    PRUNE_TARGET_TOKENS = 5000
     PRUNE_MIN_KEEP_TOKENS = 2000
     PRUNE_BACKOFF_MS = [ 150, 300 ].freeze
 
