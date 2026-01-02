@@ -132,7 +132,9 @@ class SmartProxyApp < Sinatra::Base
     parsed = raw_body.is_a?(String) ? (JSON.parse(raw_body) rescue nil) : raw_body
 
     # If upstream already returned OpenAI-compatible JSON, pass it through.
+    # Ensure `usage` is present because RubyLLM expects it.
     if parsed.is_a?(Hash) && parsed.key?('choices')
+      parsed['usage'] ||= { 'prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0 }
       parsed.to_json
     # Map Ollama `/api/chat` response into OpenAI `/v1/chat/completions` format.
     # Ollama commonly returns: {"model":"...","created_at":"...","message":{"role":"assistant","content":"..."},"done":true}
@@ -144,6 +146,10 @@ class SmartProxyApp < Sinatra::Base
       rescue StandardError
         Time.now.to_i
       end
+
+      prompt_tokens = parsed['prompt_eval_count'].to_i
+      completion_tokens = parsed['eval_count'].to_i
+      total_tokens = prompt_tokens + completion_tokens
 
       {
         id: "chatcmpl-#{SecureRandom.hex(8)}",
@@ -159,7 +165,12 @@ class SmartProxyApp < Sinatra::Base
               content: msg['content']
             }
           }
-        ]
+        ],
+        usage: {
+          prompt_tokens: prompt_tokens,
+          completion_tokens: completion_tokens,
+          total_tokens: total_tokens
+        }
       }.to_json
     else
       # Fallback: return a minimal OpenAI-shaped response with stringified body.
@@ -177,17 +188,70 @@ class SmartProxyApp < Sinatra::Base
               content: raw_body.to_s
             }
           }
-        ]
+        ],
+        usage: {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0
+        }
       }.to_json
     end
   rescue JSON::ParserError => e
     $logger.error({ event: 'chat_completions_json_parse_error', session_id: @session_id, error: e.message })
     status 400
-    { error: 'Invalid JSON payload' }.to_json
+    {
+      id: "chatcmpl-#{SecureRandom.hex(8)}",
+      object: 'chat.completion',
+      created: Time.now.to_i,
+      model: 'unknown',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'error',
+          message: {
+            role: 'assistant',
+            content: "SmartProxy error (400): Invalid JSON payload"
+          }
+        }
+      ],
+      usage: {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
+      },
+      smart_proxy_error: {
+        type: 'invalid_json',
+        message: e.message
+      }
+    }.to_json
   rescue StandardError => e
     $logger.error({ event: 'chat_completions_internal_error', session_id: @session_id, error: e.message, backtrace: (e.backtrace || []).first(5) })
     status 500
-    { error: e.message }.to_json
+    {
+      id: "chatcmpl-#{SecureRandom.hex(8)}",
+      object: 'chat.completion',
+      created: Time.now.to_i,
+      model: 'unknown',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'error',
+          message: {
+            role: 'assistant',
+            content: "SmartProxy error (500): #{e.message}"
+          }
+        }
+      ],
+      usage: {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
+      },
+      smart_proxy_error: {
+        type: 'internal_error',
+        message: e.message
+      }
+    }.to_json
   end
 
   post '/proxy/tools' do
@@ -317,10 +381,33 @@ class SmartProxyApp < Sinatra::Base
     auth_header = request.env['HTTP_AUTHORIZATION']
     provided_token = auth_header&.gsub(/^Bearer /, '')&.strip
     
-    if provided_token != auth_token
-      $logger.warn({ event: 'unauthorized_access', provided_token: provided_token })
-      halt 401, { error: 'Unauthorized' }.to_json
-    end
+    return if provided_token == auth_token
+
+    $logger.warn({ event: 'unauthorized_access', provided_token: provided_token })
+    halt 401, {
+      id: "chatcmpl-#{SecureRandom.hex(8)}",
+      object: 'chat.completion',
+      created: Time.now.to_i,
+      model: 'unknown',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'error',
+          message: {
+            role: 'assistant',
+            content: 'SmartProxy error (401): Unauthorized'
+          }
+        }
+      ],
+      usage: {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
+      },
+      smart_proxy_error: {
+        type: 'unauthorized'
+      }
+    }.to_json
   end
 
   run! if app_file == $0

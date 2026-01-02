@@ -1,0 +1,9 @@
+<div class="space-y-4">
+  <%= render AdminAiWorkflowBannerComponent.new(snapshot: @snapshot) %>
+  <%= render AdminAiWorkflowTabsComponent.new(
+        snapshot: @snapshot,
+        tab: @tab,
+        events_page: @events_page,
+        events_per_page: @events_per_page
+      ) %>
+</div>

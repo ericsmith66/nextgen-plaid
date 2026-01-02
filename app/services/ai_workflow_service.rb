@@ -47,6 +47,29 @@ class AiWorkflowService
     runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, cwa_agent)
     artifacts.attach_callbacks!(runner)
 
+    # Diagnostic breadcrumbs to help debug provider/proxy configuration issues.
+    begin
+      cfg = if Agents.respond_to?(:config)
+        Agents.config
+      elsif Agents.respond_to?(:configuration)
+        Agents.configuration
+      end
+
+      artifacts.record_event(
+        type: "runtime_config",
+        agents_openai_api_base: cfg&.respond_to?(:openai_api_base) ? cfg.openai_api_base : nil,
+        agents_default_model: cfg&.respond_to?(:default_model) ? cfg.default_model : nil,
+        agents_request_timeout: cfg&.respond_to?(:request_timeout) ? cfg.request_timeout : nil,
+        rails_env: Rails.env,
+        smart_proxy_port: ENV["SMART_PROXY_PORT"],
+        smart_proxy_openai_base: ENV["SMART_PROXY_OPENAI_BASE"],
+        proxy_auth_token_present: ENV["PROXY_AUTH_TOKEN"].present?,
+        smart_proxy_api_key_present: ENV["SMART_PROXY_API_KEY"].present?
+      )
+    rescue StandardError
+      # ignore diagnostics
+    end
+
     # Encourage tool-based handoff (the gem will expose `handoff_to_*` as tools).
     handoff_instruction = <<~TEXT
       If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
@@ -289,6 +312,8 @@ class AiWorkflowService
         correlation_id: @correlation_id,
         output: result.output,
         error: result.error&.message,
+        error_class: result.error&.class&.name,
+        error_backtrace: result.error&.backtrace,
         context: result.context,
         usage: result.usage
       })
@@ -299,11 +324,17 @@ class AiWorkflowService
     end
 
     def write_error(error)
-      write_event(type: "error", message: error.message, error_class: error.class.name)
+      write_event(
+        type: "error",
+        message: error.message,
+        error_class: error.class.name,
+        error_backtrace: error.backtrace
+      )
       write_json("run.json", {
         correlation_id: @correlation_id,
         error: error.message,
-        error_class: error.class.name
+        error_class: error.class.name,
+        error_backtrace: error.backtrace
       })
     end
 
@@ -352,7 +383,9 @@ class AiWorkflowService
         type: "agent_complete",
         agent: agent_name,
         output: result&.output,
-        error: error&.message
+        error: error&.message,
+        error_class: error&.class&.name,
+        error_backtrace: error&.backtrace
       )
     end
 
