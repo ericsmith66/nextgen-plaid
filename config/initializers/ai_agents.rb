@@ -34,6 +34,7 @@ end
 # Eager-load tool classes in production so `Agents::Tool` subclasses are available.
 require Rails.root.join("app", "tools", "safe_shell_tool")
 require Rails.root.join("app", "tools", "git_tool")
+require Rails.root.join("app", "tools", "task_breakdown_tool")
 require Rails.root.join("app", "services", "agent_sandbox_runner")
 
 # --- SmartProxy model registry hook (RubyLLM) ---

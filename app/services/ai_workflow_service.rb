@@ -47,6 +47,29 @@ class AiWorkflowService
     runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, cwa_agent)
     artifacts.attach_callbacks!(runner)
 
+    # Diagnostic breadcrumbs to help debug provider/proxy configuration issues.
+    begin
+      cfg = if Agents.respond_to?(:config)
+        Agents.config
+      elsif Agents.respond_to?(:configuration)
+        Agents.configuration
+      end
+
+      artifacts.record_event(
+        type: "runtime_config",
+        agents_openai_api_base: cfg&.respond_to?(:openai_api_base) ? cfg.openai_api_base : nil,
+        agents_default_model: cfg&.respond_to?(:default_model) ? cfg.default_model : nil,
+        agents_request_timeout: cfg&.respond_to?(:request_timeout) ? cfg.request_timeout : nil,
+        rails_env: Rails.env,
+        smart_proxy_port: ENV["SMART_PROXY_PORT"],
+        smart_proxy_openai_base: ENV["SMART_PROXY_OPENAI_BASE"],
+        proxy_auth_token_present: ENV["PROXY_AUTH_TOKEN"].present?,
+        smart_proxy_api_key_present: ENV["SMART_PROXY_API_KEY"].present?
+      )
+    rescue StandardError
+      # ignore diagnostics
+    end
+
     # Encourage tool-based handoff (the gem will expose `handoff_to_*` as tools).
     handoff_instruction = <<~TEXT
       If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
@@ -188,26 +211,50 @@ class AiWorkflowService
     )
   end
 
-  def self.run_once(prompt:, context:, artifacts:, max_turns:, model:)
+  def self.run_once(prompt:, context:, artifacts:, max_turns:, model: nil)
+    routing_decision = Ai::RoutingPolicy.call(
+      prompt: prompt,
+      research_requested: !!(context[:research_requested] || context["research_requested"])
+    )
+
+    chosen_model = model || routing_decision.model_id
+
+    artifacts.record_event(
+      type: "routing_decision",
+      policy_version: routing_decision.policy_version,
+      model_id: routing_decision.model_id,
+      use_live_search: routing_decision.use_live_search,
+      reason: routing_decision.reason,
+      chosen_model: chosen_model
+    )
+
     cwa_agent = build_agent(
       name: "CWA",
       instructions: persona_instructions("intp"),
-      model: model,
+      model: chosen_model,
       handoff_agents: [],
       tools: [ GitTool.new, SafeShellTool.new ]
+    )
+
+    planner_agent = build_agent(
+      name: "Planner",
+      instructions: persona_instructions("planner"),
+      model: chosen_model,
+      handoff_agents: [ cwa_agent ],
+      tools: [ TaskBreakdownTool.new ]
     )
 
     coordinator_agent = build_agent(
       name: "Coordinator",
       instructions: persona_instructions("coordinator"),
-      model: model,
-      handoff_agents: [ cwa_agent ]
+      model: chosen_model,
+      handoff_agents: [ planner_agent ]
     )
 
     sap_agent = build_agent(
       name: "SAP",
       instructions: persona_instructions("sap"),
-      model: model,
+      model: chosen_model,
       handoff_agents: [ coordinator_agent ]
     )
 
@@ -215,11 +262,13 @@ class AiWorkflowService
       "X-Request-ID" => context[:correlation_id]
     }
 
-    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, cwa_agent)
+    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, planner_agent, cwa_agent)
     artifacts.attach_callbacks!(runner)
 
     handoff_instruction = <<~TEXT
       If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
+      For implementation work, the Coordinator must first call the tool `handoff_to_planner`.
+      The Planner must generate micro-tasks by calling the tool `task_breakdown_tool` and storing results into `context[:micro_tasks]`.
       If the request is implementation/test/commit work, the Coordinator should call the tool `handoff_to_cwa`.
       Otherwise, answer directly.
     TEXT
@@ -289,6 +338,8 @@ class AiWorkflowService
         correlation_id: @correlation_id,
         output: result.output,
         error: result.error&.message,
+        error_class: result.error&.class&.name,
+        error_backtrace: result.error&.backtrace,
         context: result.context,
         usage: result.usage
       })
@@ -299,11 +350,17 @@ class AiWorkflowService
     end
 
     def write_error(error)
-      write_event(type: "error", message: error.message, error_class: error.class.name)
+      write_event(
+        type: "error",
+        message: error.message,
+        error_class: error.class.name,
+        error_backtrace: error.backtrace
+      )
       write_json("run.json", {
         correlation_id: @correlation_id,
         error: error.message,
-        error_class: error.class.name
+        error_class: error.class.name,
+        error_backtrace: error.backtrace
       })
     end
 
@@ -333,6 +390,22 @@ class AiWorkflowService
         ts: Time.now.utc.iso8601
       )
       File.open(events_path, "a") { |f| f.puts(enriched.to_json) }
+
+      broadcast_event(enriched)
+    end
+
+    def broadcast_event(event)
+      return unless defined?(Turbo::StreamsChannel)
+
+      Turbo::StreamsChannel.broadcast_prepend_to(
+        "ai_workflow_#{@correlation_id}",
+        target: "ai_workflow_events",
+        partial: "admin/ai_workflow/event",
+        locals: { event: event }
+      )
+    rescue StandardError => e
+      raise if Rails.env.test?
+      Rails.logger&.warn("ai_workflow broadcast failed: #{e.class}: #{e.message}")
     end
 
     def on_run_start(agent_name, input, _context_wrapper)
@@ -352,7 +425,9 @@ class AiWorkflowService
         type: "agent_complete",
         agent: agent_name,
         output: result&.output,
-        error: error&.message
+        error: error&.message,
+        error_class: error&.class&.name,
+        error_backtrace: error&.backtrace
       )
     end
 

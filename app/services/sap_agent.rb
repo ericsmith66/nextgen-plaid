@@ -15,7 +15,29 @@ module SapAgent
   class << self
     attr_accessor :task_id, :branch, :correlation_id, :model_used
 
-    def process(query_type, payload)
+    # Backward-compatible entrypoint.
+    #
+    # Legacy usage:
+    #   SapAgent.process("generate", { query: ..., user_id: ... })
+    #
+    # New PRD-50F usage:
+    #   SapAgent.process("my question", research: true)
+    #   #=> { response:, tools_used:, loop_count:, model_used: }
+    def process(query_or_type, payload = nil, research: false, request_id: nil, privacy_level: nil, max_cost_tier: nil)
+      if payload.is_a?(Hash) && COMMAND_MAPPING.key?(query_or_type.to_s)
+        return process_command(query_or_type, payload)
+      end
+
+      process_query(
+        query_or_type,
+        research: research,
+        request_id: request_id,
+        privacy_level: privacy_level,
+        max_cost_tier: max_cost_tier
+      )
+    end
+
+    def process_command(query_type, payload)
       command_class = COMMAND_MAPPING[query_type.to_s]
       raise "Unknown query type: #{query_type}" unless command_class
 
@@ -27,6 +49,61 @@ module SapAgent
       end
 
       result
+    end
+
+    WEB_SEARCH_TOOL = {
+      type: "function",
+      function: {
+        name: "web_search",
+        description: "Search the web for up-to-date information.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query" },
+            num_results: { type: "integer", description: "Number of results (default 5)" }
+          },
+          required: [ "query" ]
+        }
+      }
+    }.freeze
+
+    def process_query(query, research:, request_id:, privacy_level:, max_cost_tier:)
+      decision = Ai::RoutingPolicy.call(
+        prompt: query,
+        research_requested: !!research,
+        privacy_level: privacy_level,
+        max_cost_tier: max_cost_tier
+      )
+
+      tools = decision.use_live_search ? [ WEB_SEARCH_TOOL ] : nil
+      messages = []
+
+      if decision.use_live_search
+        messages << {
+          role: "system",
+          content: "You may use the web_search tool when up-to-date information is required. Use it only if it materially improves the answer."
+        }
+      end
+
+      messages << { role: "user", content: query.to_s }
+
+      resp = AiFinancialAdvisor.chat_completions(
+        messages: messages,
+        model: decision.model_id,
+        request_id: request_id,
+        tools: tools,
+        max_loops: decision.max_loops
+      )
+
+      smart_proxy = resp["smart_proxy"].is_a?(Hash) ? resp["smart_proxy"] : {}
+      tool_loop = smart_proxy["tool_loop"].is_a?(Hash) ? smart_proxy["tool_loop"] : {}
+
+      {
+        response: resp.dig("choices", 0, "message", "content") || resp.dig("message", "content") || resp["response"],
+        tools_used: Array(smart_proxy["tools_used"]),
+        loop_count: tool_loop["loop_count"].to_i,
+        model_used: resp["model"].presence || decision.model_id
+      }
     end
 
     def code_review(branch: nil, files: nil, task_id: nil, correlation_id: SecureRandom.uuid)

@@ -1,0 +1,96 @@
+<% if @snapshot.nil? %>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title">Workflow</h2>
+      <p class="opacity-80">Nothing to display yet.</p>
+    </div>
+  </div>
+<% else %>
+  <div class="tabs tabs-boxed flex flex-col sm:flex-row">
+    <%= link_to "Ownership", admin_ai_workflow_path(tab: "ownership", correlation_id: @snapshot.correlation_id), class: "tab #{tab_active?("ownership") ? "tab-active" : ""}" %>
+    <%= link_to "Context", admin_ai_workflow_path(tab: "context", correlation_id: @snapshot.correlation_id), class: "tab #{tab_active?("context") ? "tab-active" : ""}" %>
+    <%= link_to "Logs", admin_ai_workflow_path(tab: "logs", correlation_id: @snapshot.correlation_id), class: "tab #{tab_active?("logs") ? "tab-active" : ""}" %>
+  </div>
+
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <% if tab_active?("ownership") %>
+        <h2 class="card-title">Ownership</h2>
+        <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <dt class="text-sm opacity-70">Ball with</dt>
+            <dd class="font-mono"><%= @snapshot.ball_with.presence || "unknown" %></dd>
+          </div>
+          <div>
+            <dt class="text-sm opacity-70">State</dt>
+            <dd class="font-mono"><%= @snapshot.state.presence || "unknown" %></dd>
+          </div>
+          <div>
+            <dt class="text-sm opacity-70">Started</dt>
+            <dd class="font-mono"><%= @snapshot.started_at.presence || "unknown" %></dd>
+          </div>
+          <div>
+            <dt class="text-sm opacity-70">Finished</dt>
+            <dd class="font-mono"><%= @snapshot.finished_at.presence || "unknown" %></dd>
+          </div>
+        </dl>
+
+        <% if @snapshot.feedback_history.any? %>
+          <div class="mt-4">
+            <div class="font-semibold mb-2">Feedback history</div>
+            <ul class="menu bg-base-200 rounded-box">
+              <% @snapshot.feedback_history.each do |msg| %>
+                <li><span class="font-mono text-xs"><%= msg.to_s %></span></li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+      <% elsif tab_active?("context") %>
+        <h2 class="card-title">Context</h2>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @snapshot.context.sort_by { |k, _| k.to_s }.each do |k, v| %>
+                <tr>
+                  <td class="font-mono text-xs"><%= k %></td>
+                  <td class="font-mono text-xs whitespace-pre-wrap"><%= v.is_a?(String) ? v : JSON.pretty_generate(v) rescue v.to_s %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <h2 class="card-title">Logs</h2>
+        <div class="text-sm opacity-70">Showing <%= paged_events.length %> of <%= events.length %> events (latest first in file tail)</div>
+
+        <div id="ai_workflow_events" class="mt-3 space-y-2">
+          <% paged_events.each do |evt| %>
+            <%= render partial: "admin/ai_workflow/event", locals: { event: evt } %>
+          <% end %>
+        </div>
+
+        <div class="join mt-4">
+          <% if has_prev? %>
+            <%= link_to "Prev", admin_ai_workflow_path(tab: "logs", correlation_id: @snapshot.correlation_id, events_page: @events_page - 1), class: "btn join-item" %>
+          <% else %>
+            <button class="btn join-item" disabled>Prev</button>
+          <% end %>
+
+          <button class="btn join-item" disabled>Page <%= @events_page %></button>
+
+          <% if has_next? %>
+            <%= link_to "Next", admin_ai_workflow_path(tab: "logs", correlation_id: @snapshot.correlation_id, events_page: @events_page + 1), class: "btn join-item" %>
+          <% else %>
+            <button class="btn join-item" disabled>Next</button>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

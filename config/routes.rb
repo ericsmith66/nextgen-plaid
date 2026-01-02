@@ -52,6 +52,7 @@ Rails.application.routes.draw do
   namespace :admin do
     resources :users
     resources :accounts
+    get "ai_workflow", to: "ai_workflow#index"
     get "rag_inspector", to: "rag_inspector#index"
     get "sap_collaborate", to: "sap_collaborate#index"
     post "sap_collaborate/ask", to: "sap_collaborate#ask"
