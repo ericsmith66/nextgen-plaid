@@ -22,6 +22,21 @@ class SapAgent::IntegrationTest < ActiveSupport::TestCase
     end
   end
 
+  test "Router delegates to Ai::RoutingPolicy" do
+    payload = { query: "Short query", user_id: @user.id }
+    decision = Ai::RoutingPolicy::Decision.new(
+      model_id: "ollama",
+      use_live_search: false,
+      max_loops: 0,
+      reason: "test",
+      policy_version: Ai::RoutingPolicy::POLICY_VERSION
+    )
+
+    Ai::RoutingPolicy.stub :call, decision do
+      assert_equal "ollama", SapAgent::Router.route(payload)
+    end
+  end
+
   test "Router routes to Grok for complex queries" do
     payload = { query: "Create a full PRD for transaction enrichment", user_id: @user.id }
     model = SapAgent::Router.route(payload)

@@ -211,11 +211,27 @@ class AiWorkflowService
     )
   end
 
-  def self.run_once(prompt:, context:, artifacts:, max_turns:, model:)
+  def self.run_once(prompt:, context:, artifacts:, max_turns:, model: nil)
+    routing_decision = Ai::RoutingPolicy.call(
+      prompt: prompt,
+      research_requested: !!(context[:research_requested] || context["research_requested"])
+    )
+
+    chosen_model = model || routing_decision.model_id
+
+    artifacts.record_event(
+      type: "routing_decision",
+      policy_version: routing_decision.policy_version,
+      model_id: routing_decision.model_id,
+      use_live_search: routing_decision.use_live_search,
+      reason: routing_decision.reason,
+      chosen_model: chosen_model
+    )
+
     cwa_agent = build_agent(
       name: "CWA",
       instructions: persona_instructions("intp"),
-      model: model,
+      model: chosen_model,
       handoff_agents: [],
       tools: [ GitTool.new, SafeShellTool.new ]
     )
@@ -223,7 +239,7 @@ class AiWorkflowService
     planner_agent = build_agent(
       name: "Planner",
       instructions: persona_instructions("planner"),
-      model: model,
+      model: chosen_model,
       handoff_agents: [ cwa_agent ],
       tools: [ TaskBreakdownTool.new ]
     )
@@ -231,14 +247,14 @@ class AiWorkflowService
     coordinator_agent = build_agent(
       name: "Coordinator",
       instructions: persona_instructions("coordinator"),
-      model: model,
+      model: chosen_model,
       handoff_agents: [ planner_agent ]
     )
 
     sap_agent = build_agent(
       name: "SAP",
       instructions: persona_instructions("sap"),
-      model: model,
+      model: chosen_model,
       handoff_agents: [ coordinator_agent ]
     )
 
@@ -374,6 +390,22 @@ class AiWorkflowService
         ts: Time.now.utc.iso8601
       )
       File.open(events_path, "a") { |f| f.puts(enriched.to_json) }
+
+      broadcast_event(enriched)
+    end
+
+    def broadcast_event(event)
+      return unless defined?(Turbo::StreamsChannel)
+
+      Turbo::StreamsChannel.broadcast_prepend_to(
+        "ai_workflow_#{@correlation_id}",
+        target: "ai_workflow_events",
+        partial: "admin/ai_workflow/event",
+        locals: { event: event }
+      )
+    rescue StandardError => e
+      raise if Rails.env.test?
+      Rails.logger&.warn("ai_workflow broadcast failed: #{e.class}: #{e.message}")
     end
 
     def on_run_start(agent_name, input, _context_wrapper)

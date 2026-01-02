@@ -7,10 +7,18 @@ class AiWorkflowServicePlannerTest < ActiveSupport::TestCase
 
   def test_run_once_wires_planner_and_populates_micro_tasks
     context = AiWorkflowService.build_initial_context("cid-50e")
+    recorded_events = []
     artifacts = Class.new do
+      def initialize(recorded_events)
+        @recorded_events = recorded_events
+      end
+
       def attach_callbacks!(_runner); end
-      def record_event(_payload); end
-    end.new
+
+      def record_event(payload)
+        @recorded_events << payload
+      end
+    end.new(recorded_events)
 
     captured_agents = nil
 
@@ -44,12 +52,16 @@ class AiWorkflowServicePlannerTest < ActiveSupport::TestCase
         context: context,
         artifacts: artifacts,
         max_turns: 3,
-        model: "llama3.1:8b"
+        model: nil
       )
 
       assert captured_agents.map(&:name).include?("Planner"), "expected Planner agent"
       assert result.context[:micro_tasks].is_a?(Array)
       assert result.context[:micro_tasks].length.between?(5, 10)
+
+      routing = recorded_events.find { |e| e[:type] == "routing_decision" }
+      assert routing, "expected routing_decision event"
+      assert routing[:model_id].present?
     end
   end
 end

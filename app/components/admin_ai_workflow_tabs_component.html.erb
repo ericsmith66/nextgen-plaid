@@ -69,11 +69,9 @@
         <h2 class="card-title">Logs</h2>
         <div class="text-sm opacity-70">Showing <%= paged_events.length %> of <%= events.length %> events (latest first in file tail)</div>
 
-        <div class="mt-3 space-y-2">
+        <div id="ai_workflow_events" class="mt-3 space-y-2">
           <% paged_events.each do |evt| %>
-            <div class="mockup-code">
-              <pre><code><%= JSON.pretty_generate(evt) rescue evt.to_s %></code></pre>
-            </div>
+            <%= render partial: "admin/ai_workflow/event", locals: { event: evt } %>
           <% end %>
         </div>
 

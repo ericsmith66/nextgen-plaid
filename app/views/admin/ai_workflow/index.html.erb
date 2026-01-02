@@ -1,4 +1,7 @@
 <div class="space-y-4">
+  <% if @snapshot.present? %>
+    <%= turbo_stream_from "ai_workflow_#{@snapshot.correlation_id}" %>
+  <% end %>
   <%= render AdminAiWorkflowBannerComponent.new(snapshot: @snapshot) %>
   <%= render AdminAiWorkflowTabsComponent.new(
         snapshot: @snapshot,

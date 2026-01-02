@@ -183,6 +183,182 @@ RSpec.describe SmartProxyApp do
         body = JSON.parse(last_response.body)
         expect(body['object']).to eq('chat.completion')
         expect(body['choices'].first['message']['content']).to eq('Hi from Ollama')
+
+        # SmartProxy always annotates tool-loop metadata for deterministic callers.
+        expect(body.dig('smart_proxy', 'tool_loop', 'loop_count')).to eq(0)
+        expect(body.dig('smart_proxy', 'tools_used')).to eq([])
+      end
+
+      it 'orchestrates tool_calls server-side (max_loops default)' do
+        allow(ENV).to receive(:[]).with('GROK_API_KEY').and_return('grok_key')
+
+        first_upstream = {
+          'id' => 'chatcmpl-1',
+          'object' => 'chat.completion',
+          'created' => 1,
+          'model' => 'grok-4',
+          'choices' => [
+            {
+              'index' => 0,
+              'finish_reason' => 'tool_calls',
+              'message' => {
+                'role' => 'assistant',
+                'content' => nil,
+                'tool_calls' => [
+                  {
+                    'id' => 'call_1',
+                    'type' => 'function',
+                    'function' => {
+                      'name' => 'proxy_tools',
+                      'arguments' => { 'query' => 'test query', 'num_results' => 2 }.to_json
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          'usage' => { 'prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2 }
+        }
+
+        second_upstream = {
+          'id' => 'chatcmpl-2',
+          'object' => 'chat.completion',
+          'created' => 2,
+          'model' => 'grok-4',
+          'choices' => [
+            {
+              'index' => 0,
+              'finish_reason' => 'stop',
+              'message' => { 'role' => 'assistant', 'content' => 'Final answer' }
+            }
+          ],
+          'usage' => { 'prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2 }
+        }
+
+        stub_request(:post, 'https://api.x.ai/v1/chat/completions')
+          .to_return(
+            { status: 200, headers: { 'Content-Type' => 'application/json' }, body: first_upstream.to_json },
+            { status: 200, headers: { 'Content-Type' => 'application/json' }, body: second_upstream.to_json }
+          )
+
+        stub_request(:post, 'https://api.x.ai/v1/search/web')
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: { results: [] }.to_json)
+        stub_request(:post, 'https://api.x.ai/v1/search/x')
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: { results: [] }.to_json)
+
+        payload = {
+          'model' => 'grok-4',
+          'messages' => [ { 'role' => 'user', 'content' => 'Hello' } ],
+          'stream' => false
+        }
+
+        post '/v1/chat/completions', payload.to_json, headers
+        expect(last_response).to be_ok
+
+        body = JSON.parse(last_response.body)
+        expect(body['choices'].first['message']['content']).to eq('Final answer')
+
+        expect(body.dig('smart_proxy', 'tool_loop', 'loop_count')).to eq(1)
+        expect(body.dig('smart_proxy', 'tools_used')).to include(include('name' => 'proxy_tools', 'tool_call_id' => 'call_1'))
+      end
+
+      it 'allows per-request max_loops override via header' do
+        allow(ENV).to receive(:[]).with('GROK_API_KEY').and_return('grok_key')
+
+        upstream = {
+          'id' => 'chatcmpl-1',
+          'object' => 'chat.completion',
+          'created' => 1,
+          'model' => 'grok-4',
+          'choices' => [
+            {
+              'index' => 0,
+              'finish_reason' => 'tool_calls',
+              'message' => {
+                'role' => 'assistant',
+                'content' => nil,
+                'tool_calls' => [
+                  {
+                    'id' => 'call_1',
+                    'type' => 'function',
+                    'function' => {
+                      'name' => 'proxy_tools',
+                      'arguments' => { 'query' => 'test query', 'num_results' => 2 }.to_json
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          'usage' => { 'prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2 }
+        }
+
+        stub_request(:post, 'https://api.x.ai/v1/chat/completions')
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: upstream.to_json)
+
+        payload = {
+          'model' => 'grok-4',
+          'messages' => [ { 'role' => 'user', 'content' => 'Hello' } ],
+          'stream' => false
+        }
+
+        headers_with_override = headers.merge('HTTP_X_SMART_PROXY_MAX_LOOPS' => '0')
+        post '/v1/chat/completions', payload.to_json, headers_with_override
+        expect(last_response).to be_ok
+
+        body = JSON.parse(last_response.body)
+        expect(body.dig('smart_proxy', 'tool_loop', 'max_loops')).to eq(0)
+        expect(body.dig('smart_proxy', 'tool_loop', 'stopped')).to eq('max_loops')
+      end
+
+      it 'enforces max_loops and returns a response with tool_loop metadata' do
+        allow(ENV).to receive(:[]).with('GROK_API_KEY').and_return('grok_key')
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with('SMART_PROXY_MAX_LOOPS', '3').and_return('0')
+
+        upstream = {
+          'id' => 'chatcmpl-1',
+          'object' => 'chat.completion',
+          'created' => 1,
+          'model' => 'grok-4',
+          'choices' => [
+            {
+              'index' => 0,
+              'finish_reason' => 'tool_calls',
+              'message' => {
+                'role' => 'assistant',
+                'content' => nil,
+                'tool_calls' => [
+                  {
+                    'id' => 'call_1',
+                    'type' => 'function',
+                    'function' => {
+                      'name' => 'proxy_tools',
+                      'arguments' => { 'query' => 'test query', 'num_results' => 2 }.to_json
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          'usage' => { 'prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2 }
+        }
+
+        stub_request(:post, 'https://api.x.ai/v1/chat/completions')
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: upstream.to_json)
+
+        payload = {
+          'model' => 'grok-4',
+          'messages' => [ { 'role' => 'user', 'content' => 'Hello' } ],
+          'stream' => false
+        }
+
+        post '/v1/chat/completions', payload.to_json, headers
+        expect(last_response).to be_ok
+
+        body = JSON.parse(last_response.body)
+        expect(body.dig('smart_proxy', 'tool_loop', 'stopped')).to eq('max_loops')
+        expect(body.dig('smart_proxy', 'tool_loop', 'max_loops')).to eq(0)
       end
     end
   end
