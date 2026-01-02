@@ -220,11 +220,19 @@ class AiWorkflowService
       tools: [ GitTool.new, SafeShellTool.new ]
     )
 
+    planner_agent = build_agent(
+      name: "Planner",
+      instructions: persona_instructions("planner"),
+      model: model,
+      handoff_agents: [ cwa_agent ],
+      tools: [ TaskBreakdownTool.new ]
+    )
+
     coordinator_agent = build_agent(
       name: "Coordinator",
       instructions: persona_instructions("coordinator"),
       model: model,
-      handoff_agents: [ cwa_agent ]
+      handoff_agents: [ planner_agent ]
     )
 
     sap_agent = build_agent(
@@ -238,11 +246,13 @@ class AiWorkflowService
       "X-Request-ID" => context[:correlation_id]
     }
 
-    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, cwa_agent)
+    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, planner_agent, cwa_agent)
     artifacts.attach_callbacks!(runner)
 
     handoff_instruction = <<~TEXT
       If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
+      For implementation work, the Coordinator must first call the tool `handoff_to_planner`.
+      The Planner must generate micro-tasks by calling the tool `task_breakdown_tool` and storing results into `context[:micro_tasks]`.
       If the request is implementation/test/commit work, the Coordinator should call the tool `handoff_to_cwa`.
       Otherwise, answer directly.
     TEXT
