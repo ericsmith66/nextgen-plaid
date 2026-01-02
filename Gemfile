@@ -14,6 +14,9 @@ gem "jbuilder"
 gem "solid_cache"
 gem "solid_queue"      # replaces Sidekiq (we’ll add Sidekiq only if we outgrow it)
 gem "solid_cable"
+gem "turbo-rails"      # Turbo Streams (Hotwire)
+gem "stimulus-rails"   # Stimulus controllers (Hotwire)
+gem "importmap-rails"  # JS delivery for Hotwire without bundling
 gem "bootsnap", require: false
 gem "thruster", require: false
 gem "kamal", require: false

@@ -1,0 +1,5 @@
+# Intentionally left empty.
+#
+# This app uses `fixtures :all` in some tests.
+# The generated `sap_messages` fixtures referenced non-existent `sap_runs` fixtures,
+# which caused FK violations in unrelated tests.

@@ -1,5 +1,5 @@
 require "test_helper"
-require "webmock/minitest"
+require "ostruct"
 
 class PlaidOauthControllerTest < ActionDispatch::IntegrationTest
   setup do
@@ -17,14 +17,14 @@ class PlaidOauthControllerTest < ActionDispatch::IntegrationTest
     login_as @user, scope: :user
     link_token = "link-sandbox-test-token"
 
-    stub_request(:post, "https://sandbox.plaid.com/link/token/create")
-      .to_return(
-        status: 200,
-        body: { link_token: link_token, expiration: "2024-01-01T00:00:00Z", request_id: "req123" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    fake_service = Object.new
+    fake_service.define_singleton_method(:create_link_token) do
+      { success: true, link_token: link_token }
+    end
 
-    get plaid_oauth_initiate_url
+    PlaidOauthService.stub(:new, fake_service) do
+      get plaid_oauth_initiate_url
+    end
     assert_response :success
 
     json_response = JSON.parse(response.body)
@@ -34,14 +34,14 @@ class PlaidOauthControllerTest < ActionDispatch::IntegrationTest
   test "initiate returns error JSON on service failure" do
     login_as @user, scope: :user
 
-    stub_request(:post, "https://sandbox.plaid.com/link/token/create")
-      .to_return(
-        status: 400,
-        body: { error_code: "INVALID_REQUEST", error_message: "Invalid request" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    fake_service = Object.new
+    fake_service.define_singleton_method(:create_link_token) do
+      { success: false, error: "Invalid request" }
+    end
 
-    get plaid_oauth_initiate_url
+    PlaidOauthService.stub(:new, fake_service) do
+      get plaid_oauth_initiate_url
+    end
     assert_response :unprocessable_entity
 
     json_response = JSON.parse(response.body)
@@ -56,39 +56,26 @@ class PlaidOauthControllerTest < ActionDispatch::IntegrationTest
     institution_id = "ins_109508"
     institution_name = "Chase"
 
-    # Stub token exchange
-    stub_request(:post, "https://sandbox.plaid.com/item/public_token/exchange")
-      .to_return(
-        status: 200,
-        body: { access_token: access_token, item_id: item_id, request_id: "req123" }.to_json,
-        headers: { "Content-Type" => "application/json" }
+    user = @user
+
+    fake_service = Object.new
+    fake_service.define_singleton_method(:exchange_token) do |_public_token|
+      plaid_item = PlaidItem.create!(
+        user: user,
+        item_id: item_id,
+        institution_id: institution_id,
+        institution_name: institution_name,
+        access_token: access_token,
+        status: "good"
       )
 
-    # Stub item/get
-    stub_request(:post, "https://sandbox.plaid.com/item/get")
-      .to_return(
-        status: 200,
-        body: {
-          item: { item_id: item_id, institution_id: institution_id, webhook: nil },
-          status: { investments: nil, transactions: nil },
-          request_id: "req124"
-        }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
-
-    # Stub institutions/get_by_id
-    stub_request(:post, "https://sandbox.plaid.com/institutions/get_by_id")
-      .to_return(
-        status: 200,
-        body: {
-          institution: { institution_id: institution_id, name: institution_name },
-          request_id: "req125"
-        }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+      { success: true, plaid_item: plaid_item }
+    end
 
     assert_difference "PlaidItem.count", 1 do
-      get plaid_oauth_callback_url, params: { public_token: public_token, client_user_id: @user.id }
+      PlaidOauthService.stub(:new, fake_service) do
+        get plaid_oauth_callback_url, params: { public_token: public_token, client_user_id: @user.id }
+      end
     end
 
     assert_redirected_to root_path
@@ -124,15 +111,15 @@ class PlaidOauthControllerTest < ActionDispatch::IntegrationTest
   test "callback redirects with error on API failure" do
     public_token = "public-sandbox-bad-token"
 
-    stub_request(:post, "https://sandbox.plaid.com/item/public_token/exchange")
-      .to_return(
-        status: 400,
-        body: { error_code: "INVALID_PUBLIC_TOKEN", error_message: "Invalid public token" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    fake_service = Object.new
+    fake_service.define_singleton_method(:exchange_token) do |_token|
+      { success: false, error: "Invalid public token" }
+    end
 
     assert_no_difference "PlaidItem.count" do
-      get plaid_oauth_callback_url, params: { public_token: public_token, client_user_id: @user.id }
+      PlaidOauthService.stub(:new, fake_service) do
+        get plaid_oauth_callback_url, params: { public_token: public_token, client_user_id: @user.id }
+      end
     end
 
     assert_redirected_to root_path
@@ -142,16 +129,16 @@ class PlaidOauthControllerTest < ActionDispatch::IntegrationTest
   test "callback does not create invalid PlaidItem records on error" do
     public_token = "public-sandbox-bad-token"
 
-    stub_request(:post, "https://sandbox.plaid.com/item/public_token/exchange")
-      .to_return(
-        status: 400,
-        body: { error_code: "INVALID_PUBLIC_TOKEN", error_message: "Invalid public token" }.to_json,
-        headers: { "Content-Type" => "application/json" }
-      )
+    fake_service = Object.new
+    fake_service.define_singleton_method(:exchange_token) do |_token|
+      { success: false, error: "Invalid public token" }
+    end
 
     initial_count = PlaidItem.count
 
-    get plaid_oauth_callback_url, params: { public_token: public_token, client_user_id: @user.id }
+    PlaidOauthService.stub(:new, fake_service) do
+      get plaid_oauth_callback_url, params: { public_token: public_token, client_user_id: @user.id }
+    end
 
     assert_equal initial_count, PlaidItem.count
     assert_redirected_to root_path

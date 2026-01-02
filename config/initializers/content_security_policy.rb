@@ -13,7 +13,13 @@ Rails.application.configure do
     policy.script_src  :self, :https, :unsafe_inline, "https://*.plaid.com"
     policy.style_src   :self, :https, :unsafe_inline
     policy.frame_src   :self, "https://*.plaid.com"
-    policy.connect_src :self, :https, "https://*.plaid.com"
+    # Turbo Streams (ActionCable) uses websockets (`ws://` / `wss://`).
+    # In development/test we allow websockets broadly to avoid host/IP mismatches.
+    if Rails.env.development? || Rails.env.test?
+      policy.connect_src :self, :http, :https, "ws:", "wss:", "https://*.plaid.com"
+    else
+      policy.connect_src :self, :https, "https://*.plaid.com"
+    end
     # Allow the Plaid iframe to be interactive with the parent
     # Safari requires 'self' to be present in frame-ancestors to allow child-parent communication
     policy.frame_ancestors :self, "https://*.plaid.com", "https://api.higroundsolutions.com"
