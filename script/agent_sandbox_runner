@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "open3"
+require "fileutils"
+require "shellwords"
+
+payload_raw = ENV.fetch("AGENT_SANDBOX_PAYLOAD")
+payload = JSON.parse(payload_raw)
+
+cmd = payload.fetch("cmd")
+argv = payload["argv"]
+cwd = payload.fetch("cwd")
+
+FileUtils.mkdir_p(cwd)
+
+argv = if argv.nil? || argv.empty?
+         Shellwords.split(cmd.to_s)
+       else
+         Array(argv).map(&:to_s)
+       end
+
+stdout, stderr, status = Open3.capture3(*argv, chdir: cwd)
+
+print JSON.generate(
+  status: status.exitstatus,
+  stdout: stdout,
+  stderr: stderr
+)
+
+exit(status.exitstatus)

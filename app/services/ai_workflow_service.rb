@@ -18,11 +18,19 @@ class AiWorkflowService
     context = build_initial_context(correlation_id)
     artifacts = ArtifactWriter.new(correlation_id)
 
+    cwa_agent = build_agent(
+      name: "CWA",
+      instructions: persona_instructions("intp"),
+      model: model,
+      handoff_agents: [],
+      tools: [ GitTool.new, SafeShellTool.new ]
+    )
+
     coordinator_agent = build_agent(
       name: "Coordinator",
       instructions: persona_instructions("coordinator"),
       model: model,
-      handoff_agents: []
+      handoff_agents: [ cwa_agent ]
     )
 
     sap_agent = build_agent(
@@ -36,12 +44,13 @@ class AiWorkflowService
       "X-Request-ID" => correlation_id
     }
 
-    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent)
+    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, cwa_agent)
     artifacts.attach_callbacks!(runner)
 
-    # Encourage tool-based handoff (the gem will expose `handoff_to_coordinator` as a tool).
+    # Encourage tool-based handoff (the gem will expose `handoff_to_*` as tools).
     handoff_instruction = <<~TEXT
       If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
+      If the request is implementation/test/commit work, the Coordinator should call the tool `handoff_to_cwa`.
       Otherwise, answer directly.
     TEXT
 
@@ -169,22 +178,30 @@ class AiWorkflowService
     persona.fetch("description")
   end
 
-  def self.build_agent(name:, instructions:, model:, handoff_agents:)
+  def self.build_agent(name:, instructions:, model:, handoff_agents:, tools: [])
     Agents::Agent.new(
       name: name,
       instructions: instructions,
       model: model || Agents.configuration.default_model,
       handoff_agents: handoff_agents,
-      tools: []
+      tools: tools
     )
   end
 
   def self.run_once(prompt:, context:, artifacts:, max_turns:, model:)
+    cwa_agent = build_agent(
+      name: "CWA",
+      instructions: persona_instructions("intp"),
+      model: model,
+      handoff_agents: [],
+      tools: [ GitTool.new, SafeShellTool.new ]
+    )
+
     coordinator_agent = build_agent(
       name: "Coordinator",
       instructions: persona_instructions("coordinator"),
       model: model,
-      handoff_agents: []
+      handoff_agents: [ cwa_agent ]
     )
 
     sap_agent = build_agent(
@@ -198,11 +215,12 @@ class AiWorkflowService
       "X-Request-ID" => context[:correlation_id]
     }
 
-    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent)
+    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent, cwa_agent)
     artifacts.attach_callbacks!(runner)
 
     handoff_instruction = <<~TEXT
       If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
+      If the request is implementation/test/commit work, the Coordinator should call the tool `handoff_to_cwa`.
       Otherwise, answer directly.
     TEXT
 

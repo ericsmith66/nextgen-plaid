@@ -75,6 +75,108 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
            "expected an agent_handoff event SAP -> Coordinator"
   end
 
+  test "coordinator can handoff to cwa" do
+    url = "http://localhost:3002/v1/chat/completions"
+
+    stub_request(:post, url)
+      .to_return(
+        {
+          status: 200,
+          headers: { "Content-Type" => "application/json" },
+          body: {
+            id: "chatcmpl-1",
+            object: "chat.completion",
+            created: 1,
+            model: "llama3.1:70b",
+            choices: [
+              {
+                index: 0,
+                finish_reason: "tool_calls",
+                message: {
+                  role: "assistant",
+                  content: nil,
+                  tool_calls: [
+                    {
+                      id: "call_1",
+                      type: "function",
+                      function: {
+                        name: "handoff_to_coordinator",
+                        arguments: "{}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+          }.to_json
+        },
+        {
+          status: 200,
+          headers: { "Content-Type" => "application/json" },
+          body: {
+            id: "chatcmpl-2",
+            object: "chat.completion",
+            created: 2,
+            model: "llama3.1:70b",
+            choices: [
+              {
+                index: 0,
+                finish_reason: "tool_calls",
+                message: {
+                  role: "assistant",
+                  content: nil,
+                  tool_calls: [
+                    {
+                      id: "call_2",
+                      type: "function",
+                      function: {
+                        name: "handoff_to_cwa",
+                        arguments: "{}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            usage: { prompt_tokens: 12, completion_tokens: 6, total_tokens: 18 }
+          }.to_json
+        },
+        {
+          status: 200,
+          headers: { "Content-Type" => "application/json" },
+          body: {
+            id: "chatcmpl-3",
+            object: "chat.completion",
+            created: 3,
+            model: "llama3.1:70b",
+            choices: [
+              {
+                index: 0,
+                finish_reason: "stop",
+                message: {
+                  role: "assistant",
+                  content: "CWA received handoff and will implement/test/commit via tools"
+                }
+              }
+            ],
+            usage: { prompt_tokens: 14, completion_tokens: 7, total_tokens: 21 }
+          }.to_json
+        }
+      )
+
+    correlation_id = "cid-cwa-1"
+    result = AiWorkflowService.run(prompt: "Please implement via CWA", correlation_id: correlation_id)
+
+    assert_equal "CWA", result.context[:ball_with]
+    assert_includes result.output.to_s, "CWA"
+
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    events = File.read(run_dir.join("events.ndjson")).lines.map { |l| JSON.parse(l) }
+    assert events.any? { |e| e["type"] == "agent_handoff" && e["from"] == "Coordinator" && e["to"] == "CWA" },
+           "expected an agent_handoff event Coordinator -> CWA"
+  end
+
   test "guardrail rejects empty prompt" do
     assert_raises(AiWorkflowService::GuardrailError) do
       AiWorkflowService.run(prompt: "   ")

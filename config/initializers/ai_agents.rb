@@ -26,6 +26,16 @@ Agents.configure do |config|
   config.debug = ENV["AI_DEBUG"] == "true"
 end
 
+# --- CWA tool execution gate ---
+# Tools are dry-run by default. To allow actual command execution, a human must set:
+#   AI_TOOLS_EXECUTE=true
+# This is intentionally not a Rails config knob to keep the security boundary simple.
+
+# Eager-load tool classes in production so `Agents::Tool` subclasses are available.
+require Rails.root.join("app", "tools", "safe_shell_tool")
+require Rails.root.join("app", "tools", "git_tool")
+require Rails.root.join("app", "services", "agent_sandbox_runner")
+
 # --- SmartProxy model registry hook (RubyLLM) ---
 #
 # `ai-agents` uses `RubyLLM::Chat.new(model: <id>)` internally.
