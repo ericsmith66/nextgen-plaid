@@ -16,6 +16,11 @@ namespace :ai do
     puts "correlation_id=#{result.context[:correlation_id]}"
     puts "ball_with=#{result.context[:ball_with]}"
     puts "output:\n#{result.output}"
+  rescue AiWorkflowService::EscalateToHumanError => e
+    warn "\n=== Escalate to human ==="
+    warn e.message
+    warn "========================\n"
+    exit 1
   rescue AiWorkflowService::GuardrailError => e
     warn "GuardrailError: #{e.message}"
     exit 1

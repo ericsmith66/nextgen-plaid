@@ -8,8 +8,9 @@ require "time"
 
 class AiWorkflowService
   class GuardrailError < StandardError; end
+  class EscalateToHumanError < GuardrailError; end
 
-  DEFAULT_MAX_TURNS = 3
+  DEFAULT_MAX_TURNS = 5
 
   def self.run(prompt:, correlation_id: SecureRandom.uuid, max_turns: DEFAULT_MAX_TURNS, model: nil)
     raise GuardrailError, "prompt must be present" if prompt.nil? || prompt.strip.empty?
@@ -72,6 +73,83 @@ class AiWorkflowService
     raise
   end
 
+  # Multi-turn feedback/resolution loop.
+  #
+  # Intended usage:
+  # - Call with `feedback: nil` to get an initial response + enter `awaiting_feedback`.
+  # - Call again with `feedback:` to continue and attempt to reach a terminal state.
+  def self.resolve_feedback(
+    prompt:,
+    feedback: nil,
+    correlation_id: SecureRandom.uuid,
+    max_turns: DEFAULT_MAX_TURNS,
+    model: nil,
+    route: "dm"
+  )
+    raise GuardrailError, "prompt must be present" if prompt.nil? || prompt.strip.empty?
+
+    context = build_initial_context(correlation_id)
+    artifacts = ArtifactWriter.new(correlation_id)
+
+    initial = run_once(
+      prompt: "User request:\n#{prompt}",
+      context: context,
+      artifacts: artifacts,
+      max_turns: max_turns,
+      model: model
+    )
+
+    if feedback.nil? || feedback.to_s.strip.empty?
+      entry = {
+        ts: Time.now.utc.iso8601,
+        prompt: prompt,
+        requested_by: "Coordinator"
+      }
+      context[:state] = "awaiting_feedback"
+      context[:feedback_history] << entry
+
+      initial.context[:state] = context[:state]
+      initial.context[:feedback_history] = context[:feedback_history]
+
+      artifacts.record_event(type: "feedback_requested", route: route, requested_by: "Coordinator")
+      artifacts.write_run_json(initial)
+      return initial
+    end
+
+    entry = {
+      ts: Time.now.utc.iso8601,
+      prompt: prompt,
+      feedback: feedback.to_s
+    }
+    context[:feedback_history] << entry
+    artifacts.record_event(type: "feedback_received", route: route)
+
+    resolved = run_once(
+      prompt: "Resolve: #{prompt}\n\nFeedback:\n#{feedback}",
+      context: context,
+      artifacts: artifacts,
+      max_turns: max_turns,
+      model: model
+    )
+    context[:state] = "resolved"
+    resolved.context[:state] = context[:state]
+    resolved.context[:feedback_history] = context[:feedback_history]
+    artifacts.record_event(type: "resolution_complete", state: resolved.context[:state], route: route)
+    artifacts.write_run_json(resolved)
+    resolved
+  rescue EscalateToHumanError => e
+    begin
+      artifacts ||= ArtifactWriter.new(correlation_id)
+      context ||= build_initial_context(correlation_id)
+      context[:state] = "escalated_to_human"
+      artifacts.record_event(type: "escalate_to_human", reason: e.message, route: route)
+      artifacts.write_run_payload(correlation_id: correlation_id, error: e.message, context: context)
+    rescue StandardError
+      # ignore
+    end
+    raise
+  end
+
   def self.build_initial_context(correlation_id)
     {
       correlation_id: correlation_id,
@@ -99,6 +177,73 @@ class AiWorkflowService
       handoff_agents: handoff_agents,
       tools: []
     )
+  end
+
+  def self.run_once(prompt:, context:, artifacts:, max_turns:, model:)
+    coordinator_agent = build_agent(
+      name: "Coordinator",
+      instructions: persona_instructions("coordinator"),
+      model: model,
+      handoff_agents: []
+    )
+
+    sap_agent = build_agent(
+      name: "SAP",
+      instructions: persona_instructions("sap"),
+      model: model,
+      handoff_agents: [ coordinator_agent ]
+    )
+
+    headers = {
+      "X-Request-ID" => context[:correlation_id]
+    }
+
+    runner = Agents::Runner.with_agents(sap_agent, coordinator_agent)
+    artifacts.attach_callbacks!(runner)
+
+    handoff_instruction = <<~TEXT
+      If this request requires coordination or assignment, call the tool `handoff_to_coordinator`.
+      Otherwise, answer directly.
+    TEXT
+
+    result = runner.run(
+      "#{handoff_instruction}\n\n#{prompt}",
+      context: context,
+      max_turns: max_turns,
+      headers: headers
+    )
+
+    normalize_context!(result)
+    enforce_turn_guardrails!(result, max_turns: max_turns, artifacts: artifacts)
+    result
+  rescue Timeout::Error, Net::ReadTimeout, Net::OpenTimeout => e
+    artifacts.record_event(type: "timeout", message: e.message)
+    raise EscalateToHumanError, "request timed out"
+  rescue StandardError => e
+    # Some HTTP stacks raise their own timeout types; treat as escalation if it smells like a timeout.
+    if e.class.name.to_s.include?("Timeout")
+      artifacts.record_event(type: "timeout", message: e.message, error_class: e.class.name)
+      raise EscalateToHumanError, "request timed out"
+    end
+    raise
+  end
+
+  def self.normalize_context!(result)
+    current_agent = result.context[:current_agent] || result.context["current_agent"]
+    result.context[:ball_with] = current_agent
+
+    turn_count = result.context[:turn_count] || result.context["turn_count"]
+    result.context[:turns_count] = turn_count
+    result
+  end
+
+  def self.enforce_turn_guardrails!(result, max_turns:, artifacts:)
+    turns = (result.context[:turns_count] || 0).to_i
+    return if turns < max_turns
+
+    result.context[:state] = "escalated_to_human"
+    artifacts.record_event(type: "max_turns_exceeded", turns_count: turns, max_turns: max_turns)
+    raise EscalateToHumanError, "max turns exceeded"
   end
 
   class ArtifactWriter
@@ -129,6 +274,10 @@ class AiWorkflowService
         context: result.context,
         usage: result.usage
       })
+    end
+
+    def write_run_payload(payload)
+      write_json("run.json", payload)
     end
 
     def write_error(error)
