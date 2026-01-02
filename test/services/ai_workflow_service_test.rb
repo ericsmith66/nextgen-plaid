@@ -175,6 +175,12 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
     events = File.read(run_dir.join("events.ndjson")).lines.map { |l| JSON.parse(l) }
     assert events.any? { |e| e["type"] == "agent_handoff" && e["from"] == "Coordinator" && e["to"] == "CWA" },
            "expected an agent_handoff event Coordinator -> CWA"
+
+    assert File.exist?(run_dir.join("cwa_log.json")), "expected cwa_log.json to exist"
+    assert File.exist?(run_dir.join("cwa_log.md")), "expected cwa_log.md to exist"
+
+    cwa_log = JSON.parse(File.read(run_dir.join("cwa_log.json")))
+    assert_equal correlation_id, cwa_log["correlation_id"]
   end
 
   test "guardrail rejects empty prompt" do

@@ -5,6 +5,7 @@ require "yaml"
 require "fileutils"
 require "securerandom"
 require "time"
+require Rails.root.join("app", "services", "ai", "cwa_task_log_service")
 
 class AiWorkflowService
   class GuardrailError < StandardError; end
@@ -304,6 +305,7 @@ class AiWorkflowService
   class ArtifactWriter
     def initialize(correlation_id)
       @correlation_id = correlation_id
+      @cwa_task_log_service = Ai::CwaTaskLogService.new(correlation_id: correlation_id, artifact_writer: self)
     end
 
     def attach_callbacks!(runner)
@@ -329,12 +331,18 @@ class AiWorkflowService
         error_class: result.error&.class&.name,
         error_backtrace: result.error&.backtrace,
         context: result.context,
-        usage: result.usage
+        usage: result.usage,
+        cwa_log: @cwa_task_log_service&.snapshot,
+        cwa_log_markdown: @cwa_task_log_service&.markdown
       })
     end
 
     def write_run_payload(payload)
-      write_json("run.json", payload)
+      enriched = payload.merge(
+        cwa_log: @cwa_task_log_service&.snapshot,
+        cwa_log_markdown: @cwa_task_log_service&.markdown
+      )
+      write_json("run.json", enriched)
     end
 
     def write_error(error)
@@ -398,6 +406,7 @@ class AiWorkflowService
 
     def on_run_start(agent_name, input, _context_wrapper)
       write_event(type: "run_start", agent: agent_name, input: input)
+      @cwa_task_log_service.on_run_start(agent_name, input, _context_wrapper)
     end
 
     def on_agent_thinking(agent_name, input)
@@ -406,6 +415,7 @@ class AiWorkflowService
 
     def on_agent_handoff(from_agent, to_agent, reason)
       write_event(type: "agent_handoff", from: from_agent, to: to_agent, reason: reason)
+      @cwa_task_log_service.on_agent_handoff(from_agent, to_agent, reason)
     end
 
     def on_agent_complete(agent_name, result, error, _context_wrapper)
@@ -417,18 +427,22 @@ class AiWorkflowService
         error_class: error&.class&.name,
         error_backtrace: error&.backtrace
       )
+      @cwa_task_log_service.on_agent_complete(agent_name, result, error, _context_wrapper)
     end
 
     def on_run_complete(agent_name, result, _context_wrapper)
       write_event(type: "run_complete", agent: agent_name, output: result&.output)
+      @cwa_task_log_service.on_run_complete(agent_name, result, _context_wrapper)
     end
 
     def on_tool_start(tool_name, args)
       write_event(type: "tool_start", tool: tool_name, args: args)
+      @cwa_task_log_service.on_tool_start(tool_name, args)
     end
 
     def on_tool_complete(tool_name, result)
       write_event(type: "tool_complete", tool: tool_name, result: result)
+      @cwa_task_log_service.on_tool_complete(tool_name, result)
     end
   end
 end
