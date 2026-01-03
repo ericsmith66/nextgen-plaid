@@ -13,11 +13,67 @@ class AiWorkflowService
 
   DEFAULT_MAX_TURNS = 5
 
+  # PRD 0050: resume a run from persisted artifacts when possible.
+  def self.load_existing_context(correlation_id)
+    run_path = Rails.root.join("agent_logs", "ai_workflow", correlation_id.to_s, "run.json")
+    return nil unless File.exist?(run_path)
+
+    payload = JSON.parse(File.read(run_path))
+    ctx = payload["context"]
+    return nil unless ctx.is_a?(Hash)
+
+    ctx.symbolize_keys
+  rescue StandardError
+    nil
+  end
+
+  # PRD 0050: explicit helper to encapsulate the handoff payload schema.
+  def self.handoff_to_cwa(context:, reason: nil)
+    {
+      correlation_id: context[:correlation_id],
+      micro_tasks: context[:micro_tasks] || [],
+      reason: reason,
+      state: context[:state]
+    }.compact
+  end
+
+  def self.finalize_hybrid_handoff!(result, artifacts:)
+    current_agent = result.context[:current_agent] || result.context["current_agent"]
+    state = result.context[:state] || result.context["state"]
+
+    # If CWA was the last agent to speak and we didn't hit an explicit error state,
+    # transition to awaiting human review.
+    if current_agent.to_s == "CWA" && state.to_s == "in_progress"
+      result.context[:state] = "awaiting_review"
+      result.context[:ball_with] = "Human"
+      artifacts.record_event(type: "awaiting_review", from: "CWA")
+
+      artifacts.record_event(
+        type: "draft_artifacts_available",
+        message: "Review draft artifacts (logs, diffs, commits) before merging.",
+        correlation_id: result.context[:correlation_id] || result.context["correlation_id"],
+        run_dir: Rails.root.join("agent_logs", "ai_workflow", (result.context[:correlation_id] || result.context["correlation_id"]).to_s).to_s,
+        sandbox_hint: Rails.root.join("tmp", "agent_sandbox").to_s
+      )
+    end
+
+    if state.to_s == "escalated_to_human" || state.to_s == "blocked"
+      result.context[:ball_with] = "Human"
+    end
+
+    result
+  end
+
   def self.run(prompt:, correlation_id: SecureRandom.uuid, max_turns: DEFAULT_MAX_TURNS, model: nil)
     raise GuardrailError, "prompt must be present" if prompt.nil? || prompt.strip.empty?
 
-    context = build_initial_context(correlation_id)
+    context = load_existing_context(correlation_id) || build_initial_context(correlation_id)
     artifacts = ArtifactWriter.new(correlation_id)
+
+    # PRD 0050: log Junie deprecation routing.
+    if prompt.to_s.match?(/\bjunie\b/i)
+      artifacts.record_event(type: "junie_deprecation", message: "Deprecating Junie: Using CWA for task")
+    end
 
     cwa_agent = Agents::Registry.fetch(:cwa, model: model)
 
@@ -88,6 +144,10 @@ class AiWorkflowService
 
     artifacts.write_run_json(result)
 
+    finalize_hybrid_handoff!(result, artifacts: artifacts)
+
+    artifacts.write_run_json(result)
+
     result
   rescue StandardError => e
     # Best-effort event + run.json on failures.
@@ -115,8 +175,12 @@ class AiWorkflowService
   )
     raise GuardrailError, "prompt must be present" if prompt.nil? || prompt.strip.empty?
 
-    context = build_initial_context(correlation_id)
+    context = load_existing_context(correlation_id) || build_initial_context(correlation_id)
     artifacts = ArtifactWriter.new(correlation_id)
+
+    if prompt.to_s.match?(/\bjunie\b/i)
+      artifacts.record_event(type: "junie_deprecation", message: "Deprecating Junie: Using CWA for task")
+    end
 
     initial = run_once(
       prompt: "User request:\n#{prompt}",
@@ -125,6 +189,8 @@ class AiWorkflowService
       max_turns: max_turns,
       model: model
     )
+
+    finalize_hybrid_handoff!(initial, artifacts: artifacts)
 
     if feedback.nil? || feedback.to_s.strip.empty?
       entry = {
@@ -158,6 +224,8 @@ class AiWorkflowService
       max_turns: max_turns,
       model: model
     )
+
+    finalize_hybrid_handoff!(resolved, artifacts: artifacts)
     context[:state] = "resolved"
     resolved.context[:state] = context[:state]
     resolved.context[:feedback_history] = context[:feedback_history]

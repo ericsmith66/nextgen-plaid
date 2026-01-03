@@ -61,6 +61,9 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
       )
 
     correlation_id = "cid-123"
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    FileUtils.rm_rf(run_dir)
+
     result = AiWorkflowService.run(prompt: "Please assign this task", correlation_id: correlation_id)
 
     assert_equal "Coordinator", result.context[:ball_with]
@@ -73,6 +76,8 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
     events = File.read(run_dir.join("events.ndjson")).lines.map { |l| JSON.parse(l) }
     assert events.any? { |e| e["type"] == "agent_handoff" && e["from"] == "SAP" && e["to"] == "Coordinator" },
            "expected an agent_handoff event SAP -> Coordinator"
+  ensure
+    FileUtils.rm_rf(run_dir)
   end
 
   test "coordinator can handoff to cwa" do
@@ -166,9 +171,12 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
       )
 
     correlation_id = "cid-cwa-1"
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    FileUtils.rm_rf(run_dir)
     result = AiWorkflowService.run(prompt: "Please implement via CWA", correlation_id: correlation_id)
 
-    assert_equal "CWA", result.context[:ball_with]
+    assert_equal "Human", result.context[:ball_with]
+    assert_equal "awaiting_review", result.context[:state]
     assert_includes result.output.to_s, "CWA"
 
     run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
@@ -181,6 +189,56 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
 
     cwa_log = JSON.parse(File.read(run_dir.join("cwa_log.json")))
     assert_equal correlation_id, cwa_log["correlation_id"]
+  ensure
+    FileUtils.rm_rf(run_dir)
+  end
+
+  test "load_existing_context resumes from run.json" do
+    correlation_id = "cid-resume-1"
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    FileUtils.mkdir_p(run_dir)
+
+    File.write(
+      run_dir.join("run.json"),
+      JSON.pretty_generate({
+        correlation_id: correlation_id,
+        context: { correlation_id: correlation_id, state: "in_progress", ball_with: "CWA", micro_tasks: [ { "id" => 1 } ] }
+      })
+    )
+
+    ctx = AiWorkflowService.load_existing_context(correlation_id)
+    assert_equal correlation_id, ctx[:correlation_id]
+    assert_equal 1, ctx[:micro_tasks].length
+  ensure
+    FileUtils.rm_rf(run_dir)
+  end
+
+  test "logs junie deprecation event" do
+    url = "http://localhost:3002/v1/chat/completions"
+    stub_request(:post, url)
+      .to_return(
+        {
+          status: 200,
+          headers: { "Content-Type" => "application/json" },
+          body: {
+            id: "chatcmpl-1",
+            object: "chat.completion",
+            created: Time.now.to_i,
+            model: "llama3.1:70b",
+            choices: [ { index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" } ],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+          }.to_json
+        }
+      )
+
+    correlation_id = "cid-junie-1"
+    AiWorkflowService.run(prompt: "Junie please generate code", correlation_id: correlation_id)
+
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    events = File.read(run_dir.join("events.ndjson")).lines.map { |l| JSON.parse(l) }
+    assert events.any? { |e| e["type"] == "junie_deprecation" }
+  ensure
+    FileUtils.rm_rf(Rails.root.join("agent_logs", "ai_workflow", correlation_id))
   end
 
   test "guardrail rejects empty prompt" do
@@ -249,6 +307,8 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
       )
 
     correlation_id = "cid-feedback-1"
+    run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
+    FileUtils.rm_rf(run_dir)
     result = AiWorkflowService.resolve_feedback(prompt: "Please resolve this", correlation_id: correlation_id, feedback: nil)
 
     assert_equal "awaiting_feedback", result.context[:state]
@@ -257,6 +317,8 @@ class AiWorkflowServiceTest < ActiveSupport::TestCase
     run_dir = Rails.root.join("agent_logs", "ai_workflow", correlation_id)
     events = File.read(run_dir.join("events.ndjson")).lines.map { |l| JSON.parse(l) }
     assert events.any? { |e| e["type"] == "feedback_requested" }, "expected a feedback_requested event"
+  ensure
+    FileUtils.rm_rf(run_dir)
   end
 
   test "resolve_feedback continues and resolves when feedback is provided" do
